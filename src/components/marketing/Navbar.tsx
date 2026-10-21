@@ -1,7 +1,7 @@
-'useclient';
+'use client';
 
 import Link from 'next/link';
-import { Sparkles, Calendar, ArrowRight, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Layers, Monitor, Smartphone, Shield } from 'lucide-react';
 
 export function Navbar() {
   return (
@@ -25,7 +25,7 @@ export function Navbar() {
         </Link>
 
         {/* Navigation Links */}
-        <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-300">
+        <nav className="hidden lg:flex items-center gap-6 text-xs font-semibold text-gray-300">
           <a href="#features" className="hover:text-[#00f0ff] transition-colors">
             Modules
           </a>
@@ -34,27 +34,55 @@ export function Navbar() {
           </a>
           <a href="#partners" className="hover:text-[#ff007f] transition-colors flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-[#ff007f] animate-pulse" />
-            EO / WO Cashback
+            18% Cashback
           </a>
-          <Link href="/events/techunite" className="text-gray-400 hover:text-white transition-colors">
-            Live Preview
+          <span className="text-gray-700">|</span>
+          <Link
+            href="/events/techunite/stage"
+            target="_blank"
+            className="hover:text-[#dfb76c] transition-colors flex items-center gap-1 text-[#dfb76c]"
+          >
+            <Monitor className="w-3.5 h-3.5" />
+            <span>Big Screen LED</span>
+          </Link>
+          <Link
+            href="/dashboard/events/evt-techunite-2026/operator"
+            className="hover:text-[#00f0ff] transition-colors flex items-center gap-1 text-[#00f0ff]"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Operator Desk</span>
+          </Link>
+          <Link
+            href="/events/techunite/pass"
+            target="_blank"
+            className="hover:text-[#00ff88] transition-colors flex items-center gap-1 text-[#00ff88]"
+          >
+            <Smartphone className="w-3.5 h-3.5" />
+            <span>Mobile Pass</span>
           </Link>
         </nav>
 
         {/* Action Buttons */}
         <div className="flex items-center gap-3">
           <Link
-            href="/dashboard"
-            className="hidden sm:inline-flex items-center justify-center text-sm font-semibold text-gray-200 hover:text-white px-4 py-2 rounded-lg hover:bg-[#181e2e] transition-colors border border-transparent hover:border-[#28324a]"
+            href="/admin"
+            className="hidden sm:inline-flex items-center gap-1 text-xs font-semibold text-purple-300 hover:text-white px-3 py-2 rounded-lg hover:bg-[#1f1533] transition-colors border border-purple-500/20"
           >
-            Sign In
+            <Shield className="w-3.5 h-3.5 text-[#dfb76c]" />
+            <span>Admin</span>
+          </Link>
+          <Link
+            href="/dashboard"
+            className="hidden sm:inline-flex items-center justify-center text-xs font-semibold text-gray-200 hover:text-white px-3.5 py-2 rounded-lg hover:bg-[#181e2e] transition-colors border border-transparent hover:border-[#28324a]"
+          >
+            Dashboard
           </Link>
           <Link
             href="/dashboard/events/new"
-            className="inline-flex items-center gap-2 text-sm font-bold text-[#0b0d13] px-4 py-2.5 rounded-lg bg-gradient-to-r from-[#00f0ff] via-[#dfb76c] to-[#ff007f] hover:opacity-95 transition-all shadow-[0_0_20px_rgba(223,183,108,0.25)] hover:shadow-[0_0_25px_rgba(0,240,255,0.4)] active:scale-95"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0b0d13] px-4 py-2.5 rounded-lg bg-gradient-to-r from-[#00f0ff] via-[#dfb76c] to-[#ff007f] hover:opacity-95 transition-all shadow-[0_0_20px_rgba(223,183,108,0.25)] hover:shadow-[0_0_25px_rgba(0,240,255,0.4)] active:scale-95"
           >
             <span>Create Event</span>
-            <ArrowRight className="w-4 h-4" />
+            <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
       </div>

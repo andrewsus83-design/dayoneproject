@@ -16,6 +16,8 @@ import {
   ChevronRight,
   LogOut,
   Layers,
+  Shield,
+  Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -144,38 +146,37 @@ export function Sidebar() {
             TechUnite Live Launchers
           </div>
           <Link
-            href="/events/techunite/photowall/live"
-            target="_blank"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-[#131826] transition-colors"
+            href="/dashboard/events/evt-techunite-2026/operator"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-white bg-[#151c2e] border border-[#243354] hover:border-[#00f0ff] transition-colors"
           >
-            <Camera className="w-4 h-4 text-[#00f0ff]" />
-            <span>Live Photo Wall</span>
+            <Layers className="w-4 h-4 text-[#00f0ff]" />
+            <span className="font-bold">Operator Desk</span>
+            <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#00f0ff]/20 text-[#00f0ff] font-mono ml-auto">CREW</span>
+          </Link>
+          <Link
+            href="/events/techunite/stage"
+            target="_blank"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-gray-300 hover:text-white hover:bg-[#131826] transition-colors"
+          >
+            <Sparkles className="w-4 h-4 text-[#dfb76c]" />
+            <span>Big Screen LED</span>
             <ExternalLink className="w-3 h-3 ml-auto text-gray-600" />
           </Link>
           <Link
-            href="/events/techunite/raffle"
+            href="/events/techunite/pass"
             target="_blank"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-[#131826] transition-colors"
-          >
-            <Gift className="w-4 h-4 text-[#dfb76c]" />
-            <span>Raffle Wheels & Claw</span>
-            <ExternalLink className="w-3 h-3 ml-auto text-gray-600" />
-          </Link>
-          <Link
-            href="/events/techunite/games"
-            target="_blank"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-[#131826] transition-colors"
-          >
-            <Gamepad2 className="w-4 h-4 text-[#9d00ff]" />
-            <span>Interactive Kahoot Quiz</span>
-            <ExternalLink className="w-3 h-3 ml-auto text-gray-600" />
-          </Link>
-          <Link
-            href="/dashboard/events/evt-techunite-2026/guests"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-[#131826] transition-colors"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-gray-300 hover:text-white hover:bg-[#131826] transition-colors"
           >
             <Users className="w-4 h-4 text-[#00ff88]" />
-            <span>Guest List & Passports</span>
+            <span>Guest Mobile Pass</span>
+            <ExternalLink className="w-3 h-3 ml-auto text-gray-600" />
+          </Link>
+          <Link
+            href="/admin"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-purple-300 hover:text-white hover:bg-[#131826] transition-colors"
+          >
+            <Shield className="w-4 h-4 text-[#9d00ff]" />
+            <span>Superadmin Root</span>
           </Link>
         </div>
       </div>
