@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0b0d13;
+  --foreground: #f8fafc;
+  --card: #121622;
+  --card-border: #1e2638;
+  --gold-primary: #dfb76c;
+  --gold-dark: #8a6d3b;
+  --neon-cyan: #00f0ff;
+  --neon-pink: #ff007f;
+  --neon-purple: #9d00ff;
+  --neon-green: #00ff88;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Custom Neon & Gold Glow utilities */
+.glow-gold {
+  box-shadow: 0 0 25px -5px rgba(223, 183, 108, 0.35);
+}
+
+.glow-cyan {
+  box-shadow: 0 0 25px -5px rgba(0, 240, 255, 0.4);
+}
+
+.glow-pink {
+  box-shadow: 0 0 25px -5px rgba(255, 0, 127, 0.4);
+}
+
+.glow-purple {
+  box-shadow: 0 0 25px -5px rgba(157, 0, 255, 0.4);
+}
+
+.text-gold-gradient {
+  background: linear-gradient(135deg, #dfb76c 0%, #ffffff 50%, #8a6d3b 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-neon-gradient {
+  background: linear-gradient(135deg, #00f0ff 0%, #ff007f 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.border-gold-gradient {
+  border-image: linear-gradient(135deg, #dfb76c, #00f0ff, #ff007f) 1;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0b0d13;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e2638;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2b364e;
+}
