@@ -199,7 +199,7 @@ export const MOCK_WEDDING_BALI_EVENT: Event = {
   name: 'Sophia & Marco: Forever in Bali',
   slug: 'sophia-marco',
   description: 'A breathtaking clifftop ceremony at Uluwatu Temple, followed by a sunset reception at GWK Cultural Park. 250 guests from 18 countries.',
-  cover_image_url: 'https://images.unsplash.com/photo-1583939003579-730e3918a45a?auto=format&fit=crop&w=1200&q=80',
+  cover_image_url: 'https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793297915026_6dcfc6d9_1793297915179_e4e54b49.png',
   visibility: 'private',
   ticket_price: 'Invite Only',
   require_approval: true,
