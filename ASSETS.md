@@ -52,5 +52,13 @@
 | QR Pass Texture | Pass card BG | `https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793299296306_e88f7125_1793299296431_c3d53c65.png` |
 | Photo Frame 1:1 | Photo wall frame | `https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793299302091_896c473b_1793299302588_473908fe.png` |
 
+## POPVERSE — Additional Digital Overlays (Generated 2026-10-30)
+
+| Asset | Use | URL |
+|-------|-----|-----|
+| Photo Wall Frame (9:16) | PinterestMasonryPhotoWall frame overlay — `frameOverlayUrl` prop | `https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793300673142_6e56e2a4_1793300673564_d0c29a20.png` |
+| LED Stage Frame (16:9) | Stage big screen cathedral border — `mix-blend-mode: screen` overlay | `https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793300675118_e65da6c9_1793300675879_1fc2362a.png` |
+| Footer Banner (21:9) | Landing page footer banner above site footer | `https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793300679578_05258890_1793300680180_9c4dea1c.png` |
+
 ## Model used
-- **nano-banana-2** (20 credits/image) — 500 credits total (25 images)
+- **nano-banana-2** (20 credits/image) — 500 credits (25 images) + 60 credits (3 POPVERSE overlays) = 560 total

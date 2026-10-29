@@ -228,6 +228,16 @@ function StageBigScreenContent({ slug }: { slug: string }) {
       <div className="absolute top-0 left-1/4 w-[800px] h-[800px] bg-premium-neon/10 blur-[180px] pointer-events-none rounded-full" />
       <div className="absolute bottom-0 right-1/4 w-[800px] h-[800px] bg-premium-gold/10 blur-[180px] pointer-events-none rounded-full" />
 
+      {/* POPVERSE LED Stage Frame — decorative cathedral border overlay for the big screen */}
+      {slug === 'popverse' && (
+        <img
+          src="https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793300675118_e65da6c9_1793300675879_1fc2362a.png"
+          alt="POPVERSE stage frame"
+          className="absolute inset-0 w-full h-full object-fill pointer-events-none z-30"
+          style={{ mixBlendMode: 'screen' }}
+        />
+      )}
+
       {/* Top Ballroom Stage Header */}
       <header className="h-20 px-8 sm:px-12 flex items-center justify-between z-20 backdrop-blur-md bg-premium-surfaceDark/80 border-b border-premium-borderDark">
         <div className="flex items-center gap-4">
@@ -332,6 +342,7 @@ function StageBigScreenContent({ slug }: { slug: string }) {
             photos={photos}
             showCaptions={captionsEnabled}
             canLike={true}
+            frameOverlayUrl={slug === 'popverse' ? 'https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793300673142_6e56e2a4_1793300673564_d0c29a20.png' : undefined}
           />
         </main>
       )}

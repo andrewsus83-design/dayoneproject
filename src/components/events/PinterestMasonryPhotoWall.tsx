@@ -22,6 +22,7 @@ interface PinterestMasonryPhotoWallProps {
   showCaptions?: boolean;
   onUploadClick?: () => void;
   canLike?: boolean;
+  frameOverlayUrl?: string;
 }
 
 export function PinterestMasonryPhotoWall({
@@ -29,6 +30,7 @@ export function PinterestMasonryPhotoWall({
   showCaptions = true,
   onUploadClick,
   canLike = true,
+  frameOverlayUrl,
 }: PinterestMasonryPhotoWallProps) {
   const [items, setItems] = useState<PhotoWallUpload[]>(photos);
   const [likedIds, setLikedIds] = useState<Record<string, boolean>>({});
@@ -126,6 +128,16 @@ export function PinterestMasonryPhotoWall({
 
                 {/* Subtle dark gradient overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-black/30 pointer-events-none" />
+
+                {/* Event photo frame overlay (e.g. POPVERSE stained-glass cathedral frame) */}
+                {frameOverlayUrl && (
+                  <img
+                    src={frameOverlayUrl}
+                    alt="Event frame"
+                    className="absolute inset-0 w-full h-full object-fill pointer-events-none z-10"
+                    style={{ mixBlendMode: 'screen' }}
+                  />
+                )}
 
                 {/* Video Play Badge if media is video */}
                 {isVideo && (

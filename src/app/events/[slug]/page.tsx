@@ -309,6 +309,17 @@ function EventLandingContent({ slug }: { slug: string }) {
         </div>
       </section>
 
+      {/* ── POPVERSE BRANDED FOOTER BANNER ── */}
+      {slug === 'popverse' && (
+        <div className="w-full overflow-hidden border-t border-premium-borderDark">
+          <img
+            src="https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793300679578_05258890_1793300680180_9c4dea1c.png"
+            alt="POPVERSE 2026 — Different Tunes. One Beat. | November 13, 2026 · SPACE at One Ayala"
+            className="w-full h-auto object-cover max-h-32 sm:max-h-40"
+          />
+        </div>
+      )}
+
       {/* ── FOOTER ── */}
       <footer className="border-t border-premium-borderDark py-8 px-6 flex flex-col sm:flex-row items-center justify-between gap-4 max-w-4xl mx-auto">
         <div className="flex items-center gap-3">
