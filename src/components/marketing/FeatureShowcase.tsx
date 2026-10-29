@@ -87,7 +87,7 @@ function PreEventVisual() {
           <div className="w-2.5 h-2.5 rounded-full bg-[#FEBC2E]" />
           <div className="w-2.5 h-2.5 rounded-full bg-[#28C840]" />
         </div>
-        <span className="text-[11px] font-mono text-zinc-500 ml-1">techunite.all41.app</span>
+        <span className="text-[11px] font-mono text-zinc-500 ml-1">your-event.all41.app</span>
       </div>
 
       {/* Event card mock */}

@@ -54,10 +54,10 @@ export function Hero() {
                 <ArrowRight className="w-4 h-4" />
               </Link>
               <Link
-                href="/events/techunite"
+                href="#features"
                 className="inline-flex items-center gap-2.5 bg-transparent border border-white/10 hover:border-white/25 text-white/80 hover:text-white px-8 py-4 rounded-[1.5rem] text-[15px] font-medium transition-all scale-on-click"
               >
-                <span>Explore Live Demo</span>
+                <span>Explore modules</span>
               </Link>
             </div>
 
@@ -84,8 +84,8 @@ export function Hero() {
             {/* Floating badge */}
             <div className="absolute -top-5 -left-4 z-20 hidden lg:flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-premium-charcoal border border-premium-borderDark shadow-2xl">
               <span className="w-2.5 h-2.5 rounded-full bg-premium-success shadow-[0_0_10px_#00E676] animate-pulse" />
-              <span className="text-xs font-bold text-white">418 / 650</span>
-              <span className="text-xs text-zinc-400">checked in</span>
+              <span className="text-xs font-bold text-white">Gate Active</span>
+              <span className="text-xs text-zinc-400">QR check-in live</span>
             </div>
 
             {/* Main card */}
@@ -98,7 +98,7 @@ export function Hero() {
                   <div className="w-3 h-3 rounded-full bg-[#FEBC2E]" />
                   <div className="w-3 h-3 rounded-full bg-[#28C840]" />
                 </div>
-                <span className="text-[11px] font-mono text-zinc-500 ml-2">techunite.all41.app</span>
+                <span className="text-[11px] font-mono text-zinc-500 ml-2">your-event.all41.app</span>
                 <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-premium-success font-medium">
                   <span className="w-2 h-2 rounded-full bg-premium-success animate-pulse" />
                   Live

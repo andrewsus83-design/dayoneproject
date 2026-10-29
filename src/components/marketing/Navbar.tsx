@@ -26,11 +26,9 @@ export function Navbar() {
         {/* Nav Links */}
         <nav className="hidden lg:flex items-center gap-8 text-[13px] font-medium text-zinc-400">
           <a href="#features" className="hover:text-white transition-colors">Modules</a>
-          <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
-          <a href="#partners" className="hover:text-premium-gold transition-colors inline-flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-premium-gold" />
-            EO Partners
-          </a>
+          <a href="#features" className="hover:text-white transition-colors">Corporate</a>
+          <a href="#features" className="hover:text-white transition-colors">Weddings</a>
+          <a href="#features" className="hover:text-white transition-colors">How it works</a>
         </nav>
 
         {/* CTAs */}
