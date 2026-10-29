@@ -6,6 +6,11 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Header } from '@/components/dashboard/Header';
 import { StageLedEditor } from '@/components/dashboard/StageLedEditor';
 import { PinterestMasonryPhotoWall } from '@/components/events/PinterestMasonryPhotoWall';
+import { LandingPageBuilder } from '@/components/dashboard/event/LandingPageBuilder';
+import { InvitationFormBuilder } from '@/components/dashboard/event/InvitationFormBuilder';
+import { GamesBuilder } from '@/components/dashboard/event/GamesBuilder';
+import { PhotoWallManager } from '@/components/dashboard/event/PhotoWallManager';
+import { RaffleEngine } from '@/components/dashboard/event/RaffleEngine';
 import {
   MOCK_EVENT,
   MOCK_WEDDING_EVENT,
@@ -415,237 +420,34 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
 
             {/* Sub-tab 2: Landing Page Builder */}
             {overviewSubTab === 'landing' && (
-              <div className="p-6 sm:p-8 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark space-y-6 shadow-xl">
-                <div className="flex items-start justify-between gap-4">
+              <div className="space-y-6">
+                <div className="flex items-start justify-between gap-4 px-1">
                   <div>
                     <h3 className="text-xl font-display font-bold text-white">Landing Page Visual Builder</h3>
-                    <p className="text-xs text-zinc-400 mt-1">Configure layout blocks, hero banners, and schema-specific attendee modules.</p>
+                    <p className="text-xs text-zinc-400 mt-1">Drag sections, preview live, and publish your event page.</p>
                   </div>
                   <span className={`shrink-0 px-3 py-1.5 rounded-xl font-mono text-[10px] font-bold border ${isWedding ? 'bg-pink-950/60 border-pink-800/50 text-pink-300' : 'bg-amber-950/60 border-amber-800/50 text-premium-gold'}`}>
                     {event.theme_config.landingSchema.layoutType}
                   </span>
                 </div>
+                <LandingPageBuilder isWedding={isWedding} primaryColor={event.theme_config.primaryColor} />
 
-                {/* Hero Cover + Accent Badge */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="p-5 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark space-y-3">
-                    <span className="text-xs font-bold text-white block">Hero Cover Poster</span>
-                    <div className="aspect-video rounded-xl overflow-hidden relative border border-white/10">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={event.cover_image_url || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=800&q=80'} alt="Cover" className="w-full h-full object-cover" />
-                      <div className="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md text-[10px] font-mono text-premium-gold">
-                        Active Banner
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-5 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark space-y-3 flex flex-col justify-between">
-                    <div>
-                      <span className="text-xs font-bold text-white block mb-1">{isWedding ? 'Couple Accent Title' : 'Event Tagline / Badge'}</span>
-                      <span className="text-[10px] text-zinc-400">{isWedding ? 'e.g. "The Ariana & Daniel Wedding"' : 'e.g. "APAC Executive Summit 2026"'}</span>
-                    </div>
-                    <div className="rounded-xl border border-premium-gold/40 bg-premium-black/60 px-4 py-3 font-mono text-xs text-premium-gold">
-                      {event.theme_config.landingSchema.accentBadge || (isWedding ? 'Enter couple names…' : 'Enter event tagline…')}
-                    </div>
-                    <span className="text-[10px] text-zinc-500">Edit via Event Parameters → Event Name / Accent</span>
-                  </div>
-                </div>
-
-                {/* Common Block: Countdown */}
-                <div>
-                  <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">Common Blocks</p>
-                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-xs">
-                    <div>
-                      <span className="font-bold text-white block">Event Countdown Clock</span>
-                      <span className="text-[10px] text-zinc-400">Real-time countdown to event start</span>
-                    </div>
-                    <input type="checkbox" defaultChecked className="toggle-checkbox w-5 h-5 accent-premium-gold cursor-pointer" />
-                  </div>
-                </div>
-
-                {/* Schema-specific blocks */}
-                <div>
-                  <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">
-                    {isWedding ? 'Wedding Romance Modules' : 'Corporate Keynote Modules'}
-                  </p>
-                  <div className="space-y-3 text-xs">
-                    {isWedding ? (
-                      <>
-                        <div className="flex items-center justify-between p-3.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark">
-                          <div>
-                            <span className="font-bold text-white block">Love Story Timeline</span>
-                            <span className="text-[10px] text-zinc-400">Milestone reel — first date to engagement to wedding day</span>
-                          </div>
-                          <input type="checkbox" defaultChecked={event.theme_config.landingSchema.showLoveStory !== false} className="toggle-checkbox w-5 h-5 accent-premium-gold cursor-pointer" />
-                        </div>
-                        <div className="flex items-center justify-between p-3.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark">
-                          <div>
-                            <span className="font-bold text-white block">Digital Angpao Registry</span>
-                            <span className="text-[10px] text-zinc-400">QRIS scan + bank transfer for cashless blessings</span>
-                          </div>
-                          <input type="checkbox" defaultChecked={event.theme_config.landingSchema.showDigitalAngpao !== false} className="toggle-checkbox w-5 h-5 accent-premium-gold cursor-pointer" />
-                        </div>
-                        <div className="flex items-center justify-between p-3.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark">
-                          <div>
-                            <span className="font-bold text-white block">Dress Code Swatch Panel</span>
-                            <span className="text-[10px] text-zinc-400">Colour palette guide for guests on the portal</span>
-                          </div>
-                          <input type="checkbox" defaultChecked className="toggle-checkbox w-5 h-5 accent-premium-gold cursor-pointer" />
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="flex items-center justify-between p-3.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark">
-                          <div>
-                            <span className="font-bold text-white block">Keynote Speakers Grid</span>
-                            <span className="text-[10px] text-zinc-400">Speaker cards with name, title, company and headshot</span>
-                          </div>
-                          <input type="checkbox" defaultChecked={event.theme_config.landingSchema.showSpeakers !== false} className="toggle-checkbox w-5 h-5 accent-premium-gold cursor-pointer" />
-                        </div>
-                        <div className="flex items-center justify-between p-3.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark">
-                          <div>
-                            <span className="font-bold text-white block">Tiered Sponsors Showcase</span>
-                            <span className="text-[10px] text-zinc-400">Gold / Silver / Bronze logo bands with website links</span>
-                          </div>
-                          <input type="checkbox" defaultChecked={event.theme_config.landingSchema.showSponsors !== false} className="toggle-checkbox w-5 h-5 accent-premium-gold cursor-pointer" />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Shared optional blocks */}
-                <div>
-                  <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">Optional Shared Blocks</p>
-                  <div className="space-y-3 text-xs">
-                    <div className="flex items-center justify-between p-3.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark">
-                      <div>
-                        <span className="font-bold text-white block">{isWedding ? 'Reception Banquet Menu' : 'Gala Dining Menu'}</span>
-                        <span className="text-[10px] text-zinc-400">Course listing with dietary flags and chef's notes</span>
-                      </div>
-                      <input type="checkbox" defaultChecked={event.theme_config.landingSchema.showMenuBanquet !== false} className="toggle-checkbox w-5 h-5 accent-premium-gold cursor-pointer" />
-                    </div>
-                    <div className="flex items-center justify-between p-3.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark">
-                      <div>
-                        <span className="font-bold text-white block">Table Seating Assignment</span>
-                        <span className="text-[10px] text-zinc-400">Interactive floor plan showing guest table number</span>
-                      </div>
-                      <input type="checkbox" defaultChecked={event.theme_config.landingSchema.showTableSeating !== false} className="toggle-checkbox w-5 h-5 accent-premium-gold cursor-pointer" />
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
 
             {/* Sub-tab 3: Invitation Form Builder */}
             {overviewSubTab === 'invitation' && (
-              <div className="p-6 sm:p-8 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark space-y-6 shadow-xl">
-                <div className="flex items-start justify-between gap-4">
+              <div className="space-y-6">
+                <div className="flex items-start justify-between gap-4 px-1">
                   <div>
-                    <h3 className="text-xl font-display font-bold text-white">RSVP Invitation Form Fields</h3>
-                    <p className="text-xs text-zinc-400 mt-1">Questionnaire fields sent to guests — schema-gated by event type.</p>
+                    <h3 className="text-xl font-display font-bold text-white">Invitation Form Builder</h3>
+                    <p className="text-xs text-zinc-400 mt-1">Build your RSVP form like Typeform — cover, questions, closing page, and settings.</p>
                   </div>
                   <span className={`shrink-0 px-3 py-1.5 rounded-xl font-mono text-[10px] font-bold border ${isWedding ? 'bg-pink-950/60 border-pink-800/50 text-pink-300' : 'bg-amber-950/60 border-amber-800/50 text-premium-gold'}`}>
                     {event.theme_config.landingSchema.layoutType}
                   </span>
                 </div>
-
-                {/* System mandatory fields */}
-                <div>
-                  <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">System Mandatory</p>
-                  <div className="space-y-2">
-                    {[
-                      { label: 'Full Attendee Name', desc: 'Used on QR pass and gate check-in' },
-                      { label: 'WhatsApp Phone Number', desc: 'Broadcast + reminder delivery' },
-                      { label: 'Email Address', desc: 'QR Pass PDF dispatch + calendar invite' },
-                    ].map((field, idx) => (
-                      <div key={idx} className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-3">
-                          <Lock className="w-4 h-4 text-zinc-500" />
-                          <div>
-                            <span className="font-bold text-white">{field.label}</span>
-                            <span className="block text-[10px] text-zinc-400">{field.desc}</span>
-                          </div>
-                        </div>
-                        <span className="text-zinc-500 font-mono text-[10px]">Locked</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Schema-specific fields */}
-                <div>
-                  <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">
-                    {isWedding ? 'Wedding-Specific Fields' : 'Corporate-Specific Fields'}
-                  </p>
-                  <div className="space-y-2">
-                    {isWedding ? (
-                      <>
-                        {[
-                          { label: 'Dietary Preferences', desc: 'Halal · Vegetarian · Gluten-Free · Standard', required: true },
-                          { label: 'Plus-One Companion Details', desc: 'Name and relation of companion guest', required: false },
-                          { label: 'RSVP Song Request', desc: 'Optional song dedication for reception playlist', required: false },
-                          { label: 'Dress Code Confirmation', desc: 'Guest confirms adherence to colour theme', required: false },
-                        ].map((field, idx) => (
-                          <div key={idx} className="p-4 rounded-2xl bg-premium-surfaceDark border border-pink-900/30 flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-3">
-                              <Heart className="w-4 h-4 text-pink-400" />
-                              <div>
-                                <span className="font-bold text-white">{field.label}</span>
-                                {field.required && <span className="ml-2 text-premium-danger font-mono text-[10px]">*Required</span>}
-                                <span className="block text-[10px] text-zinc-400">{field.desc}</span>
-                              </div>
-                            </div>
-                            <input type="checkbox" defaultChecked className="toggle-checkbox w-4 h-4 accent-pink-400 cursor-pointer" />
-                          </div>
-                        ))}
-                      </>
-                    ) : (
-                      <>
-                        {[
-                          { label: 'Company / Organization Name', desc: 'Employer or institution attending from', required: true },
-                          { label: 'Designation / Job Role', desc: 'Title shown on delegate name badge', required: true },
-                          { label: 'Industry Vertical', desc: 'Optional sector classification for insights', required: false },
-                          { label: 'LinkedIn Profile URL', desc: 'Optional for networking / digital badge', required: false },
-                        ].map((field, idx) => (
-                          <div key={idx} className="p-4 rounded-2xl bg-premium-surfaceDark border border-amber-900/30 flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-3">
-                              <Briefcase className="w-4 h-4 text-premium-gold" />
-                              <div>
-                                <span className="font-bold text-white">{field.label}</span>
-                                {field.required && <span className="ml-2 text-premium-danger font-mono text-[10px]">*Required</span>}
-                                <span className="block text-[10px] text-zinc-400">{field.desc}</span>
-                              </div>
-                            </div>
-                            <input type="checkbox" defaultChecked={field.required} className="toggle-checkbox w-4 h-4 accent-premium-gold cursor-pointer" />
-                          </div>
-                        ))}
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Shared optional fields */}
-                <div>
-                  <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">Shared Optional Fields</p>
-                  <div className="space-y-2">
-                    {[
-                      { label: 'Seating Table Preference / Notes', desc: 'Guest may request a preferred table or special arrangement' },
-                      { label: 'Accessibility Requirements', desc: 'Wheelchair access, hearing loops, visual aids' },
-                    ].map((field, idx) => (
-                      <div key={idx} className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-3">
-                          <Check className="w-4 h-4 text-premium-gold" />
-                          <div>
-                            <span className="font-bold text-white">{field.label}</span>
-                            <span className="block text-[10px] text-zinc-400">{field.desc}</span>
-                          </div>
-                        </div>
-                        <input type="checkbox" defaultChecked={idx === 0} className="toggle-checkbox w-4 h-4 accent-premium-gold cursor-pointer" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <InvitationFormBuilder isWedding={isWedding} eventName={event.name} primaryColor={event.theme_config.primaryColor} slug={event.slug} />
               </div>
             )}
           </div>
@@ -1013,201 +815,43 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
           <div className="space-y-6 animate-in fade-in duration-200">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h3 className="text-2xl font-display font-bold text-white">Live Games</h3>
-                <p className="text-xs text-zinc-400">
-                  {gamesSubTab === 'quiz' ? 'Kahoot-style synchronized 4-quadrant mobile buzzer questions.' : 'Scavenger Hunt — location-based challenges and QR clue chains.'}
-                </p>
+                <h3 className="text-2xl font-display font-bold text-white">Games Builder</h3>
+                <p className="text-xs text-zinc-400">Build quiz questions, upload CSV, and create scavenger hunt QR chains.</p>
               </div>
-
-              {gamesSubTab === 'quiz' && (
-                <Link
-                  href={`/events/${event.slug}/games`}
-                  target="_blank"
-                  className="px-5 py-2.5 rounded-xl bg-premium-neon text-black font-bold text-xs shadow-neon scale-on-click flex items-center gap-2"
-                >
-                  <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>Launch Arena Game</span>
-                </Link>
-              )}
             </div>
 
-            {/* Sub-tab pills */}
-            <div className="flex items-center gap-2">
-              {([
-                { id: 'quiz', label: 'Quiz Blitz' },
-                { id: 'scavenger', label: 'Scavenger Hunt' },
-              ] as const).map((st) => (
-                <button
-                  key={st.id}
-                  type="button"
-                  onClick={() => setGamesSubTab(st.id)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap scale-on-click transition-all ${
-                    gamesSubTab === st.id
-                      ? 'bg-premium-neon/15 text-white border border-premium-neon/40'
-                      : 'bg-premium-surfaceDark text-zinc-400 border border-premium-borderDark hover:text-white'
-                  }`}
-                >
-                  {st.label}
-                </button>
-              ))}
-            </div>
+            <GamesBuilder subTab={gamesSubTab} setSubTab={setGamesSubTab} />
 
-            {/* ── Quiz Blitz sub-tab ── */}
-            {gamesSubTab === 'quiz' && (
-            <div className="space-y-4">
-              {quizQuestions.map((q, idx) => (
-                <div key={q.id} className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4 shadow-xl">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono font-bold text-premium-neon">Round {idx + 1} • {q.points} Pts</span>
-                    <span className="text-[10px] font-mono uppercase text-zinc-500">15s Timer</span>
-                  </div>
-
-                  <h4 className="text-base font-display font-bold text-white">{q.text}</h4>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                    {q.options.map((opt, oIdx) => (
-                      <div
-                        key={oIdx}
-                        className={`p-3 rounded-xl border font-bold flex items-center justify-between ${
-                          oIdx === q.answer
-                            ? 'border-premium-success bg-premium-success/15 text-premium-success'
-                            : 'border-premium-borderDark bg-premium-surfaceDark text-zinc-400'
-                        }`}
-                      >
-                        <span>{opt}</span>
-                        {oIdx === q.answer && <Check className="w-3.5 h-3.5 text-premium-success" />}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-            )}
-
-            {/* ── Scavenger Hunt sub-tab ── */}
-            {gamesSubTab === 'scavenger' && (
-              <div className="p-8 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark shadow-xl flex flex-col items-center gap-4 text-center">
-                <div className="w-14 h-14 rounded-2xl bg-premium-neon/10 flex items-center justify-center">
-                  <Gamepad2 className="w-7 h-7 text-premium-neon" />
-                </div>
-                <div>
-                  <h4 className="font-display font-bold text-white text-base">Scavenger Hunt</h4>
-                  <p className="text-xs text-zinc-400 mt-1 max-w-sm">Create QR-based clue chains and location challenges. Guests scan codes around the venue to progress through rounds.</p>
-                </div>
-                <span className="px-3 py-1 rounded-full bg-premium-gold/10 text-premium-gold text-[11px] font-bold font-mono border border-premium-gold/20">
-                  Coming Soon
-                </span>
-              </div>
-            )}
           </div>
         )}
 
         {/* =========================================================================
-            MENU 6: DOOR PRIZE (Raffle 3D Machine, Prize Pool, Audited Ledger)
+            MENU 6: DOOR PRIZE (Raffle Engine)
            ========================================================================= */}
         {activeTab === 'doorprize' && (
           <div className="space-y-6 animate-in fade-in duration-200">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h3 className="text-2xl font-display font-bold text-white">3D Door Prize & Raffle Machine</h3>
-                <p className="text-xs text-zinc-400">Manage prize tiers, 3D visualizer modes, and audited blockchain winner ledger.</p>
-              </div>
-
-              <Link
-                href={`/events/${event.slug}/raffle`}
-                target="_blank"
-                className="px-5 py-2.5 rounded-xl bg-premium-gold text-black font-bold text-xs shadow-gold scale-on-click flex items-center gap-2"
-              >
-                <Gift className="w-3.5 h-3.5" />
-                <span>Launch 3D Raffle Stage</span>
-              </Link>
-            </div>
-
-            {/* Visualizer Style Switcher */}
-            <div className="p-6 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark space-y-4 shadow-xl">
-              <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest block">3D Stage Draw Animation</span>
-              <div className="grid grid-cols-3 gap-4">
-                {[
-                  { id: 'slot', label: '🎰 Slot Machine 777' },
-                  { id: 'wheel', label: '🎡 Spinning Wheel' },
-                  { id: 'claw', label: '🕹️ Arcade Claw Machine' },
-                ].map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => setRaffleStyle(s.id as any)}
-                    className={`p-4 rounded-2xl border text-center font-bold text-xs transition-all scale-on-click ${
-                      raffleStyle === s.id
-                        ? 'border-premium-gold bg-premium-surfaceDark text-premium-gold shadow-gold'
-                        : 'border-premium-borderDark bg-premium-black/60 text-zinc-400'
-                    }`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
+                <h3 className="text-2xl font-display font-bold text-white">Door Prize & Raffle Engine</h3>
+                <p className="text-xs text-zinc-400">Wheel of fortune, slot machine, lucky draw spotlight — pick your style and spin.</p>
               </div>
             </div>
-
-            {/* Prize Catalog */}
-            <div className="space-y-3">
-              <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest block px-1">Grand Prize Catalog</span>
-              {prizeList.map((p) => (
-                <div key={p.id} className="p-5 rounded-2xl bg-premium-charcoal border border-premium-borderDark flex items-center justify-between text-xs shadow-md">
-                  <div>
-                    <h4 className="font-bold text-white text-sm">{p.name}</h4>
-                    <span className="text-zinc-400 text-[11px]">Sponsored by: {p.sponsor}</span>
-                  </div>
-                  <span className="px-3 py-1 rounded-full bg-premium-gold/15 text-premium-gold font-bold font-mono">
-                    {p.quantity} Units
-                  </span>
-                </div>
-              ))}
-            </div>
+            <RaffleEngine raffleStyle={raffleStyle} setRaffleStyle={setRaffleStyle} />
           </div>
         )}
 
         {/* =========================================================================
-            MENU 7: PHOTOS (Wall Photos/Videos, Moderation, Captions Toggle)
+            MENU 7: PHOTOS (Wall Photos/Videos, Filters, Frames, Drive)
            ========================================================================= */}
         {activeTab === 'photos' && (
           <div className="space-y-6 animate-in fade-in duration-200">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h3 className="text-2xl font-display font-bold text-white">Photo & Video Moderation Wall</h3>
-                <p className="text-xs text-zinc-400">Total {photosList.length} media uploads • Captions policy & high-res downloads</p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                {/* Captions Toggle as requested */}
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-premium-charcoal border border-premium-borderDark text-xs">
-                  <span className="text-zinc-400">Captions Mode:</span>
-                  <button
-                    type="button"
-                    onClick={() => setCaptionsOn(!captionsOn)}
-                    className={`px-3 py-1 rounded-lg font-bold text-xs ${
-                      captionsOn ? 'bg-premium-gold text-black shadow-gold' : 'bg-zinc-800 text-zinc-400'
-                    }`}
-                  >
-                    {captionsOn ? 'ON (≤300c)' : 'OFF'}
-                  </button>
-                </div>
-
-                <Link
-                  href={`/events/${event.slug}/photowall/live`}
-                  target="_blank"
-                  className="px-5 py-2.5 rounded-xl bg-premium-gold text-black font-bold text-xs shadow-gold scale-on-click"
-                >
-                  Live Stage Wall
-                </Link>
+                <h3 className="text-2xl font-display font-bold text-white">Photo Wall Manager</h3>
+                <p className="text-xs text-zinc-400">Filter effects, frames, moderation, Google Drive backup, and live stage wall.</p>
               </div>
             </div>
-
-            {/* Pinterest Masonry Component */}
-            <PinterestMasonryPhotoWall
-              photos={photosList}
-              showCaptions={captionsOn}
-              canLike={true}
-            />
+            <PhotoWallManager />
           </div>
         )}
 
