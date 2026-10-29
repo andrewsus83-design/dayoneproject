@@ -1,518 +1,385 @@
 'use client';
 
 import React, { useState, use, Suspense } from 'react';
+import Link from 'next/link';
 import {
-  UserPlus,
-  ClipboardList,
-  CheckCircle2,
-  XCircle,
-  QrCode,
-  Send,
-  Phone,
-  Mail,
-  User,
-  Hash,
-  ChevronDown,
-  Search,
-  Clock,
-  Users,
-  TrendingUp,
-  ArrowLeft,
+  MOCK_EVENT,
+  MOCK_WEDDING_EVENT,
+  MOCK_CORPORATE_NEXUS_EVENT,
+  MOCK_WEDDING_BALI_EVENT,
+  MOCK_POPVERSE_EVENT,
+} from '@/lib/mockData';
+import {
+  ArrowRight, ArrowLeft, Check, Heart, Building2, QrCode,
+  User, Mail, Phone, Utensils, Users, Sparkles, Download,
+  Share2, CalendarDays, MapPin,
 } from 'lucide-react';
 
-// ─── Mock Data ─────────────────────────────────────────────────────────────
-const PENDING_RSVPS = [
-  { id: 'r1', name: 'Alina Zhang', email: 'alina.zhang@sequoia.sg', phone: '+6591238841', company: 'Sequoia APAC', dietary: 'Vegetarian', tickets: 1, submittedAt: '12 mins ago' },
-  { id: 'r2', name: 'Reza Pratama', email: 'reza@techinnovate.id', phone: '+62811987654', company: 'TechInnovate ID', dietary: 'Halal', tickets: 2, submittedAt: '28 mins ago' },
-  { id: 'r3', name: 'Vanessa Lim', email: 'v.lim@gcapital.sg', phone: '+6598761234', company: 'G Capital', dietary: 'None', tickets: 1, submittedAt: '45 mins ago' },
-  { id: 'r4', name: 'Ahmad Farhan', email: 'ahmad.farhan@telkom.co.id', phone: '+62812345678', company: 'Telkom Indonesia', dietary: 'Halal', tickets: 1, submittedAt: '1 hr ago' },
-];
+type Step = 'name' | 'contact' | 'details' | 'confirm' | 'success';
 
-const TABLE_OPTIONS = [
-  'Diamond 01', 'Diamond 02', 'Diamond 03',
-  'Platinum 01', 'Platinum 02', 'Platinum 03', 'Platinum 04',
-  'Gold 01', 'Gold 02', 'Gold 03', 'Gold 04', 'Gold 05',
-  'Press Hub', 'VIP Lounge', 'General 01', 'General 02',
-];
-
-const CATEGORY_OPTIONS = ['VIP', 'Diamond', 'Platinum', 'Gold', 'Media / Press', 'Sponsor', 'Speaker', 'Regular'];
-
-// ─── Types ─────────────────────────────────────────────────────────────────
-type Mode = 'walkin' | 'queue';
-type RsvpItem = typeof PENDING_RSVPS[number];
-
-interface RegisteredGuest {
-  id: string;
-  name: string;
-  phone: string;
+interface FormData {
+  firstName: string;
+  lastName: string;
   email: string;
-  category: string;
-  table: string;
-  qrToken: string;
-  registeredAt: string;
+  phone: string;
+  dietary: string;
+  plusOne: boolean;
+  plusOneName: string;
+  tableNote: string;
+  agreedToTerms: boolean;
 }
 
-// ─── Main Content ───────────────────────────────────────────────────────────
-function RegisterPWAContent({ slug }: { slug: string }) {
-  const [mode, setMode] = useState<Mode>('walkin');
-  const [pendingRsvps, setPendingRsvps] = useState<RsvpItem[]>(PENDING_RSVPS);
-  const [registered, setRegistered] = useState<RegisteredGuest[]>([]);
+const DIETARY_OPTIONS = ['No restrictions', 'Vegetarian', 'Vegan', 'Halal', 'Kosher', 'Gluten-free', 'Nut allergy', 'Other'];
 
-  // Walk-in form state
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [category, setCategory] = useState('Regular');
-  const [table, setTable] = useState('General 01');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [lastRegistered, setLastRegistered] = useState<RegisteredGuest | null>(null);
-  const [approvedId, setApprovedId] = useState<string | null>(null);
+const STEPS: Step[] = ['name', 'contact', 'details', 'confirm', 'success'];
+const STEP_LABELS = ['Your Name', 'Contact', 'Details', 'Confirm', 'Done'];
 
-  const generateToken = (n: string) =>
-    `QR-${n.replace(/\s+/g, '').toUpperCase().slice(0, 4)}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+function generateQRToken() {
+  return `ALL41-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+}
 
-  const handleWalkInSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-    setIsSubmitting(true);
-    setTimeout(() => {
-      const guest: RegisteredGuest = {
-        id: `wk-${Date.now()}`,
-        name: name.trim(),
-        phone,
-        email,
-        category,
-        table,
-        qrToken: generateToken(name.trim()),
-        registeredAt: 'Just now',
-      };
-      setRegistered((prev) => [guest, ...prev]);
-      setLastRegistered(guest);
-      setName(''); setPhone(''); setEmail('');
-      setCategory('Regular'); setTable('General 01');
-      setIsSubmitting(false);
-    }, 800);
-  };
-
-  const handleApprove = (rsvp: RsvpItem) => {
-    setApprovedId(rsvp.id);
-    setTimeout(() => {
-      const guest: RegisteredGuest = {
-        id: `ap-${rsvp.id}`,
-        name: rsvp.name,
-        phone: rsvp.phone,
-        email: rsvp.email,
-        category: 'VIP',
-        table: 'Diamond 01',
-        qrToken: generateToken(rsvp.name),
-        registeredAt: 'Just now',
-      };
-      setRegistered((prev) => [guest, ...prev]);
-      setPendingRsvps((prev) => prev.filter((r) => r.id !== rsvp.id));
-      setApprovedId(null);
-    }, 700);
-  };
-
-  const handleDecline = (id: string) => {
-    setPendingRsvps((prev) => prev.filter((r) => r.id !== id));
-  };
-
-  const filteredQueue = pendingRsvps.filter((r) =>
-    r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.company.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
+function ProgressBar({ step }: { step: Step }) {
+  const idx = STEPS.indexOf(step);
+  if (step === 'success') return null;
   return (
-    <div className="min-h-screen bg-premium-black font-sans text-white select-none">
-      {/* Header */}
-      <header className="sticky top-0 z-30 bg-premium-black/90 backdrop-blur border-b border-premium-borderDark px-5 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <a href={`/events/${slug}`} className="text-zinc-500 hover:text-zinc-300 transition-colors">
-            <ArrowLeft className="w-4 h-4" />
-          </a>
-          <div className="w-8 h-8 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-sm shadow-gold flex-shrink-0">
-            41
+    <div className="flex items-center gap-2 mb-8">
+      {STEPS.slice(0, 4).map((s, i) => (
+        <React.Fragment key={s}>
+          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+            i < idx ? 'bg-premium-gold text-black' :
+            i === idx ? 'bg-premium-gold text-black ring-4 ring-premium-gold/20' :
+            'bg-premium-charcoal border border-premium-borderDark text-zinc-600'
+          }`}>
+            {i < idx ? <Check className="w-3.5 h-3.5" /> : i + 1}
           </div>
-          <div>
-            <p className="text-[10px] font-mono uppercase tracking-widest text-premium-gold font-bold leading-none">Registration Desk</p>
-            <h1 className="text-sm font-display font-bold text-white leading-none mt-0.5 capitalize">{slug.replace(/-/g, ' ')}</h1>
-          </div>
-        </div>
-
-        {/* Mode Toggle */}
-        <div className="flex items-center gap-1 bg-premium-surfaceDark p-1 rounded-2xl border border-premium-borderDark">
-          <button
-            type="button"
-            onClick={() => setMode('walkin')}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all scale-on-click ${
-              mode === 'walkin' ? 'bg-premium-gold text-black shadow-gold' : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            Walk-in
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('queue')}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all scale-on-click relative ${
-              mode === 'queue' ? 'bg-premium-gold text-black shadow-gold' : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <ClipboardList className="w-3.5 h-3.5" />
-            RSVP Queue
-            {pendingRsvps.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 rounded-md bg-premium-danger text-white text-[9px] font-mono font-bold">
-                {pendingRsvps.length}
-              </span>
-            )}
-          </button>
-        </div>
-
-        {/* Stats strip */}
-        <div className="hidden sm:flex items-center gap-4 text-xs">
-          <div className="flex items-center gap-1.5 text-premium-success">
-            <Users className="w-3.5 h-3.5" />
-            <span className="font-bold">{registered.length + 3}</span>
-            <span className="text-zinc-500">registered today</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-premium-gold">
-            <TrendingUp className="w-3.5 h-3.5" />
-            <span className="font-bold">{pendingRsvps.length}</span>
-            <span className="text-zinc-500">pending</span>
-          </div>
-        </div>
-      </header>
-
-      <main className="p-4 sm:p-6 max-w-6xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-
-          {/* ── LEFT: Form / Queue ── */}
-          <div className="lg:col-span-3">
-
-            {/* Walk-in Registration Form */}
-            {mode === 'walkin' && (
-              <div className="p-6 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark shadow-2xl">
-                <div className="flex items-center gap-3 border-b border-premium-borderDark pb-4 mb-5">
-                  <div className="w-10 h-10 rounded-2xl bg-premium-gold/15 border border-premium-gold/30 flex items-center justify-center">
-                    <UserPlus className="w-5 h-5 text-premium-gold" />
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-premium-gold font-bold block">Walk-in Registration</span>
-                    <h2 className="text-lg font-display font-bold text-white leading-none mt-0.5">Register New Guest</h2>
-                  </div>
-                </div>
-
-                <form onSubmit={handleWalkInSubmit} className="space-y-4">
-                  {/* Name — required */}
-                  <div>
-                    <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 font-bold block mb-1.5">
-                      Full Name <span className="text-premium-danger">*</span>
-                    </label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                      <input
-                        type="text"
-                        required
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="Guest full name"
-                        className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white pl-9 pr-4 py-3 rounded-xl text-sm outline-none focus:border-premium-gold transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Phone */}
-                    <div>
-                      <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 font-bold block mb-1.5">Phone (WhatsApp)</label>
-                      <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                        <input
-                          type="tel"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          placeholder="+62 811 xxx xxxx"
-                          className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white pl-9 pr-4 py-3 rounded-xl text-sm outline-none focus:border-premium-gold transition-colors"
-                        />
-                      </div>
-                    </div>
-                    {/* Email */}
-                    <div>
-                      <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 font-bold block mb-1.5">Email</label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                        <input
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="email@domain.com"
-                          className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white pl-9 pr-4 py-3 rounded-xl text-sm outline-none focus:border-premium-gold transition-colors"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Category */}
-                    <div>
-                      <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 font-bold block mb-1.5">Category</label>
-                      <div className="relative">
-                        <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                        <select
-                          value={category}
-                          onChange={(e) => setCategory(e.target.value)}
-                          className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white pl-9 pr-8 py-3 rounded-xl text-sm outline-none focus:border-premium-gold appearance-none transition-colors"
-                        >
-                          {CATEGORY_OPTIONS.map((c) => (
-                            <option key={c} value={c}>{c}</option>
-                          ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
-                      </div>
-                    </div>
-                    {/* Table */}
-                    <div>
-                      <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 font-bold block mb-1.5">Table / Seat</label>
-                      <div className="relative">
-                        <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                        <select
-                          value={table}
-                          onChange={(e) => setTable(e.target.value)}
-                          className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white pl-9 pr-8 py-3 rounded-xl text-sm outline-none focus:border-premium-gold appearance-none transition-colors"
-                        >
-                          {TABLE_OPTIONS.map((t) => (
-                            <option key={t} value={t}>{t}</option>
-                          ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={!name.trim() || isSubmitting}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-premium-gold text-black font-display font-bold text-sm shadow-gold scale-on-click disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-2"
-                  >
-                    {isSubmitting ? (
-                      <span className="animate-spin w-4 h-4 border-2 border-black/30 border-t-black rounded-full" />
-                    ) : (
-                      <QrCode className="w-4 h-4" />
-                    )}
-                    {isSubmitting ? 'Generating QR Pass…' : 'Register & Generate QR Pass'}
-                  </button>
-                </form>
-
-                {/* Success Flash */}
-                {lastRegistered && (
-                  <div className="mt-4 p-4 rounded-2xl bg-premium-success/10 border border-premium-success/30 flex items-start gap-3 animate-in slide-in-from-bottom-2 fade-in duration-300">
-                    <CheckCircle2 className="w-5 h-5 text-premium-success flex-shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-premium-success">{lastRegistered.name} registered!</p>
-                      <p className="text-xs text-zinc-400 mt-0.5">Table: <span className="text-white font-bold">{lastRegistered.table}</span></p>
-                      <p className="font-mono text-xs text-premium-neon mt-1 truncate">{lastRegistered.qrToken}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setLastRegistered(null)}
-                      className="text-zinc-600 hover:text-zinc-300 transition-colors flex-shrink-0"
-                    >
-                      <XCircle className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* RSVP Queue */}
-            {mode === 'queue' && (
-              <div className="p-6 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark shadow-2xl space-y-5">
-                <div className="flex items-center justify-between border-b border-premium-borderDark pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-premium-danger/15 border border-premium-danger/30 flex items-center justify-center">
-                      <ClipboardList className="w-5 h-5 text-premium-danger" />
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-mono uppercase tracking-widest text-premium-danger font-bold block">Pending Approval</span>
-                      <h2 className="text-lg font-display font-bold text-white leading-none mt-0.5">RSVP Queue</h2>
-                    </div>
-                  </div>
-                  <span className="px-3 py-1 rounded-full bg-premium-danger/20 text-premium-danger text-xs font-mono font-bold border border-premium-danger/30">
-                    {pendingRsvps.length} pending
-                  </span>
-                </div>
-
-                {/* Search */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search name or company…"
-                    className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white pl-9 pr-4 py-2.5 rounded-xl text-sm outline-none focus:border-premium-gold transition-colors"
-                  />
-                </div>
-
-                {/* Queue Items */}
-                <div className="space-y-3">
-                  {filteredQueue.length === 0 && (
-                    <div className="text-center py-8 text-zinc-500 text-sm">
-                      {pendingRsvps.length === 0 ? 'All RSVPs approved ✓' : 'No matching results'}
-                    </div>
-                  )}
-                  {filteredQueue.map((rsvp) => (
-                    <div
-                      key={rsvp.id}
-                      className={`p-4 rounded-2xl bg-premium-surfaceDark border transition-all ${
-                        approvedId === rsvp.id
-                          ? 'border-premium-success/50 bg-premium-success/5'
-                          : 'border-premium-borderDark hover:border-premium-gold/30'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="font-bold text-sm text-white truncate">{rsvp.name}</p>
-                            {rsvp.tickets > 1 && (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-premium-gold/20 text-premium-gold font-mono font-bold flex-shrink-0">
-                                +{rsvp.tickets - 1} guest
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-zinc-400 mt-0.5 truncate">{rsvp.company}</p>
-                          <div className="flex items-center gap-3 mt-1.5 text-[10px] text-zinc-500 font-mono">
-                            <span>{rsvp.phone}</span>
-                            {rsvp.dietary !== 'None' && (
-                              <span className="text-premium-neon">{rsvp.dietary}</span>
-                            )}
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {rsvp.submittedAt}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => handleDecline(rsvp.id)}
-                            className="p-2 rounded-xl bg-premium-danger/15 text-premium-danger border border-premium-danger/30 hover:bg-premium-danger/25 transition-all scale-on-click"
-                            title="Decline"
-                          >
-                            <XCircle className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleApprove(rsvp)}
-                            disabled={approvedId === rsvp.id}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-premium-success/15 text-premium-success border border-premium-success/30 hover:bg-premium-success/25 transition-all scale-on-click text-xs font-bold"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            Approve & Send QR
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* ── RIGHT: Live Log ── */}
-          <div className="lg:col-span-2 space-y-4">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-4 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark text-center">
-                <p className="text-2xl font-display font-bold text-premium-success">{registered.length + 3}</p>
-                <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mt-1">Registered Today</p>
-              </div>
-              <div className="p-4 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark text-center">
-                <p className="text-2xl font-display font-bold text-premium-danger">{pendingRsvps.length}</p>
-                <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mt-1">Pending RSVP</p>
-              </div>
-            </div>
-
-            {/* Recent Registrations Log */}
-            <div className="p-5 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark shadow-xl">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[10px] font-mono uppercase tracking-widest text-premium-gold font-bold">Recent Registrations</span>
-                <span className="w-2 h-2 rounded-full bg-premium-success animate-ping" />
-              </div>
-              <div className="space-y-2.5 max-h-[calc(100vh-22rem)] overflow-y-auto hide-scrollbar">
-                {[...registered].concat([
-                  { id: 'seed-1', name: 'Dr. Michael Chen', phone: '+6588219002', email: 'm.chen@nus.edu.sg', category: 'VIP', table: 'Diamond 01', qrToken: 'QR-DRMI-X8K2P', registeredAt: '1h ago' },
-                  { id: 'seed-2', name: 'Clarissa Tan Wei Ling', phone: '+6591223340', email: 'clarissa@fairmont.sg', category: 'Platinum', table: 'Platinum 03', qrToken: 'QR-CLAR-M3N9T', registeredAt: '1h 8m ago' },
-                  { id: 'seed-3', name: 'Budi Santoso', phone: '+628123456789', email: 'budi@techhub.id', category: 'Gold', table: 'Gold 02', qrToken: 'QR-BUDI-P5Q1W', registeredAt: '1h 22m ago' },
-                ]).map((g, i) => (
-                  <div key={g.id} className="flex items-center gap-3 p-3 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark">
-                    <div className="w-8 h-8 rounded-xl bg-premium-gold/10 border border-premium-gold/20 flex items-center justify-center text-premium-gold font-display font-bold text-xs flex-shrink-0">
-                      {g.name.charAt(0)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-white truncate">{g.name}</p>
-                      <p className="text-[10px] text-zinc-500 font-mono">{g.table} • {g.registeredAt}</p>
-                    </div>
-                    <button
-                      type="button"
-                      className="p-1.5 rounded-lg bg-premium-neon/10 text-premium-neon border border-premium-neon/20 hover:bg-premium-neon/20 transition-all scale-on-click flex-shrink-0"
-                      title="Resend QR Pass"
-                    >
-                      <Send className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="p-4 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-2">
-              <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 font-bold block mb-3">Quick Actions</span>
-              <a
-                href={`/events/${slug}/gate`}
-                target="_blank"
-                className="flex items-center gap-2.5 w-full px-4 py-3 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-white text-xs font-bold hover:border-premium-gold/40 hover:text-premium-gold transition-all scale-on-click"
-              >
-                <QrCode className="w-4 h-4 text-premium-neon" />
-                Open QR Scanner (Gate)
-              </a>
-              <button
-                type="button"
-                className="flex items-center gap-2.5 w-full px-4 py-3 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-zinc-400 text-xs font-bold hover:border-premium-gold/40 hover:text-white transition-all scale-on-click"
-              >
-                <Send className="w-4 h-4 text-premium-gold" />
-                Broadcast QR to Pending List
-              </button>
-            </div>
-          </div>
-        </div>
-      </main>
+          {i < 3 && (
+            <div className={`flex-1 h-0.5 rounded-full transition-all ${i < idx ? 'bg-premium-gold' : 'bg-premium-borderDark'}`} />
+          )}
+        </React.Fragment>
+      ))}
     </div>
   );
 }
 
-// ─── Page Shell ─────────────────────────────────────────────────────────────
-interface RegisterPageProps {
-  params: Promise<{ slug: string }>;
-}
+function RSVPFormContent({ slug }: { slug: string }) {
+  const event =
+    slug === 'aria-daniel' ? MOCK_WEDDING_EVENT
+    : slug === 'sophia-marco' ? MOCK_WEDDING_BALI_EVENT
+    : slug === 'nexus' ? MOCK_CORPORATE_NEXUS_EVENT
+    : slug === 'popverse' ? MOCK_POPVERSE_EVENT
+    : MOCK_EVENT;
 
-function RegisterPageInner({ params }: RegisterPageProps) {
-  const { slug } = use(params);
-  return <RegisterPWAContent slug={slug} />;
-}
+  const isWedding = event.event_type === 'wedding';
+  const [step, setStep] = useState<Step>('name');
+  const [qrToken] = useState(generateQRToken);
+  const [form, setForm] = useState<FormData>({
+    firstName: '', lastName: '', email: '', phone: '',
+    dietary: 'No restrictions', plusOne: false, plusOneName: '',
+    tableNote: '', agreedToTerms: false,
+  });
 
-export default function RegisterPage(props: RegisterPageProps) {
+  const set = (field: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    setForm(prev => ({ ...prev, [field]: e.target.value }));
+  };
+
+  const setCheck = (field: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm(prev => ({ ...prev, [field]: e.target.checked }));
+  };
+
+  const next = () => {
+    const cur = STEPS.indexOf(step);
+    if (cur < STEPS.length - 1) setStep(STEPS[cur + 1]);
+  };
+
+  const back = () => {
+    const cur = STEPS.indexOf(step);
+    if (cur > 0) setStep(STEPS[cur - 1]);
+  };
+
+  const inputCls = "w-full px-4 py-3.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-white placeholder-zinc-600 focus:outline-none focus:border-premium-gold/60 focus:ring-2 focus:ring-premium-gold/10 transition-all font-sans text-sm";
+  const labelCls = "block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2";
+
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-premium-black flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-xl shadow-gold animate-pulse">41</div>
-          <p className="text-zinc-500 text-sm font-mono">Loading Registration Desk…</p>
+    <div className="min-h-screen bg-premium-black font-sans flex flex-col">
+      {/* Top nav */}
+      <nav className="flex items-center justify-between px-6 sm:px-10 py-5 border-b border-premium-borderDark/60">
+        <Link href={`/events/${slug}`} className="flex items-center gap-2 text-zinc-500 hover:text-white transition-colors text-sm">
+          <ArrowLeft className="w-4 h-4" />
+          Back to event
+        </Link>
+        <div className="w-8 h-8 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-sm shadow-gold">41</div>
+      </nav>
+
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-10">
+        <div className="w-full max-w-lg">
+
+          {/* Event summary chip */}
+          <div className="flex items-center gap-3 mb-6 p-4 rounded-2xl bg-premium-charcoal border border-premium-borderDark">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${isWedding ? 'bg-premium-danger/10' : 'bg-premium-neon/10'}`}>
+              {isWedding ? <Heart className="w-4 h-4 text-premium-danger" /> : <Building2 className="w-4 h-4 text-premium-neon" />}
+            </div>
+            <div className="min-w-0">
+              <div className="font-display font-bold text-white text-sm truncate">{event.name}</div>
+              <div className="text-xs text-zinc-500 truncate">{event.location_name}</div>
+            </div>
+          </div>
+
+          <ProgressBar step={step} />
+
+          {/* ── STEP: name ── */}
+          {step === 'name' && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-2xl font-display font-bold text-white">What's your name?</h1>
+                <p className="text-sm text-zinc-500 mt-1">This will appear on your personalised QR pass.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>First name</label>
+                  <input type="text" placeholder="Sophia" value={form.firstName} onChange={set('firstName')} className={inputCls} autoFocus />
+                </div>
+                <div>
+                  <label className={labelCls}>Last name</label>
+                  <input type="text" placeholder="Rossi" value={form.lastName} onChange={set('lastName')} className={inputCls} />
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={next}
+                disabled={!form.firstName.trim() || !form.lastName.trim()}
+                className="w-full py-4 rounded-2xl bg-premium-gold hover:bg-premium-goldHover disabled:opacity-40 disabled:cursor-not-allowed text-black font-display font-bold text-base shadow-gold scale-on-click transition-all flex items-center justify-center gap-2"
+              >
+                Continue <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* ── STEP: contact ── */}
+          {step === 'contact' && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-2xl font-display font-bold text-white">How can we reach you?</h1>
+                <p className="text-sm text-zinc-500 mt-1">Your QR pass and event reminders will be sent here.</p>
+              </div>
+              <div>
+                <label className={labelCls}><Mail className="w-3 h-3 inline mr-1" />Email address</label>
+                <input type="email" placeholder="you@example.com" value={form.email} onChange={set('email')} className={inputCls} autoFocus />
+              </div>
+              <div>
+                <label className={labelCls}><Phone className="w-3 h-3 inline mr-1" />WhatsApp number</label>
+                <input type="tel" placeholder="+62 812 3456 7890" value={form.phone} onChange={set('phone')} className={inputCls} />
+              </div>
+              <div className="flex gap-3">
+                <button type="button" onClick={back} className="px-6 py-4 rounded-2xl border border-premium-borderDark text-zinc-400 hover:text-white hover:border-zinc-600 transition-all font-bold scale-on-click">
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={next}
+                  disabled={!form.email.includes('@') || !form.phone.trim()}
+                  className="flex-1 py-4 rounded-2xl bg-premium-gold hover:bg-premium-goldHover disabled:opacity-40 disabled:cursor-not-allowed text-black font-display font-bold text-base shadow-gold scale-on-click transition-all flex items-center justify-center gap-2"
+                >
+                  Continue <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── STEP: details ── */}
+          {step === 'details' && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-2xl font-display font-bold text-white">A few more details</h1>
+                <p className="text-sm text-zinc-500 mt-1">Help us make your experience perfect.</p>
+              </div>
+              <div>
+                <label className={labelCls}><Utensils className="w-3 h-3 inline mr-1" />Dietary preference</label>
+                <select value={form.dietary} onChange={set('dietary')} className={inputCls}>
+                  {DIETARY_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+              {isWedding && (
+                <div className="space-y-4">
+                  <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${form.plusOne ? 'bg-premium-gold border-premium-gold' : 'border-premium-borderDark'}`}>
+                      {form.plusOne && <Check className="w-3 h-3 text-black" />}
+                    </div>
+                    <input type="checkbox" className="sr-only" checked={form.plusOne} onChange={setCheck('plusOne')} />
+                    <div>
+                      <div className="text-sm font-bold text-white flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> Bringing a plus-one</div>
+                      <div className="text-xs text-zinc-500">Subject to seat availability</div>
+                    </div>
+                  </label>
+                  {form.plusOne && (
+                    <div>
+                      <label className={labelCls}>Plus-one name</label>
+                      <input type="text" placeholder="Full name" value={form.plusOneName} onChange={set('plusOneName')} className={inputCls} />
+                    </div>
+                  )}
+                </div>
+              )}
+              <div>
+                <label className={labelCls}>Special note (optional)</label>
+                <textarea
+                  value={form.tableNote}
+                  onChange={set('tableNote')}
+                  placeholder={isWedding ? 'Seating request, accessibility needs, note for the couple...' : 'Any requests or questions for the organizer...'}
+                  rows={3}
+                  className={`${inputCls} resize-none`}
+                />
+              </div>
+              <div className="flex gap-3">
+                <button type="button" onClick={back} className="px-6 py-4 rounded-2xl border border-premium-borderDark text-zinc-400 hover:text-white hover:border-zinc-600 transition-all font-bold scale-on-click">
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={next}
+                  className="flex-1 py-4 rounded-2xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-base shadow-gold scale-on-click transition-all flex items-center justify-center gap-2"
+                >
+                  Review RSVP <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── STEP: confirm ── */}
+          {step === 'confirm' && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-2xl font-display font-bold text-white">Confirm your RSVP</h1>
+                <p className="text-sm text-zinc-500 mt-1">Check everything looks right before we send your pass.</p>
+              </div>
+              <div className="rounded-2xl border border-premium-borderDark bg-premium-charcoal divide-y divide-premium-borderDark overflow-hidden">
+                {[
+                  { label: 'Name', val: `${form.firstName} ${form.lastName}` },
+                  { label: 'Email', val: form.email },
+                  { label: 'WhatsApp', val: form.phone },
+                  { label: 'Dietary', val: form.dietary },
+                  ...(isWedding && form.plusOne ? [{ label: 'Plus-one', val: form.plusOneName || 'TBD' }] : []),
+                  ...(form.tableNote ? [{ label: 'Note', val: form.tableNote }] : []),
+                ].map(({ label, val }) => (
+                  <div key={label} className="flex items-center justify-between px-5 py-3.5">
+                    <span className="text-xs font-mono text-zinc-600 uppercase tracking-wide">{label}</span>
+                    <span className="text-sm font-semibold text-white text-right max-w-[60%] truncate">{val}</span>
+                  </div>
+                ))}
+              </div>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-all ${form.agreedToTerms ? 'bg-premium-gold border-premium-gold' : 'border-premium-borderDark'}`}>
+                  {form.agreedToTerms && <Check className="w-3 h-3 text-black" />}
+                </div>
+                <input type="checkbox" className="sr-only" checked={form.agreedToTerms} onChange={setCheck('agreedToTerms')} />
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  I agree to receive event reminders and updates via email and WhatsApp from the organizer.
+                </p>
+              </label>
+              <div className="flex gap-3">
+                <button type="button" onClick={back} className="px-6 py-4 rounded-2xl border border-premium-borderDark text-zinc-400 hover:text-white hover:border-zinc-600 transition-all font-bold scale-on-click">
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={next}
+                  disabled={!form.agreedToTerms}
+                  className="flex-1 py-4 rounded-2xl bg-premium-gold hover:bg-premium-goldHover disabled:opacity-40 disabled:cursor-not-allowed text-black font-display font-bold text-base shadow-gold scale-on-click transition-all flex items-center justify-center gap-2"
+                >
+                  <Sparkles className="w-5 h-5" />
+                  {isWedding ? 'Confirm RSVP' : 'Complete Registration'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── STEP: success ── */}
+          {step === 'success' && (
+            <div className="space-y-8 text-center">
+              {/* Success badge */}
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-20 h-20 rounded-full bg-premium-success/10 border-2 border-premium-success/40 flex items-center justify-center">
+                  <Check className="w-9 h-9 text-premium-success" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-display font-bold text-white">You're on the list!</h1>
+                  <p className="text-sm text-zinc-400 mt-1">
+                    Welcome, {form.firstName}. Your QR pass is ready.
+                  </p>
+                </div>
+              </div>
+
+              {/* QR pass card */}
+              <div className="relative rounded-[2rem] overflow-hidden border border-premium-gold/30 shadow-gold">
+                <div
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{ backgroundImage: `url(https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793297932531_67c9874e_1793297932595_76652526.png)` }}
+                />
+                <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+                <div className="relative p-8 space-y-5">
+                  <div className="flex items-center justify-between">
+                    <div className="w-9 h-9 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-base shadow-gold">41</div>
+                    {isWedding
+                      ? <span className="text-xs font-mono text-premium-danger flex items-center gap-1"><Heart className="w-3 h-3 fill-current" /> Wedding</span>
+                      : <span className="text-xs font-mono text-premium-neon">Corporate</span>
+                    }
+                  </div>
+                  <div className="text-left">
+                    <div className="text-xl font-display font-bold text-white">{form.firstName} {form.lastName}</div>
+                    <div className="text-sm text-zinc-400">{event.name}</div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-zinc-500">
+                    <span className="flex items-center gap-1"><CalendarDays className="w-3 h-3" /> {new Date(event.start_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                    <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {event.location_name?.split(',')[0]}</span>
+                  </div>
+                  {/* QR code placeholder */}
+                  <div className="flex flex-col items-center gap-3 py-4">
+                    <div className="w-28 h-28 bg-white rounded-2xl flex items-center justify-center">
+                      <QrCode className="w-20 h-20 text-black" />
+                    </div>
+                    <span className="font-mono text-xs text-zinc-500 tracking-widest">{qrToken}</span>
+                  </div>
+                  <div className="text-[10px] text-zinc-700 text-center font-mono uppercase tracking-widest">
+                    Present at gate entry · Valid for 1 person
+                  </div>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="grid grid-cols-2 gap-3">
+                <button type="button" className="py-3.5 rounded-2xl bg-premium-charcoal border border-premium-borderDark text-zinc-400 hover:text-white transition-all font-bold text-sm scale-on-click flex items-center justify-center gap-2">
+                  <Download className="w-4 h-4" /> Save Pass
+                </button>
+                <button type="button" className="py-3.5 rounded-2xl bg-premium-charcoal border border-premium-borderDark text-zinc-400 hover:text-white transition-all font-bold text-sm scale-on-click flex items-center justify-center gap-2">
+                  <Share2 className="w-4 h-4" /> Share
+                </button>
+              </div>
+
+              <p className="text-xs text-zinc-600">
+                Confirmation sent to <span className="text-zinc-400">{form.email}</span> & WhatsApp {form.phone}
+              </p>
+
+              <Link
+                href={`/events/${slug}`}
+                className="inline-flex items-center gap-1.5 text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
+              >
+                ← Back to event page
+              </Link>
+            </div>
+          )}
         </div>
       </div>
-    }>
-      <RegisterPageInner {...props} />
+    </div>
+  );
+}
+
+function RSVPFormWrapper({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = use(params);
+  return <RSVPFormContent slug={slug} />;
+}
+
+export default function RSVPPage({ params }: { params: Promise<{ slug: string }> }) {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-premium-black flex items-center justify-center text-zinc-500 text-sm">Loading...</div>}>
+      <RSVPFormWrapper params={params} />
     </Suspense>
   );
 }

@@ -18,6 +18,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import SlotMachineRaffle from '@/components/stage/SlotMachineRaffle';
 
 function RaffleStageContent({ slug }: { slug: string }) {
   const event =
@@ -239,18 +240,29 @@ function RaffleStageContent({ slug }: { slug: string }) {
             </div>
           )}
 
-          {/* Slot Machine Mode */}
+          {/* Slot Machine Mode — real casino lever + spinning reels */}
           {mode === 'slot' && (
-            <div className="flex gap-4 p-8 rounded-[2rem] bg-premium-surfaceDark border-2 border-premium-gold shadow-gold">
-              {[1, 2, 3].map((slot) => (
-                <div
-                  key={slot}
-                  className="w-24 h-32 rounded-2xl bg-premium-black border border-premium-borderDark flex items-center justify-center text-3xl font-display font-bold text-premium-neon"
-                >
-                  {isSpinning ? '7' : '★'}
-                </div>
-              ))}
-            </div>
+            <SlotMachineRaffle
+              eligiblePool={eligiblePool}
+              onWinner={(w) => {
+                setWinner(w);
+                confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 }, colors: ['#00F0FF', '#C5A059', '#FF3366', '#00E676'] });
+                const newDraw: RaffleDraw = {
+                  id: `raf-${Date.now()}`,
+                  event_id: event.id,
+                  prize_name: selectedPrize,
+                  prize_tier: 1,
+                  style: 'slot',
+                  winner_guest_id: w.id,
+                  drawn_at: new Date().toISOString(),
+                  audit_notes: 'Drawn live via slot machine. Verified check-in at gate.',
+                  winner: { id: w.id, name: w.name, table_number: w.table_number },
+                };
+                setPastDraws(prev => [newDraw, ...prev]);
+              }}
+              isSpinning={isSpinning}
+              winner={winner}
+            />
           )}
 
           {/* Spin Trigger Button */}

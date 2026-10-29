@@ -55,7 +55,7 @@ function StageBigScreenContent({ slug }: { slug: string }) {
   const [stageMode, setStageMode] = useState<StageModuleId>('welcome');
   const [isAutoRotating, setIsAutoRotating] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [hudVisible, setHudVisible] = useState(true);
+  const [hudVisible, setHudVisible] = useState(false);
 
   // Photo Wall State
   const [photos, setPhotos] = useState<PhotoWallUpload[]>(MOCK_PHOTO_WALL_UPLOADS);
