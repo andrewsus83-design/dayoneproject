@@ -1,6 +1,5 @@
 export type EventType = 'corporate' | 'wedding';
 export type EventStatus = 'draft' | 'active' | 'completed' | 'cancelled';
-export type PackageTier = 'free' | 'starter' | 'plus' | 'pro' | 'business' | 'scale' | 'enterprise';
 export type RsvpStatus = 'pending' | 'attending' | 'declined';
 export type RaffleStyle = 'wheel' | 'claw' | 'slot';
 export type GameType = 'live_quiz' | 'scavenger_hunt' | 'trivia' | 'bingo';
@@ -120,13 +119,11 @@ export interface Event {
   location_address: string | null;
   location_maps_url: string | null;
   status: EventStatus;
-  package_tier: PackageTier;
   guest_limit: number;
   extra_guests_purchased: number;
   is_white_label: boolean;
   theme_config: ThemeConfig;
   settings: EventSettings;
-  referral_code_used: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -204,17 +201,3 @@ export interface GameParticipant {
   guest?: Pick<Guest, 'id' | 'name'>;
 }
 
-export interface ReferralLedger {
-  id: string;
-  partner_id: string;
-  event_id: string;
-  guest_count: number;
-  package_amount: number;
-  extra_guest_amount: number;
-  cashback_percentage: number;
-  cashback_amount: number;
-  status: 'pending' | 'calculated' | 'approved' | 'paid';
-  calculated_at: string | null;
-  paid_at: string | null;
-  payout_notes: string | null;
-}

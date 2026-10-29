@@ -8,7 +8,6 @@ import {
   Gift,
   Camera,
   Gamepad2,
-  Percent,
   Settings,
   Palette,
   ExternalLink,
@@ -27,7 +26,6 @@ import { cn } from '@/lib/utils';
 const WORKSPACE_NAV_ITEMS = [
   { label: 'My Events', href: '/dashboard', icon: Calendar, exact: true },
   { label: 'Create Event', href: '/dashboard/events/new', icon: Layers, badge: 'NEW' },
-  { label: 'EO/WO Partners', href: '/dashboard/referrals', icon: Percent, badge: '18%' },
   { label: 'Theme Presets', href: '/dashboard/themes', icon: Palette },
   { label: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];

@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Header } from '@/components/dashboard/Header';
-import { PRICING_PLANS } from '@/lib/pricing';
 import { Event } from '@/lib/types';
 import { formatIDR, formatDate } from '@/lib/utils';
 import {
@@ -65,14 +64,13 @@ export default function DashboardPage() {
               iconBg: 'bg-premium-success/10 text-premium-success border-premium-success/20',
             },
             {
-              label: 'EO/WO Cashback',
-              value: formatIDR(0),
-              valueClass: 'text-premium-gold',
-              sub: 'No referral yet',
+              label: 'Photo Uploads',
+              value: '—',
+              sub: 'No uploads yet',
               icon: Sparkles,
               iconBg: 'bg-premium-gold/10 text-premium-gold border-premium-gold/20',
             },
-          ].map(({ label, value, valueClass, sub, icon: Icon, iconBg }) => (
+          ].map(({ label, value, sub, icon: Icon, iconBg }) => (
             <div
               key={label}
               className="p-7 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark hover:border-white/10 transition-colors"
@@ -85,7 +83,7 @@ export default function DashboardPage() {
                   <Icon className="w-4 h-4" />
                 </div>
               </div>
-              <div className={`text-3xl font-display font-bold leading-none ${valueClass ?? 'text-white'}`}>
+              <div className="text-3xl font-display font-bold leading-none text-white">
                 {value}
               </div>
               <div className="mt-3 text-[12px] text-zinc-500">
@@ -126,7 +124,6 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-7">
             {filteredEvents.map((evt) => {
               const isWedding = evt.event_type === 'wedding';
-              const plan = PRICING_PLANS[evt.package_tier];
               const totalCap = evt.guest_limit + evt.extra_guests_purchased;
               const checkedIn = isWedding ? 0 : 418;
               const checkInPct = checkedIn > 0 ? Math.round((checkedIn / totalCap) * 100) : 0;
@@ -173,9 +170,6 @@ export default function DashboardPage() {
                         }`}>
                           {isWedding ? <Heart className="w-3 h-3" /> : <Building className="w-3 h-3" />}
                           {evt.event_type}
-                        </span>
-                        <span className="text-[10px] px-2.5 py-1 rounded-full bg-premium-gold/15 text-premium-gold border border-premium-gold/25 font-bold uppercase tracking-wider">
-                          {evt.package_tier}
                         </span>
                       </div>
                     </div>

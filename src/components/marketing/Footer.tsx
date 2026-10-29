@@ -13,11 +13,10 @@ const LINKS = {
     ['Ballroom Stage LED', '#features'],
   ],
   'Platform': [
-    ['Pricing Plans', '#pricing'],
-    ['EO/WO Partner Program', '#partners'],
-    ['White Label Add-on', '#pricing'],
-    ['Custom Domains', '#pricing'],
     ['Create an Event', '/dashboard/events/new'],
+    ['Event Types', '#features'],
+    ['Custom Domain (BYOD)', '#features'],
+    ['Multi-Tenant Dashboard', '/dashboard'],
   ],
   'Legal': [
     ['Terms of Service', '/terms'],

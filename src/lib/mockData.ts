@@ -91,7 +91,6 @@ export const MOCK_EVENT: Event = {
   location_address: 'Jl. Asia Afrika No.8, Gelora, Kecamatan Tanah Abang, Kota Jakarta Pusat',
   location_maps_url: 'https://maps.google.com/?q=Fairmont+Jakarta',
   status: 'active',
-  package_tier: 'pro',
   guest_limit: 600,
   extra_guests_purchased: 50,
   is_white_label: false,
@@ -110,7 +109,6 @@ export const MOCK_EVENT: Event = {
     maxEmailsPerGuest: 3,
     stageConfig: DEFAULT_STAGE_CONFIG,
   },
-  referral_code_used: 'EO-JKT-VVIP',
   created_at: '2026-10-01T00:00:00Z',
   updated_at: '2026-10-21T00:00:00Z',
 };
@@ -133,7 +131,6 @@ export const MOCK_WEDDING_EVENT: Event = {
   location_address: 'Jl. Karang Mas Sejahtera, Jimbaran, Bali',
   location_maps_url: 'https://maps.google.com/?q=Ayana+Resort+Bali',
   status: 'active',
-  package_tier: 'plus',
   guest_limit: 300,
   extra_guests_purchased: 20,
   is_white_label: true,
@@ -152,7 +149,6 @@ export const MOCK_WEDDING_EVENT: Event = {
     maxEmailsPerGuest: 3,
     stageConfig: DEFAULT_STAGE_CONFIG,
   },
-  referral_code_used: 'WO-BALI-GOLD',
   created_at: '2026-10-05T00:00:00Z',
   updated_at: '2026-10-21T00:00:00Z',
 };
