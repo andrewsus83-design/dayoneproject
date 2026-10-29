@@ -5,6 +5,9 @@ import Link from 'next/link';
 import {
   MOCK_EVENT,
   MOCK_WEDDING_EVENT,
+  MOCK_CORPORATE_NEXUS_EVENT,
+  MOCK_WEDDING_BALI_EVENT,
+  MOCK_POPVERSE_EVENT,
   MOCK_PHOTO_WALL_UPLOADS,
   MOCK_RUNDOWN,
   MOCK_GUESTS,
@@ -91,7 +94,12 @@ function RundownTimeline() {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 function MobileGuestPortalContent({ slug }: { slug: string }) {
-  const event = slug === 'aria-daniel' ? MOCK_WEDDING_EVENT : MOCK_EVENT;
+  const event =
+    slug === 'aria-daniel' ? MOCK_WEDDING_EVENT
+    : slug === 'sophia-marco' ? MOCK_WEDDING_BALI_EVENT
+    : slug === 'nexus' ? MOCK_CORPORATE_NEXUS_EVENT
+    : slug === 'popverse' ? MOCK_POPVERSE_EVENT
+    : MOCK_EVENT;
   const isWedding = event.event_type === 'wedding';
   const clientDomain = getClientDomain(slug);
   const captionsEnabled = event.settings?.enablePhotoWallCaptions ?? true;
@@ -128,8 +136,29 @@ function MobileGuestPortalContent({ slug }: { slug: string }) {
   // Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Guest + QR
-  const [guest] = useState<Guest>(MOCK_GUESTS[0]);
+  // Guest + QR — safe fallback so page renders even with empty MOCK_GUESTS
+  const [guest] = useState<Guest>(MOCK_GUESTS[0] ?? {
+    id: 'guest-preview',
+    event_id: event.id,
+    name: 'Preview Guest',
+    email: 'preview@all41.app',
+    phone: null,
+    category: 'General',
+    table_number: null,
+    plus_one_count: 0,
+    rsvp_status: 'attending' as const,
+    rsvp_notes: null,
+    custom_fields: {},
+    qr_code_token: 'QR-PREVIEW-0000',
+    is_checked_in: false,
+    checked_in_at: null,
+    checked_in_by: null,
+    photos_uploaded_count: 0,
+    emails_sent_count: 0,
+    whatsapp_sent_count: 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
 
   React.useEffect(() => {

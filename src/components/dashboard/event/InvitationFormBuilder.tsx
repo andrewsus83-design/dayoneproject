@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import {
   AlignLeft, CheckSquare, ChevronDown, Hash, Mail, Phone, Plus, Trash2,
   GripVertical, Check, QrCode, Calendar, MapPin, Clock, Users, ExternalLink,
-  Copy, Eye, ToggleLeft, ToggleRight, Settings2, X,
+  Copy, Eye, ToggleLeft, ToggleRight, Settings2, X, Share2, List, Smartphone,
+  Link, Download, Shield,
 } from 'lucide-react';
 
 type QuestionType = 'text' | 'long_text' | 'yes_no' | 'multiple' | 'number' | 'email' | 'phone';
@@ -64,7 +65,7 @@ interface InvitationFormBuilderProps {
 }
 
 export function InvitationFormBuilder({ isWedding, eventName, primaryColor, slug }: InvitationFormBuilderProps) {
-  const [formTab, setFormTab] = useState<'cover' | 'questions' | 'closing' | 'settings'>('cover');
+  const [formTab, setFormTab] = useState<'cover' | 'questions' | 'closing' | 'share' | 'responses' | 'pwa' | 'settings'>('cover');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [acceptingResponses, setAcceptingResponses] = useState(true);
   const [replyBy, setReplyBy] = useState('');
@@ -75,6 +76,25 @@ export function InvitationFormBuilder({ isWedding, eventName, primaryColor, slug
   const [formName, setFormName] = useState(isWedding ? `RSVP · ${eventName}` : `Register · ${eventName}`);
   const [copiedLink, setCopiedLink] = useState(false);
   const [previewName] = useState('Rafael Cruz');
+
+  // Add-question picker state
+  const [showAddQuestion, setShowAddQuestion] = useState(false);
+  const [newLabel, setNewLabel] = useState('');
+  const [newType, setNewType] = useState<QuestionType>('text');
+
+  const addCustomQuestion = () => {
+    if (!newLabel.trim()) return;
+    setQuestions((prev) => [...prev, {
+      id: `q-${Date.now()}`,
+      type: newType,
+      label: newLabel.trim(),
+      required: false,
+      options: newType === 'multiple' ? ['Option 1', 'Option 2'] : undefined,
+    }]);
+    setNewLabel('');
+    setNewType('text');
+    setShowAddQuestion(false);
+  };
 
   const suggested = isWedding ? SUGGESTED_WEDDING : SUGGESTED_CORPORATE;
   const addSuggested = (q: Question) => {
@@ -92,10 +112,13 @@ export function InvitationFormBuilder({ isWedding, eventName, primaryColor, slug
   const toggleRequired = (id: string) => setQuestions((prev) => prev.map((q) => q.id === id ? { ...q, required: !q.required } : q));
 
   const TABS = [
-    { id: 'cover' as const, label: 'Cover' },
-    { id: 'questions' as const, label: `Questions ${questions.length > 0 ? questions.length : '0'}` },
-    { id: 'closing' as const, label: 'Closing' },
-    { id: 'settings' as const, label: 'Settings' },
+    { id: 'cover' as const, label: 'Cover', icon: Eye },
+    { id: 'questions' as const, label: `Questions (${questions.length})`, icon: List },
+    { id: 'closing' as const, label: 'Closing', icon: QrCode },
+    { id: 'share' as const, label: 'Share', icon: Share2 },
+    { id: 'responses' as const, label: 'Responses', icon: CheckSquare },
+    { id: 'pwa' as const, label: 'PWA', icon: Smartphone },
+    { id: 'settings' as const, label: 'Settings', icon: Settings2 },
   ];
 
   return (
@@ -103,16 +126,19 @@ export function InvitationFormBuilder({ isWedding, eventName, primaryColor, slug
       {/* Left: Form builder */}
       <div className="xl:col-span-7 space-y-4">
         {/* Tabs */}
-        <div className="flex items-center gap-1 bg-premium-surfaceDark border border-premium-borderDark rounded-2xl p-1.5 w-max">
+        <div className="flex items-center gap-1 flex-wrap">
           {TABS.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => setFormTab(t.id)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                formTab === t.id ? 'bg-premium-gold text-black shadow-gold' : 'text-zinc-400 hover:text-white'
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold scale-on-click transition-all ${
+                formTab === t.id
+                  ? 'bg-premium-gold text-black shadow-gold'
+                  : 'bg-premium-surfaceDark text-zinc-400 border border-premium-borderDark hover:text-white'
               }`}
             >
+              <t.icon className="w-3.5 h-3.5" />
               {t.label}
             </button>
           ))}
@@ -128,27 +154,30 @@ export function InvitationFormBuilder({ isWedding, eventName, primaryColor, slug
               <label className="text-[10px] font-mono uppercase text-zinc-500 tracking-widest mb-2 block">Color Theme</label>
               <div className="flex gap-2 flex-wrap">
                 {[
-                  { name: 'Golden Field', c1: '#C5A059', c2: '#09090B' },
-                  { name: 'Sage Capsule', c1: '#10B981', c2: '#0A100D' },
-                  { name: 'Mint Hero', c1: '#00F0FF', c2: '#09090B' },
-                  { name: 'Neon Launch', c1: '#00F0FF', c2: '#FF3366' },
-                  { name: 'Gala Gold', c1: '#C5A059', c2: '#BE123C' },
-                  { name: 'Parol Party', c1: '#FF3366', c2: '#F59E0B' },
-                  { name: 'Summit', c1: '#3B82F6', c2: '#8B5CF6' },
+                  { name: 'Golden Field', c1: '#C5A059', c2: '#09090B', c3: '#F5F0E8' },
+                  { name: 'Sage Garden', c1: '#10B981', c2: '#0A100D', c3: '#D1FAE5' },
+                  { name: 'Mint Hero', c1: '#00F0FF', c2: '#09090B', c3: '#0E7490' },
+                  { name: 'Neon Launch', c1: '#00F0FF', c2: '#09090B', c3: '#FF3366' },
+                  { name: 'Gala Gold', c1: '#C5A059', c2: '#0F0A00', c3: '#BE123C' },
+                  { name: 'Parol Party', c1: '#FF3366', c2: '#1A0A00', c3: '#F59E0B' },
+                  { name: 'Summit', c1: '#3B82F6', c2: '#0A0A1A', c3: '#8B5CF6' },
+                  { name: 'Bali Blush', c1: '#F9A8D4', c2: '#1A0010', c3: '#FB923C' },
                 ].map((th) => (
                   <button
                     key={th.name}
                     type="button"
                     className="flex items-center gap-1.5 px-2 py-1.5 rounded-full border border-premium-borderDark text-[10px] font-bold text-zinc-300 hover:border-premium-gold/50 scale-on-click"
                   >
-                    <span className="flex gap-0.5">
-                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: th.c1 }} />
-                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: th.c2 }} />
+                    <span className="flex gap-0.5 items-center">
+                      <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: th.c1 }} />
+                      <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: th.c2 }} />
+                      <span className="w-2.5 h-2.5 rounded-full opacity-70" style={{ backgroundColor: th.c3 }} title="Accent (optional)" />
                     </span>
                     {th.name}
                   </button>
                 ))}
               </div>
+              <p className="text-[10px] text-zinc-600 mt-1.5">3 swatches: primary · background · accent (optional)</p>
             </div>
 
             {/* Event details section */}
@@ -278,11 +307,63 @@ export function InvitationFormBuilder({ isWedding, eventName, primaryColor, slug
 
             <button
               type="button"
+              onClick={() => setShowAddQuestion((v) => !v)}
               className="w-full py-3 rounded-2xl border-2 border-dashed border-premium-borderDark text-zinc-500 text-xs font-bold hover:border-premium-gold/50 flex items-center justify-center gap-2 scale-on-click"
             >
               <Plus className="w-4 h-4" />
               Add a question
             </button>
+
+            {showAddQuestion && (
+              <div className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-gold/30 space-y-3">
+                <div className="text-[10px] font-mono uppercase text-zinc-500 tracking-widest">New question</div>
+                <div className="flex gap-2 flex-wrap">
+                  {(Object.keys(TYPE_LABELS) as QuestionType[]).map((t) => {
+                    const Icon = TYPE_ICONS[t];
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setNewType(t)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[10px] font-bold scale-on-click ${
+                          newType === t
+                            ? 'bg-premium-gold text-black border-premium-gold'
+                            : 'border-premium-borderDark text-zinc-400 hover:border-premium-gold/40'
+                        }`}
+                      >
+                        <Icon className="w-3 h-3" />
+                        {TYPE_LABELS[t]}
+                      </button>
+                    );
+                  })}
+                </div>
+                <input
+                  autoFocus
+                  value={newLabel}
+                  onChange={(e) => setNewLabel(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') addCustomQuestion(); if (e.key === 'Escape') setShowAddQuestion(false); }}
+                  placeholder="Question label…"
+                  className="w-full bg-premium-charcoal border border-premium-borderDark text-white px-3 py-2 rounded-xl text-xs outline-none focus:border-premium-gold"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={addCustomQuestion}
+                    disabled={!newLabel.trim()}
+                    className="flex-1 py-2 rounded-xl bg-premium-gold text-black text-xs font-bold disabled:opacity-40 scale-on-click hover:bg-premium-goldHover"
+                  >
+                    Add question
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddQuestion(false)}
+                    className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-400 text-xs font-bold scale-on-click"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Suggested questions */}
             <div>
@@ -461,6 +542,219 @@ export function InvitationFormBuilder({ isWedding, eventName, primaryColor, slug
                   <input placeholder="https://" className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white px-3 py-2 rounded-xl text-xs outline-none focus:border-premium-gold" />
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* SHARE TAB */}
+        {formTab === 'share' && (
+          <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-5">
+            <div>
+              <h3 className="font-display font-bold text-white text-base flex items-center gap-2">
+                <Share2 className="w-4 h-4 text-premium-gold" /> Share Your Form
+              </h3>
+              <p className="text-[11px] text-zinc-400 mt-0.5">Distribute the RSVP link to guests via WhatsApp, email, or QR code.</p>
+            </div>
+
+            {/* Link */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Public RSVP Link</label>
+              <div className="flex items-center gap-2 bg-premium-surfaceDark border border-premium-borderDark rounded-2xl px-4 py-3">
+                <Link className="w-4 h-4 text-premium-neon shrink-0" />
+                <span className="flex-1 font-mono text-xs text-premium-neon truncate">https://{slug}.all41.app/register</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(`https://${slug}.all41.app/register`);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-premium-gold text-black font-bold text-[10px] scale-on-click"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+
+            {/* QR code */}
+            <div className="flex flex-col sm:flex-row items-start gap-6">
+              <div className="w-32 h-32 bg-white rounded-2xl flex items-center justify-center shrink-0 p-2">
+                <div className="w-full h-full bg-[repeating-linear-gradient(0deg,#000_0px,#000_4px,transparent_4px,transparent_8px),repeating-linear-gradient(90deg,#000_0px,#000_4px,transparent_4px,transparent_8px)] opacity-20 rounded" />
+                <div className="absolute w-20 h-20 flex items-center justify-center">
+                  <QrCode className="w-16 h-16 text-black" />
+                </div>
+              </div>
+              <div className="space-y-3 flex-1">
+                <div>
+                  <div className="text-sm font-bold text-white">QR Code</div>
+                  <div className="text-xs text-zinc-400 mt-0.5">Print or display on invitation cards. Guests scan to open the RSVP form.</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button type="button" className="px-4 py-2 rounded-xl bg-premium-gold text-black font-bold text-xs scale-on-click flex items-center gap-1.5">
+                    <Download className="w-3.5 h-3.5" /> Download PNG
+                  </button>
+                  <button type="button" className="px-4 py-2 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-white font-bold text-xs scale-on-click">
+                    Download SVG
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Share channels */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Share via</label>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: 'WhatsApp', color: 'bg-green-600 hover:bg-green-700' },
+                  { label: 'Email', color: 'bg-blue-600 hover:bg-blue-700' },
+                  { label: 'Telegram', color: 'bg-sky-500 hover:bg-sky-600' },
+                ].map((c) => (
+                  <button
+                    key={c.label}
+                    type="button"
+                    className={`py-2.5 rounded-xl text-white font-bold text-xs scale-on-click transition-colors ${c.color}`}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* RESPONSES TAB */}
+        {formTab === 'responses' && (
+          <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-display font-bold text-white text-base flex items-center gap-2">
+                  <CheckSquare className="w-4 h-4 text-premium-gold" /> Responses
+                </h3>
+                <p className="text-[11px] text-zinc-400 mt-0.5">View and export all submitted RSVP responses.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button type="button" className="px-3.5 py-2 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-white font-bold text-xs scale-on-click flex items-center gap-1.5">
+                  <Download className="w-3.5 h-3.5" /> Export CSV
+                </button>
+              </div>
+            </div>
+
+            {/* Stats strip */}
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Total RSVPs', value: '127', color: 'text-white' },
+                { label: 'Attending', value: '118', color: 'text-premium-success' },
+                { label: 'Declined', value: '9', color: 'text-premium-danger' },
+              ].map((s) => (
+                <div key={s.label} className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-center">
+                  <div className={`text-2xl font-display font-bold ${s.color}`}>{s.value}</div>
+                  <div className="text-[10px] text-zinc-400 mt-0.5 font-mono">{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Sample response list */}
+            <div className="rounded-2xl overflow-hidden border border-premium-borderDark">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-premium-surfaceDark text-zinc-400 font-mono uppercase text-[10px] tracking-wider">
+                    <th className="p-3 pl-4">Name</th>
+                    <th className="p-3">Attending</th>
+                    <th className="p-3">Guests</th>
+                    <th className="p-3 pr-4">Submitted</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-premium-borderDark/60">
+                  {[
+                    { name: 'Sarah Kim', att: true, guests: 2, date: 'Oct 28' },
+                    { name: 'Marco Reyes', att: true, guests: 1, date: 'Oct 27' },
+                    { name: 'Lena Hoffman', att: false, guests: 0, date: 'Oct 26' },
+                    { name: 'James Tan', att: true, guests: 4, date: 'Oct 25' },
+                  ].map((r) => (
+                    <tr key={r.name} className="hover:bg-premium-surfaceDark/40 transition-colors">
+                      <td className="p-3 pl-4 font-bold text-white">{r.name}</td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${r.att ? 'bg-premium-success/15 text-premium-success border border-premium-success/30' : 'bg-premium-danger/15 text-premium-danger border border-premium-danger/30'}`}>
+                          {r.att ? 'Yes' : 'No'}
+                        </span>
+                      </td>
+                      <td className="p-3 text-zinc-400">{r.guests}</td>
+                      <td className="p-3 pr-4 text-zinc-500 font-mono">{r.date}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[10px] text-zinc-500 font-mono text-center">Showing 4 of 127 responses</p>
+          </div>
+        )}
+
+        {/* PWA TAB */}
+        {formTab === 'pwa' && (
+          <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-5">
+            <div>
+              <h3 className="font-display font-bold text-white text-base flex items-center gap-2">
+                <Smartphone className="w-4 h-4 text-premium-gold" /> PWA Admin Register
+              </h3>
+              <p className="text-[11px] text-zinc-400 mt-0.5">
+                Install the admin PWA on your device. Registration scanning requires OTP login sent to your registered admin email.
+              </p>
+            </div>
+
+            {/* OTP Login notice */}
+            <div className="p-4 rounded-2xl bg-blue-950/40 border border-blue-800/40 flex items-start gap-3">
+              <Shield className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+              <div className="text-xs text-blue-300">
+                <span className="font-bold">Secure OTP Login — </span>
+                To activate scan mode, the admin must authenticate via a one-time password sent to their registered email address in the backend. No password is stored on device.
+              </div>
+            </div>
+
+            {/* Install card */}
+            <div className="p-6 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-center space-y-4">
+              <div className="w-16 h-16 bg-premium-gold rounded-2xl flex items-center justify-center mx-auto shadow-gold">
+                <span className="text-premium-black font-display font-bold text-2xl">41</span>
+              </div>
+              <div>
+                <div className="text-sm font-bold text-white">all41 Admin Scanner</div>
+                <div className="text-xs text-zinc-400 mt-0.5">Check-in, register guests, and scan QR passes</div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <a
+                  href={`https://${slug}.all41.app/admin`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="py-3 rounded-xl bg-premium-black border border-premium-borderDark text-xs font-bold text-white flex flex-col items-center gap-1 scale-on-click hover:border-premium-gold/50"
+                >
+                  <Smartphone className="w-5 h-5 text-premium-gold" />
+                  <span>Open Admin PWA</span>
+                </a>
+                <button
+                  type="button"
+                  className="py-3 rounded-xl bg-premium-gold text-black text-xs font-bold flex flex-col items-center gap-1 scale-on-click shadow-gold"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(`https://${slug}.all41.app/admin`);
+                  }}
+                >
+                  <Link className="w-5 h-5" />
+                  <span>Copy Admin URL</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Admin setup steps */}
+            <div className="space-y-2">
+              <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Setup Steps</p>
+              {[
+                'Open the Admin PWA link on your phone',
+                'Enter your admin email (registered in backend)',
+                'Receive and enter the OTP code',
+                'Tap "Activate Scanner" to start scanning guest QR codes',
+              ].map((step, i) => (
+                <div key={i} className="flex items-start gap-3 text-xs text-zinc-300">
+                  <span className="shrink-0 w-5 h-5 rounded-full bg-premium-gold text-black font-bold text-[10px] flex items-center justify-center">{i + 1}</span>
+                  {step}
+                </div>
+              ))}
             </div>
           </div>
         )}

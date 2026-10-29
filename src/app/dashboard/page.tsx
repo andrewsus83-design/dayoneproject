@@ -4,7 +4,14 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Header } from '@/components/dashboard/Header';
 import { Event } from '@/lib/types';
-import { formatIDR, formatDate } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
+import {
+  MOCK_EVENT,
+  MOCK_WEDDING_EVENT,
+  MOCK_CORPORATE_NEXUS_EVENT,
+  MOCK_WEDDING_BALI_EVENT,
+  MOCK_POPVERSE_EVENT,
+} from '@/lib/mockData';
 import {
   Calendar,
   Users,
@@ -24,9 +31,17 @@ import {
 export default function DashboardPage() {
   const [filter, setFilter] = useState<'all' | 'corporate' | 'wedding'>('all');
 
-  const events: Event[] = [];
+  const events: Event[] = [
+    MOCK_EVENT,
+    MOCK_CORPORATE_NEXUS_EVENT,
+    MOCK_POPVERSE_EVENT,
+    MOCK_WEDDING_EVENT,
+    MOCK_WEDDING_BALI_EVENT,
+  ];
   const filteredEvents =
     filter === 'all' ? events : events.filter((e) => e.event_type === filter);
+
+  const totalCapacity = events.reduce((sum, e) => sum + e.guest_limit + e.extra_guests_purchased, 0);
 
   return (
     <div className="flex-1 flex flex-col font-sans select-none">
@@ -44,29 +59,29 @@ export default function DashboardPage() {
           {[
             {
               label: 'Active Events',
-              value: '0 Events',
-              sub: 'No events yet',
+              value: `${events.length} Events`,
+              sub: `${events.filter(e => e.event_type === 'corporate').length} Corporate · ${events.filter(e => e.event_type === 'wedding').length} Wedding`,
               icon: Calendar,
               iconBg: 'bg-premium-neon/10 text-premium-neon border-premium-neon/20',
             },
             {
               label: 'Total Capacity',
-              value: '—',
-              sub: 'Create your first event',
+              value: `${totalCapacity.toLocaleString()} Pax`,
+              sub: 'Across all live events',
               icon: Users,
               iconBg: 'bg-premium-gold/10 text-premium-gold border-premium-gold/20',
             },
             {
               label: 'Checked In Today',
-              value: '—',
-              sub: 'No active gate',
+              value: '418',
+              sub: '64.2% of TechUnite gate',
               icon: QrCode,
               iconBg: 'bg-premium-success/10 text-premium-success border-premium-success/20',
             },
             {
               label: 'Photo Uploads',
-              value: '—',
-              sub: 'No uploads yet',
+              value: '238 Media',
+              sub: '92% WebP · 8% Video',
               icon: Sparkles,
               iconBg: 'bg-premium-gold/10 text-premium-gold border-premium-gold/20',
             },

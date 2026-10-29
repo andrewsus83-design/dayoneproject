@@ -11,13 +11,20 @@ import { InvitationFormBuilder } from '@/components/dashboard/event/InvitationFo
 import { GamesBuilder } from '@/components/dashboard/event/GamesBuilder';
 import { PhotoWallManager } from '@/components/dashboard/event/PhotoWallManager';
 import { RaffleEngine } from '@/components/dashboard/event/RaffleEngine';
+import { EventDesignStudio } from '@/components/dashboard/event/EventDesignStudio';
+import { CommentsWall } from '@/components/dashboard/event/CommentsWall';
 import {
   MOCK_EVENT,
   MOCK_WEDDING_EVENT,
+  MOCK_CORPORATE_NEXUS_EVENT,
+  MOCK_WEDDING_BALI_EVENT,
+  MOCK_POPVERSE_EVENT,
+  POPVERSE_QUIZ_QUESTIONS,
   MOCK_GUESTS,
   MOCK_PHOTO_WALL_UPLOADS,
   MOCK_RAFFLES,
   DEFAULT_STAGE_CONFIG,
+  MOCK_REGISTRATIONS,
 } from '@/lib/mockData';
 import { Guest, PhotoWallUpload } from '@/lib/types';
 import { formatDate, formatIDR } from '@/lib/utils';
@@ -61,6 +68,7 @@ import {
   TrendingUp,
   Heart,
   Briefcase,
+  Palette,
 } from 'lucide-react';
 
 interface EventHubProps {
@@ -89,7 +97,12 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
   };
 
   // Choose mock event or custom title
-  const baseEvent = eventId === 'evt-aria-daniel-2026' ? MOCK_WEDDING_EVENT : MOCK_EVENT;
+  const baseEvent =
+    eventId === 'evt-aria-daniel-2026' ? MOCK_WEDDING_EVENT
+    : eventId === 'evt-nexus-innovation-2026' ? MOCK_CORPORATE_NEXUS_EVENT
+    : eventId === 'evt-sophia-marco-2026' ? MOCK_WEDDING_BALI_EVENT
+    : eventId === 'evt-popverse-converge-2026' ? MOCK_POPVERSE_EVENT
+    : MOCK_EVENT;
   const isWedding = baseEvent.event_type === 'wedding';
   const event = {
     ...baseEvent,
@@ -106,11 +119,9 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
   // Guests & Registrations state
   const [guestsList, setGuestsList] = useState<Guest[]>(MOCK_GUESTS);
   const [searchGuest, setSearchGuest] = useState('');
-  const [registrations, setRegistrations] = useState([
-    { id: 'reg-1', name: 'Alina Zhang', email: 'alina.zhang@sequoia.sg', phone: '+6591238841', status: 'pending', tickets: 1, submittedAt: '10 mins ago', answers: { company: 'Sequoia APAC', dietary: 'Vegetarian' } },
-    { id: 'reg-2', name: 'Reza Pratama', email: 'reza@techinnovate.id', phone: '+62811987654', status: 'pending', tickets: 2, submittedAt: '25 mins ago', answers: { company: 'TechInnovate ID', dietary: 'Halal' } },
-    { id: 'reg-3', name: 'Dr. Michael Chen', email: 'm.chen@nus.edu.sg', phone: '+6588219002', status: 'approved', tickets: 1, submittedAt: '1 hour ago', answers: { company: 'NUS FinTech Lab', dietary: 'None' } },
-  ]);
+  const [registrations, setRegistrations] = useState(
+    MOCK_REGISTRATIONS[eventId] ?? MOCK_REGISTRATIONS['evt-techunite-2026']
+  );
 
   // Broadcast state
   const [broadcastChannel, setBroadcastChannel] = useState<'whatsapp' | 'email'>('whatsapp');
@@ -122,7 +133,7 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
   const [captionsOn, setCaptionsOn] = useState(true);
 
   // Games sub-tab
-  const [gamesSubTab, setGamesSubTab] = useState<'quiz' | 'scavenger'>('quiz');
+  const [gamesSubTab, setGamesSubTab] = useState<'quiz' | 'scavenger' | 'link'>('quiz');
 
   // Guests sub-tab
   const [guestsSubTab, setGuestsSubTab] = useState<'list' | 'invitation' | 'import'>('list');
@@ -164,12 +175,15 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
     });
   };
 
-  // Games Question Bank State
-  const [quizQuestions, setQuizQuestions] = useState([
-    { id: 'q-1', text: 'In what year was All41 founded?', options: ['2023', '2024', '2025', '2026'], answer: 1, points: 1000 },
-    { id: 'q-2', text: 'Which regional payment rail powers our QR check-in tokenization?', options: ['QRIS Realtime', 'Swift GPI', 'FedNow', 'SEPA'], answer: 0, points: 1200 },
-    { id: 'q-3', text: 'What is the maximum allowed WebP image size for stage photowall?', options: ['500KB', '2MB', '10MB', '50MB'], answer: 1, points: 1000 },
-  ]);
+  // Games Question Bank State — seeded from event
+  const defaultQuestions = eventId === 'evt-popverse-converge-2026'
+    ? POPVERSE_QUIZ_QUESTIONS.slice(0, 10)
+    : [
+        { id: 'q-1', text: 'In what year was All41 founded?', options: ['2023', '2024', '2025', '2026'], answer: 1, points: 1000 },
+        { id: 'q-2', text: 'Which regional payment rail powers our QR check-in tokenization?', options: ['QRIS Realtime', 'Swift GPI', 'FedNow', 'SEPA'], answer: 0, points: 1200 },
+        { id: 'q-3', text: 'What is the maximum allowed WebP image size for stage photowall?', options: ['500KB', '2MB', '10MB', '50MB'], answer: 1, points: 1000 },
+      ];
+  const [quizQuestions, setQuizQuestions] = useState(defaultQuestions);
 
   // Door Prize State
   const [raffleStyle, setRaffleStyle] = useState<'wheel' | 'slot' | 'claw'>('slot');
@@ -209,82 +223,63 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
 
   return (
     <div className="flex-1 flex flex-col font-sans select-none bg-premium-black text-zinc-100 min-h-screen">
-      {/* Top Header */}
-      <Header
-        title={event.name}
-        subtitle={`${isWedding ? 'Luxury Wedding' : 'Corporate Summit'} • Live Subdomain: ${event.slug}.all41.app`}
-        actionText="← All Workspace Events"
-        actionHref="/dashboard"
-      />
+      {/* Slim top bar — breadcrumb + quick actions only */}
+      <div className="h-14 flex items-center justify-between px-8 border-b border-premium-borderDark/60 flex-shrink-0 bg-premium-black/80 backdrop-blur-sm sticky top-0 z-30">
+        <div className="flex items-center gap-3 min-w-0">
+          <Link href="/dashboard" className="text-zinc-600 hover:text-zinc-400 transition-colors flex-shrink-0">
+            <ArrowRight className="w-4 h-4 rotate-180" />
+          </Link>
+          <span className="text-zinc-700">/</span>
+          <span className="text-sm font-display font-semibold text-white truncate">{event.name}</span>
+          {isWedding
+            ? <Heart className="w-3.5 h-3.5 text-premium-danger flex-shrink-0" />
+            : <Briefcase className="w-3.5 h-3.5 text-premium-neon flex-shrink-0" />
+          }
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/events/${event.slug}`}
+            target="_blank"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-premium-borderDark text-xs font-bold text-zinc-400 hover:text-white hover:border-white/20 transition-all scale-on-click"
+          >
+            <Globe className="w-3.5 h-3.5" />
+            Guest View
+          </Link>
+          <Link
+            href={`/events/${event.slug}/gate`}
+            target="_blank"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-premium-gold text-black text-xs font-bold hover:bg-premium-goldHover transition-all scale-on-click shadow-gold"
+          >
+            <QrCode className="w-3.5 h-3.5" />
+            Gate
+          </Link>
+        </div>
+      </div>
 
-      <div className="p-6 sm:p-8 max-w-7xl mx-auto w-full space-y-8">
-        
+      <div className="px-8 py-8 max-w-5xl mx-auto w-full space-y-8">
+
         {/* Creation Success Banner */}
         {isJustCreated && (
-          <div className="p-5 rounded-[2rem] bg-premium-charcoal border-2 border-premium-gold shadow-gold flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4">
+          <div className="p-5 rounded-2xl bg-premium-charcoal border border-premium-gold/40 shadow-gold flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-premium-gold/20 text-premium-gold flex items-center justify-center border border-premium-gold/40 shadow-gold flex-shrink-0">
-                <Sparkles className="w-6 h-6" />
+              <div className="w-10 h-10 rounded-xl bg-premium-gold/15 text-premium-gold flex items-center justify-center border border-premium-gold/30 flex-shrink-0">
+                <Sparkles className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-lg font-display font-bold text-white">Event Launched Successfully!</h3>
-                <p className="text-xs text-zinc-300">
-                  Welcome to your dedicated Event Command Suite. Access Overview, Guests, Broadcast, Games, Door Prize, and LIVE Launchers below.
-                </p>
+                <h3 className="text-sm font-display font-bold text-white">Event live — ready to manage</h3>
+                <p className="text-xs text-zinc-500 mt-0.5">Use the sidebar to navigate between sections.</p>
               </div>
             </div>
             <Link
               href={`/events/${event.slug}`}
               target="_blank"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-premium-gold text-black font-bold text-xs shadow-gold scale-on-click whitespace-nowrap"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-premium-gold text-black font-bold text-xs shadow-gold scale-on-click whitespace-nowrap"
             >
-              <span>Open Guest PWA</span>
+              Open Guest PWA
               <ExternalLink className="w-3.5 h-3.5" />
             </Link>
           </div>
         )}
-
-        {/* TOP TAB SWITCHER (The 10 User-Specified Menus) */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-premium-borderDark/60 hide-scrollbar">
-          {[
-            { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-            { id: 'guests', label: 'Guests', icon: Users },
-            { id: 'registrations', label: 'Registrations', icon: ClipboardCheck, badge: '2 Pending' },
-            { id: 'broadcast', label: 'Broadcast', icon: Radio },
-            { id: 'games', label: 'Games', icon: Gamepad2 },
-            { id: 'doorprize', label: 'Door Prize', icon: Gift },
-            { id: 'photos', label: 'Photos', icon: Camera },
-            { id: 'insights', label: 'Insights', icon: BarChart3 },
-            { id: 'live', label: 'LIVE', icon: Play, isLive: true },
-            { id: 'setting', label: 'Setting', icon: Settings },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => handleTabChange(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all scale-on-click whitespace-nowrap ${
-                  isActive
-                    ? 'bg-premium-gold text-black shadow-gold font-display'
-                    : 'bg-premium-surfaceDark/60 border border-premium-borderDark text-zinc-400 hover:text-white hover:bg-premium-charcoal'
-                }`}
-              >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-black' : tab.isLive ? 'text-premium-neon' : 'text-zinc-400'}`} />
-                <span>{tab.label}</span>
-                {tab.isLive && (
-                  <span className="w-2 h-2 rounded-full bg-premium-success animate-ping" />
-                )}
-                {tab.badge && !isActive && (
-                  <span className="text-[9px] px-1.5 py-0.2 rounded-md bg-premium-danger/20 text-premium-danger font-mono font-bold">
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
 
         {/* =========================================================================
             MENU 1: OVERVIEW (Event Info, Landing Page Builder, Invitation Form Builder)
@@ -454,7 +449,20 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
         )}
 
         {/* =========================================================================
-            MENU 2: GUESTS (Roster, Seating Table, VIP Badges, CSV)
+            MENU 2: DESIGN STUDIO
+           ========================================================================= */}
+        {activeTab === 'design' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <div>
+              <h3 className="text-2xl font-display font-bold text-white">Design Studio</h3>
+              <p className="text-xs text-zinc-400">Customize fonts, colors, and card styles for your event page.</p>
+            </div>
+            <EventDesignStudio isWedding={isWedding} />
+          </div>
+        )}
+
+        {/* =========================================================================
+            MENU 3: GUESTS (Roster, Seating Table, VIP Badges, CSV)
            ========================================================================= */}
         {activeTab === 'guests' && (
           <div className="space-y-6 animate-in fade-in duration-200">
@@ -575,7 +583,7 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setActiveTab('overview')}
+                  onClick={() => { setActiveTab('overview'); setOverviewSubTab('invitation'); }}
                   className="px-5 py-2.5 rounded-xl bg-premium-gold text-black font-bold text-xs shadow-gold scale-on-click"
                 >
                   Open Invitation Builder →
@@ -852,6 +860,21 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
               </div>
             </div>
             <PhotoWallManager />
+          </div>
+        )}
+
+        {/* =========================================================================
+            MENU 7b: COMMENTS WALL
+           ========================================================================= */}
+        {activeTab === 'comments' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-2xl font-display font-bold text-white">Comments Wall</h3>
+                <p className="text-xs text-zinc-400">Live guest messages, moderation queue, and stage display wall.</p>
+              </div>
+            </div>
+            <CommentsWall isWedding={isWedding} />
           </div>
         )}
 

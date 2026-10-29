@@ -470,7 +470,7 @@ function RegisterPWAContent({ slug }: { slug: string }) {
             <div className="p-4 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-2">
               <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 font-bold block mb-3">Quick Actions</span>
               <a
-                href={`/dashboard/events/techunite-apac-2026/checkin`}
+                href={`/events/${slug}/gate`}
                 target="_blank"
                 className="flex items-center gap-2.5 w-full px-4 py-3 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-white text-xs font-bold hover:border-premium-gold/40 hover:text-premium-gold transition-all scale-on-click"
               >

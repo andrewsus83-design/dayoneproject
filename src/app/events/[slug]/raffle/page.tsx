@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, use, Suspense } from 'react';
 import Link from 'next/link';
-import { MOCK_EVENT, MOCK_GUESTS, MOCK_RAFFLES } from '@/lib/mockData';
+import { MOCK_EVENT, MOCK_CORPORATE_NEXUS_EVENT, MOCK_WEDDING_BALI_EVENT, MOCK_POPVERSE_EVENT, MOCK_WEDDING_EVENT, MOCK_GUESTS, MOCK_RAFFLES } from '@/lib/mockData';
 import { RaffleDraw, Guest } from '@/lib/types';
 import { formatDateTime } from '@/lib/utils';
 import {
@@ -20,6 +20,12 @@ import {
 import confetti from 'canvas-confetti';
 
 function RaffleStageContent({ slug }: { slug: string }) {
+  const event =
+    slug === 'aria-daniel' ? MOCK_WEDDING_EVENT :
+    slug === 'sophia-marco' ? MOCK_WEDDING_BALI_EVENT :
+    slug === 'nexus' ? MOCK_CORPORATE_NEXUS_EVENT :
+    slug === 'popverse' ? MOCK_POPVERSE_EVENT :
+    MOCK_EVENT;
   const [mode, setMode] = useState<'wheel' | 'claw' | 'slot'>('wheel');
   const [selectedPrize, setSelectedPrize] = useState<string>('Apple MacBook Pro M4 Max (16-inch)');
   const [isSpinning, setIsSpinning] = useState(false);
@@ -58,7 +64,7 @@ function RaffleStageContent({ slug }: { slug: string }) {
       // Append to past draws
       const newDraw: RaffleDraw = {
         id: `raf-${Date.now()}`,
-        event_id: MOCK_EVENT.id,
+        event_id: event.id,
         prize_name: selectedPrize,
         prize_tier: 1,
         style: mode,
@@ -120,7 +126,7 @@ function RaffleStageContent({ slug }: { slug: string }) {
           </Link>
           <div>
             <h1 className="text-xl font-display font-medium text-white flex items-center gap-3">
-              <span>{MOCK_EVENT.name} • Door Prize Arena</span>
+              <span>{event.name} • Door Prize Arena</span>
               <span className="text-xs px-3 py-1 rounded-full bg-premium-gold/20 text-premium-gold font-bold border border-premium-gold/30 uppercase tracking-wider">
                 Audited Pool
               </span>

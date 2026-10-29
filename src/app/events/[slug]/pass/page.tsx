@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, use, Suspense } from 'react';
 import Link from 'next/link';
-import { MOCK_EVENT, MOCK_GUESTS } from '@/lib/mockData';
+import { MOCK_EVENT, MOCK_WEDDING_EVENT, MOCK_CORPORATE_NEXUS_EVENT, MOCK_WEDDING_BALI_EVENT, MOCK_POPVERSE_EVENT, MOCK_GUESTS } from '@/lib/mockData';
 import { Guest } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
 import { getClientDomain } from '@/lib/domain';
@@ -22,7 +22,34 @@ import {
 import QRCode from 'qrcode';
 
 function GuestMobilePassContent({ slug }: { slug: string }) {
-  const [guest, setGuest] = useState<Guest>(MOCK_GUESTS[0]); // Budi Santoso
+  const event =
+    slug === 'aria-daniel' ? MOCK_WEDDING_EVENT :
+    slug === 'sophia-marco' ? MOCK_WEDDING_BALI_EVENT :
+    slug === 'nexus' ? MOCK_CORPORATE_NEXUS_EVENT :
+    slug === 'popverse' ? MOCK_POPVERSE_EVENT :
+    MOCK_EVENT;
+  const [guest] = useState<Guest>(MOCK_GUESTS[0] ?? {
+    id: 'guest-preview',
+    event_id: event.id,
+    name: 'Preview Guest',
+    email: 'preview@all41.app',
+    phone: null,
+    category: 'General',
+    table_number: null,
+    plus_one_count: 0,
+    rsvp_status: 'attending' as const,
+    rsvp_notes: null,
+    custom_fields: {},
+    qr_code_token: 'QR-PREVIEW-0000',
+    is_checked_in: false,
+    checked_in_at: null,
+    checked_in_by: null,
+    photos_uploaded_count: 0,
+    emails_sent_count: 0,
+    whatsapp_sent_count: 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const clientDomain = getClientDomain(slug);
 
@@ -105,7 +132,7 @@ function GuestMobilePassContent({ slug }: { slug: string }) {
               <Calendar className="w-4 h-4 text-premium-gold" />
               <span>Event Date:</span>
             </span>
-            <span className="font-semibold text-white">{formatDate(MOCK_EVENT.start_date)}</span>
+            <span className="font-semibold text-white">{formatDate(event.start_date)}</span>
           </div>
 
           <div className="flex items-center justify-between text-zinc-300">
@@ -113,7 +140,7 @@ function GuestMobilePassContent({ slug }: { slug: string }) {
               <MapPin className="w-4 h-4 text-premium-neon" />
               <span>Venue:</span>
             </span>
-            <span className="font-semibold text-white truncate max-w-[200px]">{MOCK_EVENT.location_name}</span>
+            <span className="font-semibold text-white truncate max-w-[200px]">{event.location_name}</span>
           </div>
 
           <div className="flex items-center justify-between text-zinc-300 pt-2 border-t border-premium-borderDark">

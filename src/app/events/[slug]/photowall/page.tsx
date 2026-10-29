@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, use, Suspense } from 'react';
 import Link from 'next/link';
-import { MOCK_EVENT, MOCK_WEDDING_EVENT, MOCK_GUESTS } from '@/lib/mockData';
+import { MOCK_EVENT, MOCK_WEDDING_EVENT, MOCK_CORPORATE_NEXUS_EVENT, MOCK_WEDDING_BALI_EVENT, MOCK_POPVERSE_EVENT, MOCK_GUESTS } from '@/lib/mockData';
 import { Guest } from '@/lib/types';
 import {
   Camera,
@@ -22,7 +22,12 @@ import {
 import confetti from 'canvas-confetti';
 
 function GuestPhotoWallContent({ slug }: { slug: string }) {
-  const event = slug === 'aria-daniel' ? MOCK_WEDDING_EVENT : MOCK_EVENT;
+  const event =
+    slug === 'aria-daniel' ? MOCK_WEDDING_EVENT :
+    slug === 'sophia-marco' ? MOCK_WEDDING_BALI_EVENT :
+    slug === 'nexus' ? MOCK_CORPORATE_NEXUS_EVENT :
+    slug === 'popverse' ? MOCK_POPVERSE_EVENT :
+    MOCK_EVENT;
   const captionsEnabled = event.settings?.enablePhotoWallCaptions ?? true;
   const maxCaptionLength = event.settings?.maxCaptionLength ?? 300;
 

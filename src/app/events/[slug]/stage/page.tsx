@@ -4,6 +4,9 @@ import React, { useState, useEffect, use, Suspense } from 'react';
 import {
   MOCK_EVENT,
   MOCK_WEDDING_EVENT,
+  MOCK_CORPORATE_NEXUS_EVENT,
+  MOCK_WEDDING_BALI_EVENT,
+  MOCK_POPVERSE_EVENT,
   MOCK_PHOTO_WALL_UPLOADS,
   MOCK_GUESTS,
   MOCK_RAFFLES,
@@ -38,7 +41,12 @@ import QRCode from 'qrcode';
 import confetti from 'canvas-confetti';
 
 function StageBigScreenContent({ slug }: { slug: string }) {
-  const event = slug === 'aria-daniel' ? MOCK_WEDDING_EVENT : MOCK_EVENT;
+  const event =
+    slug === 'aria-daniel' ? MOCK_WEDDING_EVENT :
+    slug === 'sophia-marco' ? MOCK_WEDDING_BALI_EVENT :
+    slug === 'nexus' ? MOCK_CORPORATE_NEXUS_EVENT :
+    slug === 'popverse' ? MOCK_POPVERSE_EVENT :
+    MOCK_EVENT;
   const clientDomain = getClientDomain(slug);
   const captionsEnabled = event.settings?.enablePhotoWallCaptions ?? true;
 

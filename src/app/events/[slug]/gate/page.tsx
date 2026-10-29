@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, use, Suspense } from 'react';
 import Link from 'next/link';
-import { MOCK_GUESTS, MOCK_EVENT, MOCK_WEDDING_EVENT } from '@/lib/mockData';
+import { MOCK_GUESTS, MOCK_EVENT, MOCK_WEDDING_EVENT, MOCK_CORPORATE_NEXUS_EVENT, MOCK_WEDDING_BALI_EVENT, MOCK_POPVERSE_EVENT } from '@/lib/mockData';
 import { Guest } from '@/lib/types';
 import {
   QrCode,
@@ -13,7 +13,7 @@ import {
   AlertCircle,
   ArrowLeft,
   Camera,
-  Flashlight,
+  Zap,
   Wifi,
   RefreshCw,
   Clock,
@@ -32,7 +32,12 @@ type ScanResult = {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 function GateRegisterContent({ slug }: { slug: string }) {
-  const event = slug === 'aria-daniel' ? MOCK_WEDDING_EVENT : MOCK_EVENT;
+  const event =
+    slug === 'aria-daniel' ? MOCK_WEDDING_EVENT :
+    slug === 'sophia-marco' ? MOCK_WEDDING_BALI_EVENT :
+    slug === 'nexus' ? MOCK_CORPORATE_NEXUS_EVENT :
+    slug === 'popverse' ? MOCK_POPVERSE_EVENT :
+    MOCK_EVENT;
   const isWedding = event.event_type === 'wedding';
 
   const [activeTab, setActiveTab] = useState<GateTab>('scan');

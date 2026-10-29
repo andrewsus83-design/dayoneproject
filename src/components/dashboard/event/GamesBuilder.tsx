@@ -500,21 +500,21 @@ function QuizBuilder() {
 /* ─── Main GamesBuilder ──────────────────────────────────── */
 
 interface GamesBuilderProps {
-  subTab: 'quiz' | 'scavenger';
-  setSubTab: (t: 'quiz' | 'scavenger') => void;
+  subTab: 'quiz' | 'scavenger' | 'link';
+  setSubTab: (t: 'quiz' | 'scavenger' | 'link') => void;
 }
 
 export function GamesBuilder({ subTab, setSubTab }: GamesBuilderProps) {
   return (
     <div className="space-y-5">
       {/* Tab switcher */}
-      <div className="flex items-center gap-2 bg-premium-surfaceDark border border-premium-borderDark rounded-2xl p-1.5 w-max">
-        {([['quiz', 'Live Trivia Quiz', Zap], ['scavenger', 'Scavenger Hunt', MapPin]] as const).map(([id, label, Icon]) => (
+      <div className="flex items-center gap-2 bg-premium-surfaceDark border border-premium-borderDark rounded-2xl p-1.5 w-max flex-wrap">
+        {([['quiz', 'Live Trivia Quiz', Zap], ['scavenger', 'Scavenger Hunt', MapPin], ['link', 'Link URL', QrCode]] as const).map(([id, label, Icon]) => (
           <button
             key={id}
             type="button"
             onClick={() => setSubTab(id)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 scale-on-click ${
               subTab === id ? 'bg-premium-gold text-black shadow-gold' : 'text-zinc-400 hover:text-white'
             }`}
           >
@@ -524,10 +524,39 @@ export function GamesBuilder({ subTab, setSubTab }: GamesBuilderProps) {
         ))}
       </div>
 
-      <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark">
-        {subTab === 'quiz' && <QuizBuilder />}
-        {subTab === 'scavenger' && <ScavengerBuilder />}
-      </div>
+      {subTab !== 'link' && (
+        <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark">
+          {subTab === 'quiz' && <QuizBuilder />}
+          {subTab === 'scavenger' && <ScavengerBuilder />}
+        </div>
+      )}
+
+      {subTab === 'link' && (
+        <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-5">
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-1">Games Live URL</p>
+            <p className="text-xs text-zinc-400">Share this link so guests can join your live games from their phones.</p>
+          </div>
+          <div className="flex items-center gap-2 bg-premium-surfaceDark border border-premium-borderDark rounded-2xl px-4 py-3">
+            <span className="text-premium-neon font-mono text-sm flex-1 truncate">https://play.all41.app/g/your-event-slug</span>
+            <button type="button" className="p-2 rounded-xl bg-premium-black border border-premium-borderDark hover:border-zinc-600 transition-all scale-on-click">
+              <Copy className="w-4 h-4 text-zinc-400" />
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center">
+              <QrCode className="w-16 h-16 text-black" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs text-zinc-400">QR Code for projector / printed materials</p>
+              <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 bg-premium-gold text-black rounded-xl text-xs font-bold scale-on-click shadow-gold">
+                <Download className="w-3.5 h-3.5" />
+                Download PNG
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

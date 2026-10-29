@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, use, Suspense } from 'react';
 import Link from 'next/link';
-import { MOCK_EVENT, MOCK_WEDDING_EVENT, MOCK_PHOTO_WALL_UPLOADS } from '@/lib/mockData';
+import { MOCK_EVENT, MOCK_WEDDING_EVENT, MOCK_CORPORATE_NEXUS_EVENT, MOCK_WEDDING_BALI_EVENT, MOCK_POPVERSE_EVENT, MOCK_PHOTO_WALL_UPLOADS } from '@/lib/mockData';
 import { PhotoWallUpload } from '@/lib/types';
 import { getClientDomain } from '@/lib/domain';
 import { PinterestMasonryPhotoWall } from '@/components/events/PinterestMasonryPhotoWall';
@@ -10,7 +10,12 @@ import { Camera, Sparkles, Heart, Maximize2, Minimize2, QrCode } from 'lucide-re
 import QRCode from 'qrcode';
 
 function LivePhotoWallContent({ slug }: { slug: string }) {
-  const event = slug === 'aria-daniel' ? MOCK_WEDDING_EVENT : MOCK_EVENT;
+  const event =
+    slug === 'aria-daniel' ? MOCK_WEDDING_EVENT :
+    slug === 'sophia-marco' ? MOCK_WEDDING_BALI_EVENT :
+    slug === 'nexus' ? MOCK_CORPORATE_NEXUS_EVENT :
+    slug === 'popverse' ? MOCK_POPVERSE_EVENT :
+    MOCK_EVENT;
   const clientDomain = getClientDomain(slug);
   const captionsEnabled = event.settings?.enablePhotoWallCaptions ?? true;
 

@@ -1,40 +1,53 @@
 'use client';
 
-import React, { useState, use, Suspense } from 'react';
+import React, { useState, useEffect, useRef, use, Suspense } from 'react';
 import Link from 'next/link';
-import { Header } from '@/components/dashboard/Header';
 import { MOCK_EVENT, MOCK_GUESTS } from '@/lib/mockData';
 import { Guest } from '@/lib/types';
-import { formatDate, formatDateTime } from '@/lib/utils';
 import {
   Users,
-  Search,
-  Filter,
   UserPlus,
   FileSpreadsheet,
   QrCode,
   Mail,
   CheckCircle2,
-  Clock,
   X,
   Send,
   Download,
-  AlertCircle,
-  ExternalLink,
-  Globe,
-  Copy,
+  Search,
+  Upload,
+  ArrowLeft,
 } from 'lucide-react';
 import QRCode from 'qrcode';
-import { getClientUrl, getClientDomain } from '@/lib/domain';
+import * as XLSX from 'xlsx';
+
+const STORAGE_KEY = (id: string) => `all41-guests-${id}`;
+
+function loadGuests(eventId: string): Guest[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY(eventId));
+    if (raw) return JSON.parse(raw) as Guest[];
+  } catch {}
+  return MOCK_GUESTS;
+}
+
+function saveGuests(eventId: string, guests: Guest[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY(eventId), JSON.stringify(guests));
+  } catch {}
+}
 
 function GuestListContent({ eventId }: { eventId: string }) {
   const [guests, setGuests] = useState<Guest[]>(MOCK_GUESTS);
+  const [hydrated, setHydrated] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'checked_in' | 'pending'>('all');
   const [selectedGuestQr, setSelectedGuestQr] = useState<Guest | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [emailSentAlert, setEmailSentAlert] = useState<string | null>(null);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // New Guest Form State
   const [newName, setNewName] = useState('');
@@ -42,6 +55,23 @@ function GuestListContent({ eventId }: { eventId: string }) {
   const [newPhone, setNewPhone] = useState('');
   const [newCategory, setNewCategory] = useState('VIP Delegate');
   const [newTable, setNewTable] = useState('Table 05');
+
+  // Hydrate from localStorage on mount
+  useEffect(() => {
+    const saved = loadGuests(eventId);
+    setGuests(saved);
+    setHydrated(true);
+  }, [eventId]);
+
+  // Persist to localStorage whenever guests change (after hydration)
+  useEffect(() => {
+    if (!hydrated) return;
+    saveGuests(eventId, guests);
+  }, [guests, eventId, hydrated]);
+
+  const updateGuests = (updated: Guest[]) => {
+    setGuests(updated);
+  };
 
   // Filtered Guests
   const filtered = guests.filter((g) => {
@@ -105,25 +135,172 @@ function GuestListContent({ eventId }: { eventId: string }) {
       updated_at: new Date().toISOString(),
     };
 
-    setGuests([newGuest, ...guests]);
+    updateGuests([newGuest, ...guests]);
     setNewName('');
     setNewEmail('');
     setNewPhone('');
     setIsAddModalOpen(false);
   };
 
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = ev.target?.result;
+        let rows: Record<string, string>[] = [];
+
+        if (file.name.endsWith('.csv')) {
+          // Parse CSV manually
+          const text = data as string;
+          const lines = text.split('\n').filter(Boolean);
+          const headers = lines[0].split(',').map((h) => h.trim().replace(/"/g, '').toLowerCase());
+          rows = lines.slice(1).map((line) => {
+            const vals = line.split(',').map((v) => v.trim().replace(/"/g, ''));
+            return Object.fromEntries(headers.map((h, i) => [h, vals[i] ?? '']));
+          });
+        } else {
+          // Parse XLSX/XLS
+          const wb = XLSX.read(data, { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          rows = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: '' });
+        }
+
+        const imported: Guest[] = rows
+          .filter((r) => r.name || r.Name || r.NAME)
+          .map((r, idx) => {
+            const name = String(r.name || r.Name || r.NAME || `Guest ${idx + 1}`).trim();
+            return {
+              id: `gst-import-${Date.now()}-${idx}`,
+              event_id: eventId,
+              name,
+              email: String(r.email || r.Email || r.EMAIL || '').trim() || null,
+              phone: String(r.phone || r.Phone || r.PHONE || r.whatsapp || '').trim() || null,
+              category: String(r.category || r.Category || r.tag || r.Tag || 'General').trim(),
+              table_number: String(r.table || r.Table || r.table_number || '').trim() || null,
+              plus_one_count: 0,
+              rsvp_status: 'attending' as const,
+              rsvp_notes: null,
+              custom_fields: {},
+              qr_code_token: `QR-ALL41-${name.slice(0, 4).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`,
+              is_checked_in: false,
+              checked_in_at: null,
+              checked_in_by: null,
+              photos_uploaded_count: 0,
+              emails_sent_count: 0,
+              whatsapp_sent_count: 0,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+          });
+
+        updateGuests([...imported, ...guests]);
+        setImportStatus(`${imported.length} guests imported successfully from ${file.name}`);
+        setTimeout(() => setImportStatus(null), 5000);
+      } catch (err) {
+        setImportStatus(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        setTimeout(() => setImportStatus(null), 5000);
+      }
+
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    if (file.name.endsWith('.csv')) {
+      reader.readAsText(file);
+    } else {
+      reader.readAsArrayBuffer(file);
+    }
+  };
+
+  const handleExportCSV = () => {
+    const headers = ['Name', 'Email', 'Phone', 'Category', 'Table', 'QR Token', 'Checked In'];
+    const rows = guests.map((g) => [
+      g.name, g.email ?? '', g.phone ?? '', g.category,
+      g.table_number ?? '', g.qr_code_token, g.is_checked_in ? 'Yes' : 'No',
+    ]);
+    const csv = [headers, ...rows].map((r) => r.map((v) => `"${v}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `guests-${eventId}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const checkedInCount = guests.filter((g) => g.is_checked_in).length;
 
   return (
-    <div className="flex-1 flex flex-col font-sans select-none">
-      <Header
-        title={`${MOCK_EVENT.name} • Attendees`}
-        subtitle="Manage guest roster, issue dynamic QR passes, and trigger Resend email invites"
-        actionText="Back to Operations"
-        actionHref="/dashboard"
+    <div className="flex-1 flex flex-col font-sans select-none bg-premium-black text-zinc-100 min-h-screen">
+      {/* Hidden file input for import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv,.xlsx,.xls"
+        className="hidden"
+        onChange={handleImportFile}
       />
 
-      <div className="p-6 sm:p-8 space-y-8 max-w-7xl">
+      <div className="px-8 py-8 max-w-5xl mx-auto w-full space-y-6">
+        {/* Breadcrumb */}
+        <Link href={`/dashboard/events/${eventId}?tab=guests`} className="inline-flex items-center gap-2 text-xs text-zinc-600 hover:text-zinc-400 transition-colors font-mono">
+          <ArrowLeft className="w-3 h-3" /> Back to event
+        </Link>
+
+        {/* Page title + actions */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-display font-bold text-white">Guest Roster</h1>
+            <p className="text-xs text-zinc-500 mt-0.5 font-mono">{guests.length} registered · {guests.filter(g => g.is_checked_in).length} checked in · auto-saved</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-premium-borderDark text-xs font-bold text-zinc-400 hover:text-white hover:border-white/20 transition-all scale-on-click"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Import CSV / Excel
+            </button>
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-premium-borderDark text-xs font-bold text-zinc-400 hover:text-white hover:border-white/20 transition-all scale-on-click"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export CSV
+            </button>
+            <Link
+              href={`/dashboard/events/${eventId}/checkin`}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-premium-neon/30 text-xs font-bold text-premium-neon hover:bg-premium-neon/10 transition-all scale-on-click"
+            >
+              <QrCode className="w-3.5 h-3.5" />
+              Gate Scanner
+            </Link>
+            <button
+              type="button"
+              onClick={() => setIsAddModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black text-xs font-bold shadow-gold scale-on-click"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              Add Guest
+            </button>
+          </div>
+        </div>
+
+        {/* Import success / error alert */}
+        {importStatus && (
+          <div className={`p-4 rounded-2xl flex items-center justify-between text-sm border ${importStatus.startsWith('Import failed') ? 'bg-premium-danger/10 border-premium-danger/30 text-premium-danger' : 'bg-premium-success/10 border-premium-success/30 text-premium-success'}`}>
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+              <span>{importStatus}</span>
+            </div>
+            <button onClick={() => setImportStatus(null)} className="text-zinc-500 hover:text-white scale-on-click"><X className="w-4 h-4" /></button>
+          </div>
+        )}
+
         {/* Email Dispatched Alert */}
         {emailSentAlert && (
           <div className="p-4 rounded-2xl bg-premium-charcoal border border-premium-gold/40 text-premium-gold flex items-center justify-between text-sm shadow-gold">
@@ -136,45 +313,6 @@ function GuestListContent({ eventId }: { eventId: string }) {
             </button>
           </div>
         )}
-
-        {/* Top Control Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-premium-gold/15 text-premium-gold border border-premium-gold/30 shadow-gold">
-              <Users className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-xl font-display font-medium text-white flex items-center gap-3">
-                <span>Guest Roster & Passports</span>
-                <span className="text-xs px-3 py-1 rounded-full bg-premium-charcoal border border-premium-borderDark text-zinc-300 font-mono">
-                  {guests.length} Registered
-                </span>
-              </div>
-              <div className="text-xs text-zinc-400 mt-0.5">
-                Gate Check-in: <strong className="text-premium-success">{checkedInCount}</strong> / {guests.length} checked-in ({((checkedInCount / guests.length) * 100).toFixed(0)}%)
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
-            <Link
-              href={`/dashboard/events/${eventId}/checkin`}
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-premium-charcoal border border-premium-borderDark text-xs font-bold text-premium-neon hover:border-premium-neon transition-colors scale-on-click"
-            >
-              <QrCode className="w-4 h-4" />
-              <span>Launch Gate Scanner</span>
-            </Link>
-
-            <button
-              type="button"
-              onClick={() => setIsAddModalOpen(true)}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black text-xs font-bold transition-all shadow-gold scale-on-click"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>Add Guest</span>
-            </button>
-          </div>
-        </div>
 
         {/* Guest Roster Master Table */}
         <div className="bg-premium-charcoal rounded-[2.5rem] border border-premium-borderDark overflow-hidden shadow-2xl">

@@ -1,388 +1,611 @@
 'use client';
-
-import React, { useState } from 'react';
+import { useState, useRef } from 'react';
+import React from 'react';
 import {
-  Type, Image, AlignLeft, MousePointer, BookOpen, LayoutGrid, Star,
-  ChevronUp, ChevronDown, Eye, EyeOff, Plus, Trash2, GripVertical,
-  Palette, Upload, Link2, Globe, Calendar, Clock, MapPin, Check,
+  Image, Type, AlignLeft, Info, MousePointerClick, BookOpen, Grid3X3,
+  Sparkles, Upload, Plus, Trash2, GripVertical, Eye, EyeOff, Check,
+  Link, Star, Quote, Play, X as XIcon, Smartphone,
 } from 'lucide-react';
 
-interface LPSection {
-  id: string;
-  type: 'cover' | 'title' | 'subtitle' | 'body' | 'button' | 'verse' | 'gallery' | 'highlights' | 'info';
-  label: string;
-  enabled: boolean;
-  content?: string;
-  sub?: string;
+type LandingSubTab = 'hero' | 'gallery' | 'testimony' | 'info' | 'title' | 'subtitle' | 'notes';
+
+interface Props {
+  isWedding: boolean;
+  primaryColor: string;
 }
 
-const DEFAULT_SECTIONS: LPSection[] = [
-  { id: 's-cover', type: 'cover', label: 'Cover Photo / Hero', enabled: true },
-  { id: 's-title', type: 'title', label: 'Event Title', enabled: true, content: 'TechUnite APAC Summit 2026' },
-  { id: 's-sub', type: 'subtitle', label: 'Subtitle / Label', enabled: true, content: 'APAC Executive Summit', sub: 'Leading the Next Wave of Innovation' },
-  { id: 's-info', type: 'info', label: 'Core Event Info', enabled: true },
-  { id: 's-body', type: 'body', label: 'Body Text', enabled: true, content: "Join 500+ technology leaders, investors, and innovators at Asia's premier executive summit. Two days of keynotes, workshops, and high-value networking." },
-  { id: 's-btn', type: 'button', label: 'CTA Button', enabled: true, content: 'Register Delegate Pass', sub: 'Seats are limited — secure yours today' },
-  { id: 's-verse', type: 'verse', label: 'Notes / Verse / Quote', enabled: false, content: '"The best way to predict the future is to create it." — Peter Drucker' },
-  { id: 's-gallery', type: 'gallery', label: 'Photo Gallery', enabled: false },
-  { id: 's-highlights', type: 'highlights', label: 'Highlights / Features', enabled: true },
-];
-
-const SECTION_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  cover: Image,
-  title: Type,
-  subtitle: AlignLeft,
-  info: Calendar,
-  body: AlignLeft,
-  button: MousePointer,
-  verse: BookOpen,
-  gallery: LayoutGrid,
-  highlights: Star,
-};
-
-function PhonePreview({ sections, primaryColor }: { sections: LPSection[]; primaryColor: string }) {
-  const active = sections.filter((s) => s.enabled);
+function SubNav({ active, onChange }: { active: LandingSubTab; onChange: (t: LandingSubTab) => void }) {
+  const tabs: { id: LandingSubTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+    { id: 'hero', label: 'Hero Image', icon: Image },
+    { id: 'gallery', label: 'Photo Gallery', icon: Grid3X3 },
+    { id: 'testimony', label: 'Testimony', icon: Quote },
+    { id: 'info', label: 'Core Information', icon: Info },
+    { id: 'title', label: 'Title', icon: Type },
+    { id: 'subtitle', label: 'Subtitle / Label', icon: AlignLeft },
+    { id: 'notes', label: 'Notes', icon: BookOpen },
+  ];
   return (
-    <div
-      className="w-[210px] flex-shrink-0 rounded-[2.5rem] border-[5px] border-zinc-800 bg-[#09090B] overflow-hidden shadow-2xl"
-      style={{ height: '420px' }}
-    >
-      <div className="h-5 bg-zinc-900 flex items-center justify-center">
-        <div className="w-16 h-1.5 rounded-full bg-zinc-700" />
+    <div className="flex items-center gap-2 flex-wrap">
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          onClick={() => onChange(t.id)}
+          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold scale-on-click transition-all whitespace-nowrap ${
+            active === t.id
+              ? 'bg-premium-gold/15 text-premium-gold border border-premium-gold/40'
+              : 'bg-premium-surfaceDark text-zinc-400 border border-premium-borderDark hover:text-white'
+          }`}
+        >
+          <t.icon className="w-3.5 h-3.5" />
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ── Shared phone preview ─────────────────────────────── */
+function PhonePreview({
+  title, subtitle, info, ctaLabel, heroUrl, galleryOn, testimoniesOn, notes,
+}: {
+  title: string; subtitle: string; info: string; ctaLabel: string;
+  heroUrl: string; galleryOn: boolean; testimoniesOn: boolean; notes: string;
+}) {
+  return (
+    <div className="shrink-0 w-[210px] h-[420px] rounded-[2.5rem] bg-[#09090B] border-4 border-zinc-700 overflow-hidden shadow-2xl relative flex flex-col">
+      <div className="absolute inset-x-0 top-0 h-6 flex items-center justify-center z-10">
+        <div className="w-20 h-4 rounded-b-xl bg-zinc-800" />
       </div>
-      <div className="overflow-y-auto" style={{ height: '395px' }}>
-        {active.map((sec) => (
-          <PreviewSection key={sec.id} section={sec} primaryColor={primaryColor} />
-        ))}
+      <div className="flex-1 overflow-y-auto pt-5 scrollbar-none">
+        {heroUrl ? (
+          <div className="relative h-28 bg-zinc-800">
+            <div
+              className="absolute inset-0 bg-cover bg-center"
+              style={{ backgroundImage: `url(${heroUrl})` }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#09090B]" />
+          </div>
+        ) : (
+          <div className="h-28 bg-gradient-to-b from-zinc-800 to-[#09090B] flex items-center justify-center">
+            <Image className="w-8 h-8 text-zinc-600" />
+          </div>
+        )}
+        <div className="px-4 pt-2 space-y-1.5 pb-4">
+          <div className="text-[9px] font-mono text-amber-400 uppercase tracking-widest">{subtitle || 'Subtitle label'}</div>
+          <div className="text-sm font-display font-bold text-white leading-tight">{title || 'Event Title'}</div>
+          <div className="text-[9px] text-zinc-400">{info || 'Date · Venue · Location'}</div>
+          {notes && <div className="text-[8px] italic text-zinc-500 border-l border-zinc-700 pl-2">{notes}</div>}
+          {galleryOn && (
+            <div className="grid grid-cols-3 gap-0.5 mt-1">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="aspect-square bg-zinc-800 rounded" />
+              ))}
+            </div>
+          )}
+          {testimoniesOn && (
+            <div className="bg-zinc-800/80 rounded-xl px-3 py-2 mt-1">
+              <div className="text-[8px] italic text-zinc-300">&ldquo;Absolutely outstanding event!&rdquo;</div>
+              <div className="text-[7px] text-zinc-500 mt-0.5">— Sarah K.</div>
+            </div>
+          )}
+          <button type="button" className="w-full py-1.5 rounded-lg bg-amber-500 text-black font-bold text-[9px] mt-2 scale-on-click">
+            {ctaLabel || 'Register Now'}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-function PreviewSection({ section, primaryColor }: { section: LPSection; primaryColor: string }) {
-  switch (section.type) {
-    case 'cover':
-      return (
-        <div
-          className="w-full h-32 flex items-end p-3"
-          style={{ background: `linear-gradient(180deg, ${primaryColor}44 0%, #09090B 100%)` }}
-        >
-          <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold" style={{ backgroundColor: primaryColor, color: '#000' }}>41</div>
-        </div>
-      );
-    case 'title':
-      return (
-        <div className="px-4 pt-3 pb-1">
-          <div className="text-[13px] font-bold text-white leading-tight">{section.content}</div>
-        </div>
-      );
-    case 'subtitle':
-      return (
-        <div className="px-4 pb-2">
-          <span className="text-[7px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${primaryColor}22`, color: primaryColor }}>{section.content}</span>
-          {section.sub && <div className="text-[8px] text-zinc-400 mt-0.5">{section.sub}</div>}
-        </div>
-      );
-    case 'info':
-      return (
-        <div className="px-4 py-2 space-y-1">
-          {[['📅', 'Nov 14–15, 2026'], ['🕒', '09:00 – 18:00'], ['📍', 'Marina Bay Sands, Singapore']].map(([icon, text]) => (
-            <div key={text} className="flex items-center gap-1.5 text-[7px] text-zinc-300">{icon} {text}</div>
-          ))}
-        </div>
-      );
-    case 'body':
-      return (
-        <div className="px-4 py-2">
-          <div className="text-[7px] text-zinc-400 leading-relaxed">{section.content}</div>
-        </div>
-      );
-    case 'button':
-      return (
-        <div className="px-4 py-3">
-          <div className="text-center py-2 rounded-xl text-[8px] font-bold" style={{ backgroundColor: primaryColor, color: '#000' }}>{section.content}</div>
-          {section.sub && <div className="text-center text-[6px] text-zinc-500 mt-1">{section.sub}</div>}
-        </div>
-      );
-    case 'verse':
-      return (
-        <div className="mx-4 my-2 p-2 rounded-lg border-l-2 bg-white/5" style={{ borderColor: primaryColor }}>
-          <div className="text-[7px] text-zinc-400 italic">{section.content}</div>
-        </div>
-      );
-    case 'gallery':
-      return (
-        <div className="px-4 py-2">
-          <div className="grid grid-cols-3 gap-1">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="aspect-square rounded-md bg-zinc-800" />
-            ))}
-          </div>
-        </div>
-      );
-    case 'highlights':
-      return (
-        <div className="px-4 py-2 space-y-1">
-          {['500+ Delegates', 'Keynote Speakers', 'Exhibition Hall'].map((h) => (
-            <div key={h} className="flex items-center gap-1.5 text-[7px] text-zinc-300">
-              <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: primaryColor }} />
-              {h}
-            </div>
-          ))}
-        </div>
-      );
-    default:
-      return null;
-  }
-}
+/* ── Testimony card ─────────────────────────────────────── */
+interface Testimony { id: string; name: string; role: string; text: string; rating: number; }
 
-export function LandingPageBuilder({ isWedding, primaryColor }: { isWedding: boolean; primaryColor: string }) {
-  const [sections, setSections] = useState<LPSection[]>(DEFAULT_SECTIONS);
-  const [editingSec, setEditingSec] = useState<string | null>('s-title');
-  const [saved, setSaved] = useState(false);
+/* ── Main component ──────────────────────────────────────── */
+export function LandingPageBuilder({ isWedding, primaryColor }: Props) {
+  const [subTab, setSubTab] = useState<LandingSubTab>('hero');
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
-  const toggle = (id: string) => setSections((prev) => prev.map((s) => s.id === id ? { ...s, enabled: !s.enabled } : s));
-  const moveUp = (idx: number) => {
-    if (idx === 0) return;
-    setSections((prev) => { const n = [...prev]; [n[idx - 1], n[idx]] = [n[idx], n[idx - 1]]; return n; });
-  };
-  const moveDown = (idx: number) => {
-    setSections((prev) => { if (idx === prev.length - 1) return prev; const n = [...prev]; [n[idx], n[idx + 1]] = [n[idx + 1], n[idx]]; return n; });
-  };
-  const updateContent = (id: string, key: 'content' | 'sub', val: string) =>
-    setSections((prev) => prev.map((s) => s.id === id ? { ...s, [key]: val } : s));
+  // Hero
+  const [heroUrl, setHeroUrl] = useState('');
+  const [heroOverlay, setHeroOverlay] = useState(true);
+  const heroInputRef = useRef<HTMLInputElement>(null);
 
-  const editSec = sections.find((s) => s.id === editingSec);
+  // Gallery
+  const [galleryOn, setGalleryOn] = useState(false);
+  const [galleryPhotos, setGalleryPhotos] = useState<{ id: string; url: string; caption: string }[]>([]);
+
+  // Testimony
+  const [testimoniesOn, setTestimoniesOn] = useState(false);
+  const [testimonies, setTestimonies] = useState<Testimony[]>([
+    { id: 't1', name: 'Sarah Kim', role: isWedding ? 'Bridesmaid' : 'CEO, TechCorp', text: 'Absolutely outstanding — every detail was perfect.', rating: 5 },
+  ]);
+  const [newTestimony, setNewTestimony] = useState({ name: '', role: '', text: '', rating: 5 });
+
+  // Info
+  const [eventDate, setEventDate] = useState('2026-11-29');
+  const [eventTime, setEventTime] = useState('16:00');
+  const [venue, setVenue] = useState(isWedding ? 'Grand Ballroom, Hotel Mulia' : 'Marina Bay Sands Convention Centre');
+  const [city, setCity] = useState(isWedding ? 'Jakarta, Indonesia' : 'Singapore');
+  const [capacity, setCapacity] = useState(isWedding ? '200 Guests' : '500 Delegates');
+  const [dressCode, setDressCode] = useState(isWedding ? 'Formal — White & Gold' : 'Business Attire');
+
+  // Title
+  const [title, setTitle] = useState(isWedding ? 'The Wedding of Andreas & Clara' : 'TechUnite APAC Summit 2026');
+  const [ctaLabel, setCtaLabel] = useState(isWedding ? 'RSVP Now' : 'Register Delegate Pass');
+  const [ctaSub, setCtaSub] = useState(isWedding ? 'Limited seats — reserve yours today' : 'Seats are limited — secure yours today');
+
+  // Subtitle
+  const [subtitle, setSubtitle] = useState(isWedding ? 'A Celebration of Love' : 'APAC Executive Summit');
+  const [badge, setBadge] = useState(isWedding ? 'Intimate Garden Ceremony' : 'Invitation Only');
+
+  // Notes
+  const [notesOn, setNotesOn] = useState(false);
+  const [notesText, setNotesText] = useState(
+    isWedding
+      ? '"And now these three remain: faith, hope and love. But the greatest of these is love." — 1 Corinthians 13:13'
+      : '"The best way to predict the future is to create it." — Peter Drucker'
+  );
+
+  const infoString = `${new Date(eventDate + 'T' + eventTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} · ${eventTime} · ${venue}`;
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-      {/* Left: Section list */}
-      <div className="xl:col-span-5 space-y-4">
-        <div className="p-5 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display font-bold text-white text-base">Page Sections</h3>
-            <button
-              type="button"
-              onClick={() => {
-                setSaved(true);
-                setTimeout(() => setSaved(false), 2000);
-              }}
-              className="px-4 py-1.5 rounded-xl text-xs font-bold scale-on-click flex items-center gap-1.5 bg-premium-gold text-black shadow-gold"
-            >
-              {saved ? <><Check className="w-3.5 h-3.5" /> Saved</> : 'Save Changes'}
-            </button>
-          </div>
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 items-start">
+      {/* Left: editor */}
+      <div className="space-y-5 min-w-0">
+        <SubNav active={subTab} onChange={setSubTab} />
 
-          <div className="space-y-2">
-            {sections.map((sec, idx) => {
-              const Icon = SECTION_ICONS[sec.type] || AlignLeft;
-              const isEditing = editingSec === sec.id;
-              return (
+        {/* ── Hero Image ── */}
+        {subTab === 'hero' && (
+          <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-display font-bold text-white">Hero / Cover Image</h4>
+                <p className="text-xs text-zinc-400 mt-0.5">Full-bleed banner shown at the top of the landing page.</p>
+              </div>
+            </div>
+
+            {heroUrl ? (
+              <div className="relative rounded-2xl overflow-hidden h-48">
                 <div
-                  key={sec.id}
-                  className={`rounded-2xl border transition-all cursor-pointer ${
-                    isEditing
-                      ? 'border-premium-gold/50 bg-premium-gold/5'
-                      : sec.enabled
-                        ? 'border-premium-borderDark bg-premium-surfaceDark'
-                        : 'border-premium-borderDark/40 bg-premium-surfaceDark/40 opacity-50'
-                  }`}
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{ backgroundImage: `url(${heroUrl})` }}
+                />
+                {heroOverlay && <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/70" />}
+                <button
+                  type="button"
+                  onClick={() => setHeroUrl('')}
+                  className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-white hover:bg-premium-danger/80"
                 >
-                  <div
-                    className="p-3 flex items-center gap-3"
-                    onClick={() => setEditingSec(isEditing ? null : sec.id)}
-                  >
-                    <GripVertical className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0 cursor-grab" />
-                    <Icon className={`w-4 h-4 flex-shrink-0 ${isEditing ? 'text-premium-gold' : 'text-zinc-500'}`} />
-                    <span className={`flex-1 text-xs font-bold ${isEditing ? 'text-premium-gold' : 'text-white'}`}>{sec.label}</span>
-                    <div className="flex items-center gap-1">
-                      <button type="button" onClick={(e) => { e.stopPropagation(); moveUp(idx); }} className="p-1 hover:text-white text-zinc-600">
-                        <ChevronUp className="w-3 h-3" />
-                      </button>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); moveDown(idx); }} className="p-1 hover:text-white text-zinc-600">
-                        <ChevronDown className="w-3 h-3" />
-                      </button>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); toggle(sec.id); }} className={`p-1 ${sec.enabled ? 'text-premium-success' : 'text-zinc-600'}`}>
-                        {sec.enabled ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                  </div>
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div
+                className="h-48 rounded-2xl bg-premium-surfaceDark border-2 border-dashed border-premium-borderDark flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-premium-gold/50 transition-colors"
+                onClick={() => heroInputRef.current?.click()}
+              >
+                <div className="w-12 h-12 rounded-2xl bg-premium-gold/10 flex items-center justify-center">
+                  <Upload className="w-6 h-6 text-premium-gold" />
+                </div>
+                <div className="text-center">
+                  <div className="text-sm font-bold text-white">Upload Hero Image</div>
+                  <div className="text-xs text-zinc-400 mt-0.5">JPG, PNG, WebP — max 4MB · Recommended 1920×1080</div>
+                </div>
+                <input
+                  ref={heroInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) setHeroUrl(URL.createObjectURL(f));
+                  }}
+                />
+              </div>
+            )}
 
-                  {/* Inline edit panel */}
-                  {isEditing && (
-                    <div className="px-4 pb-4 space-y-3 border-t border-premium-borderDark/50 pt-3">
-                      {sec.type === 'cover' && (
-                        <div>
-                          <label className="text-[10px] text-zinc-400 font-bold block mb-2">Hero Image</label>
-                          <div className="h-20 rounded-xl border-2 border-dashed border-premium-borderDark bg-premium-black flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-premium-gold/50">
-                            <Upload className="w-5 h-5 text-zinc-600" />
-                            <span className="text-[10px] text-zinc-500">Upload or paste URL</span>
-                          </div>
-                          <input
-                            type="text"
-                            placeholder="https://... or CDN URL"
-                            className="mt-2 w-full bg-premium-black border border-premium-borderDark text-white px-3 py-2 rounded-xl text-[11px] outline-none focus:border-premium-gold"
-                          />
-                        </div>
-                      )}
-                      {(sec.type === 'title' || sec.type === 'body' || sec.type === 'verse') && (
-                        <div>
-                          <label className="text-[10px] text-zinc-400 font-bold block mb-1">Text Content</label>
-                          <textarea
-                            value={sec.content || ''}
-                            onChange={(e) => updateContent(sec.id, 'content', e.target.value)}
-                            rows={sec.type === 'body' ? 4 : 2}
-                            className="w-full bg-premium-black border border-premium-borderDark text-white px-3 py-2 rounded-xl text-[11px] outline-none focus:border-premium-gold resize-none"
-                          />
-                        </div>
-                      )}
-                      {sec.type === 'subtitle' && (
-                        <>
-                          <div>
-                            <label className="text-[10px] text-zinc-400 font-bold block mb-1">Badge / Label</label>
-                            <input
-                              value={sec.content || ''}
-                              onChange={(e) => updateContent(sec.id, 'content', e.target.value)}
-                              className="w-full bg-premium-black border border-premium-borderDark text-white px-3 py-2 rounded-xl text-[11px] outline-none focus:border-premium-gold"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[10px] text-zinc-400 font-bold block mb-1">Subtitle Text</label>
-                            <input
-                              value={sec.sub || ''}
-                              onChange={(e) => updateContent(sec.id, 'sub', e.target.value)}
-                              className="w-full bg-premium-black border border-premium-borderDark text-white px-3 py-2 rounded-xl text-[11px] outline-none focus:border-premium-gold"
-                            />
-                          </div>
-                        </>
-                      )}
-                      {sec.type === 'button' && (
-                        <>
-                          <div>
-                            <label className="text-[10px] text-zinc-400 font-bold block mb-1">Button Label</label>
-                            <input
-                              value={sec.content || ''}
-                              onChange={(e) => updateContent(sec.id, 'content', e.target.value)}
-                              className="w-full bg-premium-black border border-premium-borderDark text-white px-3 py-2 rounded-xl text-[11px] outline-none focus:border-premium-gold"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[10px] text-zinc-400 font-bold block mb-1">Note under button</label>
-                            <input
-                              value={sec.sub || ''}
-                              onChange={(e) => updateContent(sec.id, 'sub', e.target.value)}
-                              className="w-full bg-premium-black border border-premium-borderDark text-white px-3 py-2 rounded-xl text-[11px] outline-none focus:border-premium-gold"
-                            />
-                          </div>
-                        </>
-                      )}
-                      {sec.type === 'info' && (
-                        <div className="space-y-2">
-                          {['Date', 'Time', 'Venue', 'City / Address'].map((lbl) => (
-                            <div key={lbl}>
-                              <label className="text-[10px] text-zinc-400 font-bold block mb-1">{lbl}</label>
-                              <input
-                                placeholder={`Enter ${lbl.toLowerCase()}…`}
-                                className="w-full bg-premium-black border border-premium-borderDark text-white px-3 py-2 rounded-xl text-[11px] outline-none focus:border-premium-gold"
-                              />
-                            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-zinc-300">Dark gradient overlay</span>
+              <button
+                type="button"
+                onClick={() => setHeroOverlay(!heroOverlay)}
+                className={`px-3 py-1.5 rounded-xl font-bold scale-on-click ${heroOverlay ? 'bg-premium-gold text-black' : 'bg-zinc-800 text-zinc-400'}`}
+              >
+                {heroOverlay ? 'ON' : 'OFF'}
+              </button>
+            </div>
+
+            {/* OpenArt generate option */}
+            <div className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark/60 flex items-center justify-between">
+              <div>
+                <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-premium-gold" />
+                  AI-generated hero image
+                </div>
+                <div className="text-[10px] text-zinc-400 mt-0.5">Generate a cinematic banner with OpenArt nano-banana-2</div>
+              </div>
+              <button
+                type="button"
+                className="px-3.5 py-2 rounded-xl bg-premium-gold text-black font-bold text-xs shadow-gold scale-on-click"
+                onClick={() => alert('OpenArt image generation would launch here')}
+              >
+                Generate
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Photo Gallery ── */}
+        {subTab === 'gallery' && (
+          <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-display font-bold text-white">Photo Gallery Section</h4>
+                <p className="text-xs text-zinc-400 mt-0.5">Pinterest-style masonry grid shown on the landing page.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setGalleryOn(!galleryOn)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs scale-on-click ${galleryOn ? 'bg-premium-gold text-black shadow-gold' : 'bg-zinc-800 text-zinc-400'}`}
+              >
+                {galleryOn ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                {galleryOn ? 'ON' : 'OFF'}
+              </button>
+            </div>
+
+            {!galleryOn && (
+              <div className="p-4 rounded-2xl bg-premium-surfaceDark border border-dashed border-premium-borderDark text-center text-xs text-zinc-500">
+                Toggle ON to show a photo gallery on your landing page.
+              </div>
+            )}
+
+            {galleryOn && (
+              <>
+                {galleryPhotos.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    {galleryPhotos.map((p) => (
+                      <div key={p.id} className="relative aspect-square rounded-xl overflow-hidden bg-zinc-800 group">
+                        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${p.url})` }} />
+                        <button
+                          type="button"
+                          onClick={() => setGalleryPhotos((prev) => prev.filter((x) => x.id !== p.id))}
+                          className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Trash2 className="w-3 h-3 text-white" />
+                        </button>
+                      </div>
+                    ))}
+                    <label className="aspect-square rounded-xl border-2 border-dashed border-premium-borderDark bg-premium-surfaceDark flex items-center justify-center cursor-pointer hover:border-premium-gold/50 transition-colors">
+                      <Plus className="w-5 h-5 text-zinc-500" />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => {
+                          const files = Array.from(e.target.files || []);
+                          setGalleryPhotos((prev) => [
+                            ...prev,
+                            ...files.map((f) => ({ id: Date.now() + f.name, url: URL.createObjectURL(f), caption: '' })),
+                          ]);
+                        }}
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <label className="h-32 rounded-2xl border-2 border-dashed border-premium-borderDark bg-premium-surfaceDark flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-premium-gold/50 transition-colors">
+                    <Upload className="w-6 h-6 text-zinc-500" />
+                    <span className="text-xs text-zinc-400">Upload photos (multi-select)</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files || []);
+                        setGalleryPhotos(files.map((f) => ({ id: Date.now() + f.name, url: URL.createObjectURL(f), caption: '' })));
+                      }}
+                    />
+                  </label>
+                )}
+                <div className="text-[10px] text-zinc-500 font-mono">
+                  {galleryPhotos.length} photo{galleryPhotos.length !== 1 ? 's' : ''} uploaded · Max 20 · WebP recommended
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── Testimony ── */}
+        {subTab === 'testimony' && (
+          <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-display font-bold text-white">Testimonies / Quotes</h4>
+                <p className="text-xs text-zinc-400 mt-0.5">Social proof cards shown before the CTA button.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTestimoniesOn(!testimoniesOn)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs scale-on-click ${testimoniesOn ? 'bg-premium-gold text-black shadow-gold' : 'bg-zinc-800 text-zinc-400'}`}
+              >
+                {testimoniesOn ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                {testimoniesOn ? 'ON' : 'OFF'}
+              </button>
+            </div>
+
+            {!testimoniesOn && (
+              <div className="p-4 rounded-2xl bg-premium-surfaceDark border border-dashed border-premium-borderDark text-center text-xs text-zinc-500">
+                Toggle ON to show testimonies on your landing page.
+              </div>
+            )}
+
+            {testimoniesOn && (
+              <>
+                <div className="space-y-3">
+                  {testimonies.map((t) => (
+                    <div key={t.id} className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-1 mb-1">
+                          {Array.from({ length: t.rating }).map((_, i) => (
+                            <Star key={i} className="w-3 h-3 fill-premium-gold text-premium-gold" />
                           ))}
                         </div>
-                      )}
-                      {sec.type === 'gallery' && (
-                        <div>
-                          <label className="text-[10px] text-zinc-400 font-bold block mb-2">Gallery Photos</label>
-                          <div className="grid grid-cols-3 gap-2">
-                            {[1, 2, 3].map((i) => (
-                              <div key={i} className="aspect-square rounded-xl border-2 border-dashed border-premium-borderDark bg-premium-black flex items-center justify-center cursor-pointer hover:border-premium-gold/50">
-                                <Plus className="w-4 h-4 text-zinc-600" />
-                              </div>
-                            ))}
-                          </div>
-                          <div className="mt-2">
-                            <label className="text-[10px] text-zinc-400 font-bold block mb-1">Or link Google Drive</label>
-                            <input
-                              placeholder="https://drive.google.com/..."
-                              className="w-full bg-premium-black border border-premium-borderDark text-white px-3 py-2 rounded-xl text-[11px] outline-none focus:border-premium-gold"
-                            />
-                          </div>
-                        </div>
-                      )}
-                      {sec.type === 'highlights' && (
-                        <div>
-                          <label className="text-[10px] text-zinc-400 font-bold block mb-2">Feature Highlights</label>
-                          <div className="space-y-2">
-                            {(isWedding
-                              ? ['Intimate Garden Ceremony', 'Sunset Reception', 'Live Band', 'Catered Banquet']
-                              : ['500+ Delegates', 'Keynote Speakers', 'Networking Rails', 'AI Workshops']
-                            ).map((h) => (
-                              <div key={h} className="flex items-center gap-2 text-[11px] text-zinc-300 bg-premium-black border border-premium-borderDark rounded-xl px-3 py-2">
-                                <Star className="w-3 h-3 text-premium-gold" />
-                                {h}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                        <p className="text-xs italic text-zinc-300">&ldquo;{t.text}&rdquo;</p>
+                        <p className="text-[10px] text-zinc-500 mt-1 font-bold">{t.name} · {t.role}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setTestimonies((prev) => prev.filter((x) => x.id !== t.id))}
+                        className="shrink-0 text-zinc-600 hover:text-premium-danger"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                  )}
+                  ))}
                 </div>
-              );
-            })}
+
+                {/* Add testimony form */}
+                <div className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark/60 space-y-3">
+                  <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Add Testimony</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      value={newTestimony.name}
+                      onChange={(e) => setNewTestimony((p) => ({ ...p, name: e.target.value }))}
+                      placeholder="Name"
+                      className="px-3 py-2 rounded-xl bg-premium-black border border-premium-borderDark text-xs text-white placeholder-zinc-600 outline-none focus:border-premium-gold/60"
+                    />
+                    <input
+                      value={newTestimony.role}
+                      onChange={(e) => setNewTestimony((p) => ({ ...p, role: e.target.value }))}
+                      placeholder={isWedding ? 'Relation' : 'Role / Company'}
+                      className="px-3 py-2 rounded-xl bg-premium-black border border-premium-borderDark text-xs text-white placeholder-zinc-600 outline-none focus:border-premium-gold/60"
+                    />
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={newTestimony.text}
+                    onChange={(e) => setNewTestimony((p) => ({ ...p, text: e.target.value }))}
+                    placeholder="Their testimonial..."
+                    className="w-full px-3 py-2 rounded-xl bg-premium-black border border-premium-borderDark text-xs text-white placeholder-zinc-600 outline-none focus:border-premium-gold/60 resize-none"
+                  />
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <button key={s} type="button" onClick={() => setNewTestimony((p) => ({ ...p, rating: s }))}>
+                          <Star className={`w-4 h-4 ${s <= newTestimony.rating ? 'fill-premium-gold text-premium-gold' : 'text-zinc-700'}`} />
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!newTestimony.name || !newTestimony.text) return;
+                        setTestimonies((prev) => [...prev, { id: Date.now().toString(), ...newTestimony }]);
+                        setNewTestimony({ name: '', role: '', text: '', rating: 5 });
+                      }}
+                      className="px-4 py-1.5 rounded-xl bg-premium-gold text-black font-bold text-xs scale-on-click"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
+        )}
 
-          <button
-            type="button"
-            className="mt-4 w-full py-3 rounded-2xl border-2 border-dashed border-premium-borderDark text-zinc-500 text-xs font-bold hover:border-premium-gold/50 hover:text-zinc-300 flex items-center justify-center gap-2 scale-on-click"
-          >
-            <Plus className="w-4 h-4" />
-            Add Custom Section
-          </button>
-        </div>
+        {/* ── Core Information ── */}
+        {subTab === 'info' && (
+          <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4">
+            <h4 className="font-display font-bold text-white">Core Event Information</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {[
+                { label: 'Event Date', value: eventDate, type: 'date', set: setEventDate },
+                { label: 'Event Time', value: eventTime, type: 'time', set: setEventTime },
+              ].map(({ label, value, type, set }) => (
+                <div key={label} className="space-y-1.5">
+                  <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{label}</label>
+                  <input
+                    type={type}
+                    value={value}
+                    onChange={(e) => set(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-xs text-white outline-none focus:border-premium-gold/60"
+                  />
+                </div>
+              ))}
+              {[
+                { label: 'Venue / Hall', value: venue, set: setVenue },
+                { label: 'City / Country', value: city, set: setCity },
+                { label: 'Capacity', value: capacity, set: setCapacity },
+                { label: isWedding ? 'Dress Code' : 'Attire', value: dressCode, set: setDressCode },
+              ].map(({ label, value, set }) => (
+                <div key={label} className="space-y-1.5">
+                  <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{label}</label>
+                  <input
+                    value={value}
+                    onChange={(e) => set(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-xs text-white outline-none focus:border-premium-gold/60"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 p-3 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-[10px] font-mono text-zinc-400">
+              Preview: {infoString}
+            </div>
+          </div>
+        )}
 
-        {/* Theme / Color */}
-        <div className="p-5 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark">
-          <h4 className="text-sm font-display font-bold text-white mb-3 flex items-center gap-2">
-            <Palette className="w-4 h-4 text-premium-gold" />
-            Theme & Colors
-          </h4>
-          <div className="flex gap-2 flex-wrap">
-            {['#C5A059', '#00F0FF', '#F43F5E', '#10B981', '#3B82F6', '#8B5CF6'].map((c) => (
-              <button
-                key={c}
-                type="button"
-                className="w-8 h-8 rounded-full border-2 scale-on-click"
-                style={{ backgroundColor: c, borderColor: c === primaryColor ? 'white' : 'transparent' }}
-              />
+        {/* ── Title ── */}
+        {subTab === 'title' && (
+          <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4">
+            <h4 className="font-display font-bold text-white">Event Title & CTA Button</h4>
+            {[
+              { label: 'Main Title', value: title, set: setTitle, hint: 'Shown as H1 on landing page' },
+              { label: 'CTA Button Label', value: ctaLabel, set: setCtaLabel, hint: 'Primary call-to-action text' },
+              { label: 'CTA Sub-label', value: ctaSub, set: setCtaSub, hint: 'Small text beneath the button' },
+            ].map(({ label, value, set, hint }) => (
+              <div key={label} className="space-y-1.5">
+                <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{label}</label>
+                <input
+                  value={value}
+                  onChange={(e) => set(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-sm text-white outline-none focus:border-premium-gold/60"
+                />
+                <p className="text-[10px] text-zinc-600">{hint}</p>
+              </div>
             ))}
           </div>
-        </div>
+        )}
 
-        {/* Link */}
-        <div className="p-5 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark">
-          <h4 className="text-sm font-display font-bold text-white mb-3 flex items-center gap-2">
-            <Globe className="w-4 h-4 text-premium-neon" />
-            Public URL
-          </h4>
-          <div className="flex items-center gap-2 bg-premium-surfaceDark border border-premium-borderDark rounded-xl px-3 py-2">
-            <Link2 className="w-3.5 h-3.5 text-zinc-500" />
-            <span className="text-xs font-mono text-premium-neon flex-1">all41.app/e/bea-migs</span>
-            <button type="button" className="text-zinc-400 hover:text-white">
-              <Check className="w-3.5 h-3.5" />
+        {/* ── Subtitle / Label ── */}
+        {subTab === 'subtitle' && (
+          <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4">
+            <h4 className="font-display font-bold text-white">Subtitle & Label Badge</h4>
+            {[
+              { label: 'Subtitle / Tagline', value: subtitle, set: setSubtitle, hint: 'Appears above the main title' },
+              { label: 'Label Badge', value: badge, set: setBadge, hint: 'Small pill badge e.g. "Invitation Only"' },
+            ].map(({ label, value, set, hint }) => (
+              <div key={label} className="space-y-1.5">
+                <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{label}</label>
+                <input
+                  value={value}
+                  onChange={(e) => set(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-sm text-white outline-none focus:border-premium-gold/60"
+                />
+                <p className="text-[10px] text-zinc-600">{hint}</p>
+              </div>
+            ))}
+            <div className="flex items-center gap-2 flex-wrap pt-1">
+              <div className="px-3 py-1 rounded-full bg-premium-gold/15 text-premium-gold border border-premium-gold/30 text-[10px] font-bold font-mono">
+                {badge}
+              </div>
+              <div className="text-sm font-display font-bold text-zinc-400">{subtitle}</div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Notes ── */}
+        {subTab === 'notes' && (
+          <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-display font-bold text-white">Notes / Verse / Quote</h4>
+                <p className="text-xs text-zinc-400 mt-0.5">Optional inspirational text displayed below core info.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNotesOn(!notesOn)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs scale-on-click ${notesOn ? 'bg-premium-gold text-black shadow-gold' : 'bg-zinc-800 text-zinc-400'}`}
+              >
+                {notesOn ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                {notesOn ? 'ON' : 'OFF'}
+              </button>
+            </div>
+
+            {!notesOn && (
+              <div className="p-4 rounded-2xl bg-premium-surfaceDark border border-dashed border-premium-borderDark text-center text-xs text-zinc-500">
+                Toggle ON to show a verse, quote, or note on your landing page.
+              </div>
+            )}
+
+            {notesOn && (
+              <div className="space-y-3">
+                <textarea
+                  rows={4}
+                  value={notesText}
+                  onChange={(e) => setNotesText(e.target.value)}
+                  className="w-full px-4 py-3 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-sm text-white italic outline-none focus:border-premium-gold/60 resize-none"
+                />
+                <div className="p-4 rounded-2xl bg-premium-surfaceDark border-l-2 border-premium-gold text-xs italic text-zinc-300">
+                  {notesText}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Save row */}
+        <div className="flex items-center justify-between pt-2">
+          <button
+            type="button"
+            onClick={() => setShowPreviewModal(true)}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-zinc-300 text-sm font-bold scale-on-click hover:border-zinc-600 lg:hidden"
+          >
+            <Smartphone className="w-4 h-4" />
+            Preview
+          </button>
+          <button
+            type="button"
+            className="px-6 py-2.5 rounded-xl bg-premium-gold text-black font-bold text-sm shadow-gold scale-on-click ml-auto"
+            onClick={() => alert('Landing page saved!')}
+          >
+            Save Landing Page
+          </button>
+        </div>
+      </div>
+
+      {/* Right: phone preview — desktop only */}
+      <div className="hidden lg:flex flex-col items-center gap-3 pt-[3.5rem]">
+        <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Live Preview</span>
+        <PhonePreview
+          title={title}
+          subtitle={subtitle}
+          info={infoString}
+          ctaLabel={ctaLabel}
+          heroUrl={heroUrl}
+          galleryOn={galleryOn}
+          testimoniesOn={testimoniesOn}
+          notes={notesOn ? notesText : ''}
+        />
+      </div>
+
+      {/* Mobile preview modal */}
+      {showPreviewModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 lg:hidden" onClick={() => setShowPreviewModal(false)}>
+          <div className="relative" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => setShowPreviewModal(false)}
+              className="absolute -top-10 right-0 p-2 text-zinc-400 hover:text-white scale-on-click"
+            >
+              <XIcon className="w-5 h-5" />
             </button>
+            <span className="block text-center text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">Live Preview</span>
+            <PhonePreview
+              title={title}
+              subtitle={subtitle}
+              info={infoString}
+              ctaLabel={ctaLabel}
+              heroUrl={heroUrl}
+              galleryOn={galleryOn}
+              testimoniesOn={testimoniesOn}
+              notes={notesOn ? notesText : ''}
+            />
           </div>
         </div>
-      </div>
-
-      {/* Right: Phone preview */}
-      <div className="xl:col-span-7 flex flex-col items-center gap-4 pt-2">
-        <div className="flex items-center gap-3 self-start">
-          <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Live Preview</span>
-          <span className="px-2 py-0.5 rounded-md bg-premium-success/15 text-premium-success font-mono text-[10px] border border-premium-success/30">Auto-sync</span>
-        </div>
-        <PhonePreview sections={sections} primaryColor={primaryColor} />
-        <p className="text-[10px] text-zinc-600 text-center max-w-[210px]">Sections render live as you edit. Toggle visibility to show/hide.</p>
-      </div>
+      )}
     </div>
   );
 }
