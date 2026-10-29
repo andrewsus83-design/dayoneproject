@@ -94,79 +94,83 @@ function CheckinScannerContent({ eventId }: { eventId: string }) {
   const checkedInCount = guests.filter((g) => g.is_checked_in).length;
 
   return (
-    <div className="min-h-screen bg-[#080a10] text-[#f8fafc] flex flex-col">
+    <div className="min-h-screen bg-premium-black text-zinc-100 flex flex-col font-sans select-none">
       {/* Top Header Bar */}
-      <header className="h-16 px-6 border-b border-[#1b2234] bg-[#0c101a] flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <header className="h-20 px-6 sm:px-8 border-b border-premium-borderDark bg-premium-black/80 backdrop-blur-xl flex items-center justify-between">
+        <div className="flex items-center gap-4">
           <Link
             href={`/dashboard/events/${eventId}/guests`}
-            className="p-2 rounded-lg bg-[#141a29] text-gray-400 hover:text-white border border-[#232d44]"
+            className="p-2.5 rounded-2xl bg-premium-charcoal text-zinc-400 hover:text-white border border-premium-borderDark scale-on-click"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <h1 className="text-sm font-bold text-white flex items-center gap-2">
+            <h1 className="text-base font-display font-medium text-white flex items-center gap-2">
               <span>Gate Check-In Terminal</span>
-              <span className="w-2 h-2 rounded-full bg-[#00ff88] animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-premium-success shadow-[0_0_8px_#00E676] animate-pulse" />
             </h1>
-            <p className="text-[10px] text-gray-400 font-mono">{MOCK_EVENT.name}</p>
+            <p className="text-xs text-zinc-400 font-mono">{MOCK_EVENT.name}</p>
           </div>
         </div>
 
         <div className="flex items-center gap-4 text-xs font-mono">
           <div className="text-right">
-            <span className="text-gray-400">Total Checked In: </span>
-            <strong className="text-[#00ff88] text-sm">{checkedInCount}</strong>
-            <span className="text-gray-400"> / {guests.length}</span>
+            <span className="text-zinc-500">Total Checked In: </span>
+            <strong className="text-premium-success font-display font-bold text-base">{checkedInCount}</strong>
+            <span className="text-zinc-500"> / {guests.length}</span>
           </div>
         </div>
       </header>
 
       {/* Main Scanner Body */}
-      <div className="flex-1 p-6 max-w-5xl mx-auto w-full grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+      <div className="flex-1 p-6 sm:p-8 max-w-5xl mx-auto w-full grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
         {/* Left Column: Scanner Viewfinder Simulator */}
         <div className="md:col-span-7 space-y-6">
-          <div className="relative rounded-3xl overflow-hidden border-2 border-[#1f283d] bg-[#0e121e] p-6 text-center shadow-2xl">
-            {/* Viewfinder Target Frame */}
-            <div className="relative w-full aspect-square max-w-sm mx-auto rounded-2xl border-2 border-dashed border-[#00f0ff]/50 bg-[#121827] flex flex-col items-center justify-center p-6 overflow-hidden">
-              {/* Animated Laser Scanning Line */}
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#00f0ff] to-transparent shadow-[0_0_15px_#00f0ff] animate-bounce" />
-
-              <div className="p-4 rounded-2xl bg-[#00f0ff]/10 text-[#00f0ff] mb-4">
-                <QrCode className="w-16 h-16 animate-pulse" />
+          <div className="relative rounded-[2.5rem] overflow-hidden border border-premium-borderDark bg-premium-charcoal p-8 text-center shadow-2xl">
+            {/* Viewfinder Target Frame matching Master UI Kit */}
+            <div className="w-64 h-64 border-2 border-white/20 rounded-3xl overflow-hidden mb-6 relative mx-auto bg-premium-surfaceDark">
+              <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-premium-gold rounded-tl-2xl"></div>
+              <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-premium-gold rounded-tr-2xl"></div>
+              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-premium-gold rounded-bl-2xl"></div>
+              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-premium-gold rounded-br-2xl"></div>
+              <div className="absolute top-0 left-0 w-full h-1 bg-premium-gold shadow-[0_0_15px_#C5A059] animate-scan-line"></div>
+              
+              <div className="w-full h-full flex flex-col items-center justify-center p-4">
+                <QrCode className="w-16 h-16 text-premium-gold/30 animate-pulse" />
               </div>
-              <p className="text-xs text-gray-300 font-semibold">
-                Point Attendee QR Pass Towards Camera
-              </p>
-              <p className="text-[11px] text-gray-500 mt-1">
-                High-speed sub-second optical detection active
-              </p>
             </div>
 
+            <h3 className="text-xl font-display font-medium text-white mb-1">
+              Point Attendee QR Pass Towards Camera
+            </h3>
+            <p className="text-xs text-zinc-500">
+              High-speed sub-second optical detection active
+            </p>
+
             {/* Quick Demo Scan Shortcuts */}
-            <div className="mt-6 pt-4 border-t border-[#1a2133]">
-              <div className="text-[10px] font-mono text-gray-400 uppercase tracking-wider mb-2">
+            <div className="mt-8 pt-6 border-t border-premium-borderDark">
+              <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">
                 Simulate Instant Test Scans:
               </div>
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <button
                   type="button"
                   onClick={() => handleProcessScan('QR-ALL41-SITI-3309')}
-                  className="px-2.5 py-1.5 rounded-lg bg-[#00ff88]/10 border border-[#00ff88]/30 text-[#00ff88] text-xs font-medium hover:bg-[#00ff88]/20 transition-colors"
+                  className="px-3 py-1.5 rounded-xl bg-premium-success/15 border border-premium-success/30 text-premium-success text-xs font-bold hover:bg-premium-success/25 transition-colors scale-on-click"
                 >
                   Scan Pending (Siti Rahmawati)
                 </button>
                 <button
                   type="button"
                   onClick={() => handleProcessScan('QR-ALL41-BUDI-9812')}
-                  className="px-2.5 py-1.5 rounded-lg bg-[#ff007f]/10 border border-[#ff007f]/30 text-[#ff007f] text-xs font-medium hover:bg-[#ff007f]/20 transition-colors"
+                  className="px-3 py-1.5 rounded-xl bg-premium-danger/15 border border-premium-danger/30 text-premium-danger text-xs font-bold hover:bg-premium-danger/25 transition-colors scale-on-click"
                 >
                   Scan Duplicate (Budi Santoso)
                 </button>
                 <button
                   type="button"
                   onClick={() => handleProcessScan('QR-INVALID-9999')}
-                  className="px-2.5 py-1.5 rounded-lg bg-[#192237] border border-[#27375a] text-gray-400 text-xs font-medium hover:text-white transition-colors"
+                  className="px-3 py-1.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-zinc-400 text-xs font-bold hover:text-white transition-colors scale-on-click"
                 >
                   Scan Invalid
                 </button>
@@ -179,20 +183,20 @@ function CheckinScannerContent({ eventId }: { eventId: string }) {
                 e.preventDefault();
                 handleProcessScan(tokenInput);
               }}
-              className="mt-4 flex gap-2"
+              className="mt-6 flex gap-3"
             >
               <input
                 type="text"
                 placeholder="Or manually enter token (e.g. QR-ALL41-SITI-3309)..."
                 value={tokenInput}
                 onChange={(e) => setTokenInput(e.target.value)}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-[#090b12] border border-[#1e263d] text-xs font-mono text-white placeholder-gray-500 focus:outline-none focus:border-[#00f0ff]"
+                className="flex-1 px-5 py-3.5 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-xs font-mono text-white placeholder-zinc-500 focus:outline-none focus:border-premium-gold"
               />
               <button
                 type="submit"
-                className="px-5 py-2.5 rounded-xl bg-[#00f0ff] text-[#0b0d13] font-bold text-xs hover:brightness-110 transition-all"
+                className="px-6 py-3.5 rounded-2xl bg-premium-gold hover:bg-premium-goldHover text-black font-bold text-xs shadow-gold scale-on-click transition-all"
               >
-                Verify
+                Verify Pass
               </button>
             </form>
           </div>
@@ -203,47 +207,47 @@ function CheckinScannerContent({ eventId }: { eventId: string }) {
           {/* Dynamic Result Feedback Box */}
           {scanResult && (
             <div
-              className={`p-6 rounded-3xl border shadow-2xl transition-all animate-fadeIn ${
+              className={`p-8 rounded-[2.5rem] border shadow-2xl transition-all ${
                 scanResult.status === 'success'
-                  ? 'bg-[#0b1f17] border-[#00ff88] text-[#00ff88]'
+                  ? 'bg-premium-charcoal border-premium-success/40 text-premium-success'
                   : scanResult.status === 'already_checked_in'
-                  ? 'bg-[#29131c] border-[#ff007f] text-[#ff007f]'
-                  : 'bg-[#241315] border-red-500 text-red-400'
+                  ? 'bg-premium-charcoal border-premium-gold/40 text-premium-gold'
+                  : 'bg-premium-charcoal border-premium-danger/40 text-premium-danger shadow-danger'
               }`}
             >
-              <div className="flex items-center gap-3 mb-3">
-                {scanResult.status === 'success' && <CheckCircle2 className="w-8 h-8 stroke-[2.5]" />}
-                {scanResult.status === 'already_checked_in' && <AlertTriangle className="w-8 h-8 stroke-[2.5]" />}
-                {scanResult.status === 'not_found' && <XCircle className="w-8 h-8 stroke-[2.5]" />}
+              <div className="flex items-center gap-4 mb-4">
+                {scanResult.status === 'success' && <CheckCircle2 className="w-10 h-10 stroke-[2.5]" />}
+                {scanResult.status === 'already_checked_in' && <AlertTriangle className="w-10 h-10 stroke-[2.5]" />}
+                {scanResult.status === 'not_found' && <XCircle className="w-10 h-10 stroke-[2.5]" />}
 
                 <div>
-                  <h3 className="text-lg font-black uppercase tracking-tight">
+                  <h3 className="text-xl font-display font-bold uppercase tracking-tight">
                     {scanResult.status === 'success' && 'Entry Verified'}
                     {scanResult.status === 'already_checked_in' && 'Duplicate Entry'}
                     {scanResult.status === 'not_found' && 'Invalid Pass'}
                   </h3>
-                  <div className="text-xs opacity-90">{scanResult.message}</div>
+                  <div className="text-xs opacity-90 font-light mt-0.5">{scanResult.message}</div>
                 </div>
               </div>
 
               {scanResult.guest && (
-                <div className="mt-4 pt-4 border-t border-current/20 space-y-2 text-xs">
-                  <div className="flex justify-between font-bold text-white text-sm">
+                <div className="mt-4 pt-4 border-t border-current/20 space-y-2.5 text-xs">
+                  <div className="flex justify-between font-bold text-white text-base font-display">
                     <span>Attendee:</span>
                     <span>{scanResult.guest.name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Category:</span>
-                    <span className="font-semibold">{scanResult.guest.category}</span>
+                    <span className="text-zinc-400">Category:</span>
+                    <span className="font-bold">{scanResult.guest.category}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Assigned Table:</span>
-                    <span className="font-extrabold text-base text-[#dfb76c]">
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-400">Assigned Table:</span>
+                    <span className="font-display font-bold text-lg text-white">
                       {scanResult.guest.table_number || 'Open Seating'}
                     </span>
                   </div>
                   {scanResult.guest.rsvp_notes && (
-                    <div className="text-[11px] italic bg-black/30 p-2 rounded-lg mt-2">
+                    <div className="text-xs italic bg-black/40 p-3 rounded-xl mt-2 text-zinc-300">
                       Notes: {scanResult.guest.rsvp_notes}
                     </div>
                   )}
@@ -253,37 +257,40 @@ function CheckinScannerContent({ eventId }: { eventId: string }) {
           )}
 
           {/* Live Recent Check-in Feed */}
-          <div className="p-5 rounded-2xl bg-[#0f1320] border border-[#1b2234]">
-            <div className="text-xs font-mono uppercase text-gray-400 tracking-wider mb-3 flex items-center justify-between">
+          <div className="p-8 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark shadow-2xl">
+            <div className="text-xs font-bold uppercase text-zinc-500 tracking-widest mb-4 flex items-center justify-between">
               <span>Recent Gate Admissions</span>
-              <span className="text-[10px] text-[#00ff88]">Live Feed</span>
+              <span className="text-xs text-premium-success flex items-center gap-1.5 font-medium">
+                <span className="w-2 h-2 rounded-full bg-premium-success shadow-[0_0_8px_#00E676] animate-pulse" />
+                Live Feed
+              </span>
             </div>
 
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {recentLogs.map((log, idx) => (
                 <div
                   key={idx}
-                  className="p-3 rounded-xl bg-[#14192a] border border-[#1f283d] flex items-center justify-between text-xs"
+                  className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark flex items-center justify-between text-xs"
                 >
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-3">
                     {log.status === 'success' ? (
-                      <CheckCircle2 className="w-4 h-4 text-[#00ff88] flex-shrink-0" />
+                      <CheckCircle2 className="w-4 h-4 text-premium-success flex-shrink-0" />
                     ) : (
-                      <AlertTriangle className="w-4 h-4 text-[#ff007f] flex-shrink-0" />
+                      <AlertTriangle className="w-4 h-4 text-premium-gold flex-shrink-0" />
                     )}
                     <div>
-                      <div className="font-bold text-white">{log.guestName}</div>
-                      <div className="text-[10px] text-gray-400 font-mono">
+                      <div className="font-bold text-white text-sm font-display">{log.guestName}</div>
+                      <div className="text-[11px] text-zinc-500 font-mono mt-0.5">
                         {log.table} • {log.time}
                       </div>
                     </div>
                   </div>
 
                   <span
-                    className={`text-[10px] font-mono px-2 py-0.5 rounded ${
+                    className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full ${
                       log.status === 'success'
-                        ? 'bg-[#00ff88]/10 text-[#00ff88]'
-                        : 'bg-[#ff007f]/10 text-[#ff007f]'
+                        ? 'bg-premium-success/20 text-premium-success border border-premium-success/30'
+                        : 'bg-premium-gold/20 text-premium-gold border border-premium-gold/30'
                     }`}
                   >
                     {log.status === 'success' ? 'Admitted' : 'Duplicate'}

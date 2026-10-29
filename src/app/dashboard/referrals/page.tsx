@@ -72,154 +72,156 @@ export default function ReferralsLedgerPage() {
     .reduce((sum, l) => sum + l.cashbackAmount, 0);
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col font-sans select-none">
       <Header
         title="EO & WO Referral Partner Hub"
         subtitle="Track event cashback commissions, referral disbursements, and partner payout tiers"
+        actionText="Back to Operations"
+        actionHref="/dashboard"
       />
 
       <div className="p-6 sm:p-8 space-y-8 max-w-7xl">
         {/* Top Partner Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="p-6 rounded-2xl bg-[#121624] border border-[#1e263d]">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-mono text-gray-400 uppercase">Pending Post-Event Cashback</span>
-              <div className="p-2 rounded-lg bg-[#dfb76c]/10 text-[#dfb76c]">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="p-8 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark shadow-xl">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Pending Post-Event Cashback</span>
+              <div className="p-2.5 rounded-2xl bg-premium-gold/15 text-premium-gold border border-premium-gold/30 shadow-gold">
                 <Clock className="w-4 h-4" />
               </div>
             </div>
-            <div className="text-3xl font-black text-[#dfb76c]">{formatIDR(pendingCashback)}</div>
-            <div className="text-xs text-gray-400 mt-1">Disbursed automatically when active events wrap up</div>
+            <div className="text-3xl font-display font-bold text-premium-gold">{formatIDR(pendingCashback)}</div>
+            <div className="text-xs text-zinc-400 mt-2 font-light">Disbursed automatically when active events wrap up</div>
           </div>
 
-          <div className="p-6 rounded-2xl bg-[#121624] border border-[#1e263d]">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-mono text-gray-400 uppercase">Total Lifetime Paid</span>
-              <div className="p-2 rounded-lg bg-[#00ff88]/10 text-[#00ff88]">
+          <div className="p-8 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark shadow-xl">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Total Lifetime Paid</span>
+              <div className="p-2.5 rounded-2xl bg-premium-success/15 text-premium-success border border-premium-success/30">
                 <Wallet className="w-4 h-4" />
               </div>
             </div>
-            <div className="text-3xl font-black text-[#00ff88]">{formatIDR(totalEarnedLifetime)}</div>
-            <div className="text-xs text-gray-400 mt-1">Paid directly to Bank Central Asia (BCA)</div>
+            <div className="text-3xl font-display font-bold text-premium-success">{formatIDR(totalEarnedLifetime)}</div>
+            <div className="text-xs text-zinc-400 mt-2 font-light">Paid directly to Bank Central Asia (BCA)</div>
           </div>
 
-          <div className="p-6 rounded-2xl bg-[#121624] border border-[#1e263d] flex flex-col justify-between">
+          <div className="p-8 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark shadow-xl flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-mono text-gray-400 uppercase">Your Referral Code</span>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-[#ff007f]/15 text-[#ff007f] font-mono border border-[#ff007f]/30">
-                  Verified Partner
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Your Referral Code</span>
+                <span className="text-xs px-3 py-1 rounded-full bg-premium-gold/20 text-premium-gold font-bold border border-premium-gold/30 uppercase tracking-wider">
+                  Partner
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xl font-mono font-black text-white">{referralCode}</span>
+              <div className="flex items-center gap-3">
+                <span className="text-2xl font-mono font-bold text-white">{referralCode}</span>
                 <button
                   type="button"
                   onClick={handleCopyCode}
-                  className="p-1.5 rounded-lg bg-[#182035] text-gray-400 hover:text-white transition-colors"
+                  className="p-2 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-zinc-400 hover:text-white transition-colors scale-on-click"
                   title="Copy Code"
                 >
-                  {copied ? <Check className="w-4 h-4 text-[#00ff88]" /> : <Copy className="w-4 h-4" />}
+                  {copied ? <Check className="w-4 h-4 text-premium-success" /> : <Copy className="w-4 h-4" />}
                 </button>
               </div>
             </div>
-            <div className="text-[11px] text-gray-400 mt-3">
+            <div className="text-xs text-zinc-500 mt-3 font-light">
               Give this code to your clients or attach to event bookings to bind commissions.
             </div>
           </div>
         </div>
 
         {/* Commission Scale Reference */}
-        <div className="p-5 rounded-2xl bg-[#151929] border border-[#232c44]">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div className="p-8 rounded-[2rem] bg-premium-surfaceDark border border-premium-borderDark">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-[#dfb76c]" />
+              <h3 className="text-lg font-display font-medium text-white flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-premium-gold" />
                 <span>Cashback Tier Scale (Min 100 pax required)</span>
               </h3>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-zinc-400 mt-1 font-light">
                 Calculated on base package fee + extra guest top-ups. Paid out after event status is marked completed.
               </p>
             </div>
-            <div className="text-xs font-mono text-gray-400">
+            <div className="text-xs font-mono text-zinc-400">
               Disbursement threshold: <strong className="text-white">Min Rp 100.000</strong>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3 rounded-xl bg-[#0e121e] border border-[#1b2234]">
-              <div className="text-xs text-gray-400">100 - 499 Guests</div>
-              <div className="text-lg font-black text-[#dfb76c]">10%</div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="p-4 rounded-2xl bg-premium-charcoal border border-premium-borderDark">
+              <div className="text-xs text-zinc-500 font-bold uppercase tracking-wider">100 - 499 Guests</div>
+              <div className="text-2xl font-display font-bold text-premium-gold mt-1">10%</div>
             </div>
-            <div className="p-3 rounded-xl bg-[#0e121e] border border-[#1b2234]">
-              <div className="text-xs text-gray-400">500 - 999 Guests</div>
-              <div className="text-lg font-black text-[#00f0ff]">12%</div>
+            <div className="p-4 rounded-2xl bg-premium-charcoal border border-premium-borderDark">
+              <div className="text-xs text-zinc-500 font-bold uppercase tracking-wider">500 - 999 Guests</div>
+              <div className="text-2xl font-display font-bold text-premium-neon mt-1">12%</div>
             </div>
-            <div className="p-3 rounded-xl bg-[#0e121e] border border-[#1b2234]">
-              <div className="text-xs text-gray-400">1,000 - 1,999 Guests</div>
-              <div className="text-lg font-black text-[#9d00ff]">15%</div>
+            <div className="p-4 rounded-2xl bg-premium-charcoal border border-premium-borderDark">
+              <div className="text-xs text-zinc-500 font-bold uppercase tracking-wider">1,000 - 1,999 Guests</div>
+              <div className="text-2xl font-display font-bold text-premium-gold mt-1">15%</div>
             </div>
-            <div className="p-3 rounded-xl bg-[#0e121e] border border-[#1b2234]">
-              <div className="text-xs text-gray-400">2,000+ Guests</div>
-              <div className="text-lg font-black text-[#ff007f]">18%</div>
+            <div className="p-4 rounded-2xl bg-premium-charcoal border border-premium-borderDark">
+              <div className="text-xs text-zinc-500 font-bold uppercase tracking-wider">2,000+ Guests</div>
+              <div className="text-2xl font-display font-bold text-premium-danger mt-1">18%</div>
             </div>
           </div>
         </div>
 
         {/* Ledger Table */}
-        <div className="rounded-2xl bg-[#121624] border border-[#1e263d] overflow-hidden">
-          <div className="px-6 py-4 border-b border-[#1e263d] flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white">Commission Transaction Ledger</h3>
-            <span className="text-xs text-gray-400 font-mono">{ledger.length} Records</span>
+        <div className="bg-premium-charcoal rounded-[2.5rem] border border-premium-borderDark overflow-hidden shadow-2xl">
+          <div className="p-6 border-b border-premium-borderDark flex items-center justify-between bg-premium-surfaceDark">
+            <h3 className="font-display font-medium text-lg text-white">Commission Transaction Ledger</h3>
+            <span className="text-xs text-zinc-500 font-mono">{ledger.length} Records</span>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-gray-300">
-              <thead className="bg-[#0e121e] border-b border-[#1e263d] text-gray-400 uppercase font-mono text-[10px]">
+            <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead className="bg-premium-black text-zinc-500 font-bold uppercase tracking-widest text-xs">
                 <tr>
-                  <th className="px-6 py-3.5">Event Name</th>
-                  <th className="px-6 py-3.5">Guest Count</th>
-                  <th className="px-6 py-3.5">Qualifying Spend</th>
-                  <th className="px-6 py-3.5">Rate</th>
-                  <th className="px-6 py-3.5">Commission</th>
-                  <th className="px-6 py-3.5 text-right">Payout Status</th>
+                  <th className="px-8 py-5">Event Name</th>
+                  <th className="px-8 py-5">Guest Count</th>
+                  <th className="px-8 py-5">Qualifying Spend</th>
+                  <th className="px-8 py-5">Rate</th>
+                  <th className="px-8 py-5">Commission</th>
+                  <th className="px-8 py-5 text-right">Payout Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#182035]">
+              <tbody className="divide-y divide-premium-borderDark">
                 {ledger.map((item) => (
-                  <tr key={item.id} className="hover:bg-[#151a2c] transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-white text-sm">{item.eventName}</div>
-                      <div className="text-[10px] text-gray-400 font-mono">{formatDate(item.eventDate)}</div>
+                  <tr key={item.id} className="hover:bg-premium-surfaceDark transition-colors group">
+                    <td className="px-8 py-6">
+                      <div className="font-bold text-white text-base font-display">{item.eventName}</div>
+                      <div className="text-xs text-zinc-500 font-mono mt-0.5">{formatDate(item.eventDate)}</div>
                     </td>
 
-                    <td className="px-6 py-4 font-mono font-bold text-white">
+                    <td className="px-8 py-6 font-mono font-bold text-white">
                       {item.guestCount} pax
                     </td>
 
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-white">{formatIDR(item.packageBase + item.extraGuestSpend)}</div>
-                      <div className="text-[10px] text-gray-500 font-mono">
+                    <td className="px-8 py-6">
+                      <div className="font-medium text-white font-mono">{formatIDR(item.packageBase + item.extraGuestSpend)}</div>
+                      <div className="text-xs text-zinc-500 font-mono mt-0.5">
                         Base: {formatIDR(item.packageBase)} + Extra: {formatIDR(item.extraGuestSpend)}
                       </div>
                     </td>
 
-                    <td className="px-6 py-4 font-bold text-[#dfb76c] font-mono">
+                    <td className="px-8 py-6 font-display font-bold text-premium-gold text-base">
                       {(item.cashbackRate * 100).toFixed(0)}%
                     </td>
 
-                    <td className="px-6 py-4 font-black text-white text-sm">
+                    <td className="px-8 py-6 font-display font-bold text-white text-lg">
                       {formatIDR(item.cashbackAmount)}
                     </td>
 
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-8 py-6 text-right">
                       {item.status === 'paid' ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#00ff88]/10 text-[#00ff88] text-[11px] font-semibold border border-[#00ff88]/30">
+                        <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-premium-success/20 text-premium-success text-xs font-bold uppercase border border-premium-success/30">
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>Paid ({item.paidDate})</span>
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-400/10 text-amber-400 text-[11px] font-semibold border border-amber-400/30">
+                        <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-premium-gold/20 text-premium-gold text-xs font-bold uppercase border border-premium-gold/30">
                           <Clock className="w-3.5 h-3.5" />
                           <span>Pending Event Wrap-up</span>
                         </span>

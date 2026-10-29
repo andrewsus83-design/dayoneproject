@@ -1,12 +1,28 @@
-export type EventType = 'corporate' | 'wedding' | 'conference' | 'concert' | 'other';
+export type EventType = 'corporate' | 'wedding';
 export type EventStatus = 'draft' | 'active' | 'completed' | 'cancelled';
 export type PackageTier = 'free' | 'starter' | 'plus' | 'pro' | 'business' | 'scale' | 'enterprise';
 export type RsvpStatus = 'pending' | 'attending' | 'declined';
-export type RaffleStyle = 'wheel' | 'claw' | 'slot' | 'gacha' | 'scratch' | 'lotto';
+export type RaffleStyle = 'wheel' | 'claw' | 'slot';
 export type GameType = 'live_quiz' | 'scavenger_hunt' | 'trivia' | 'bingo';
+
+export type ThemeCategory = 'corporate' | 'wedding';
+
+export interface LandingSchemaConfig {
+  layoutType: 'corporate_keynote' | 'wedding_romance';
+  showSpeakers?: boolean;
+  showSponsors?: boolean;
+  showLoveStory?: boolean;
+  showDigitalAngpao?: boolean;
+  showMenuBanquet?: boolean;
+  showTableSeating?: boolean;
+  accentBadge: string;
+}
 
 export interface ThemeConfig {
   preset: string;
+  name: string;
+  category: ThemeCategory;
+  description: string;
   primaryColor: string;
   secondaryColor: string;
   accentColor: string;
@@ -15,10 +31,57 @@ export interface ThemeConfig {
   fontFamily: string;
   bannerUrl: string | null;
   logoUrl: string | null;
+  landingSchema: LandingSchemaConfig;
+}
+
+export type StageModuleId =
+  | 'welcome'
+  | 'photowall'
+  | 'quiz'
+  | 'raffle'
+  | 'rundown'
+  | 'menu'
+  | 'sponsors';
+
+export interface StageModuleConfig {
+  id: StageModuleId;
+  name: string;
+  description: string;
+  isEnabled: boolean;
+  durationSeconds: number;
+}
+
+export interface StageConfig {
+  activeMode: StageModuleId | 'auto_rotate';
+  autoRotateIntervalSeconds: number;
+  modules: StageModuleConfig[];
+  tickerText: string;
+  showSubdomainQr: boolean;
+}
+
+export interface RundownItem {
+  id: string;
+  time: string;
+  title: string;
+  speakerOrHost?: string;
+  location?: string;
+  description?: string;
+  isCurrent?: boolean;
+}
+
+export interface MenuItem {
+  id: string;
+  course: 'Appetizer' | 'Main Course' | 'Dessert' | 'Beverages';
+  name: string;
+  description: string;
+  dietaryFlags?: ('Halal' | 'Vegetarian' | 'Gluten-Free' | 'Chef Specialty')[];
+  pairing?: string;
 }
 
 export interface EventSettings {
   enablePhotoWall: boolean;
+  enablePhotoWallCaptions: boolean;
+  maxCaptionLength: number;
   enableRaffle: boolean;
   enableGames: boolean;
   enableRsvp: boolean;
@@ -27,6 +90,7 @@ export interface EventSettings {
   requireCheckInForRaffle: boolean;
   maxPhotosPerGuest: number;
   maxEmailsPerGuest: number;
+  stageConfig?: StageConfig;
 }
 
 export interface Organization {
@@ -43,6 +107,11 @@ export interface Event {
   organization_id: string;
   name: string;
   slug: string;
+  description?: string;
+  cover_image_url?: string;
+  visibility?: 'public' | 'private';
+  ticket_price?: string;
+  require_approval?: boolean;
   custom_domain: string | null;
   event_type: EventType;
   start_date: string;
@@ -89,12 +158,16 @@ export interface PhotoWallUpload {
   id: string;
   event_id: string;
   guest_id: string;
+  media_type: 'image' | 'video';
   image_url: string;
+  video_url?: string | null;
   thumbnail_url: string | null;
   filter_used: string | null;
   frame_used: string | null;
   caption: string | null;
   is_approved: boolean;
+  aspect_ratio?: 'portrait' | 'square' | 'landscape';
+  likes_count?: number;
   created_at: string;
   guest?: Pick<Guest, 'id' | 'name' | 'table_number'>;
 }

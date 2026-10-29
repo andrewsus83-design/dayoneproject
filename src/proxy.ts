@@ -2,54 +2,77 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 export function proxy(request: NextRequest) {
   const url = request.nextUrl;
-  const hostname = request.headers.get('host') || '';
+  const rawHost = request.headers.get('host') || '';
+  // Strip port from hostname for clean domain comparison (e.g. "techunite.all41.app:3000" -> "techunite.all41.app")
+  const host = rawHost.split(':')[0].toLowerCase();
 
-  // Get root domain from environment (defaults to all41.app or localhost:3000)
-  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000';
+  // Root domain default (e.g. "all41.app")
+  const rootDomain = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'all41.app').toLowerCase();
 
-  // Exclude internal Next.js paths, static files, and APIs that shouldn't be rewritten
+  // Exclude static assets, internal Next.js paths, favicons, and APIs from proxy rewriting
   if (
     url.pathname.startsWith('/_next') ||
     url.pathname.startsWith('/api') ||
     url.pathname.startsWith('/static') ||
+    url.pathname === '/manifest.webmanifest' ||
+    url.pathname === '/favicon.ico' ||
     url.pathname.includes('.')
   ) {
     return NextResponse.next();
   }
 
-  // Normalize hostname (remove port for clean comparison if needed, or keep for localhost)
-  const isLocalhost = hostname.includes('localhost');
-  const isRootDomain =
-    hostname === rootDomain ||
-    hostname === `www.${rootDomain}` ||
-    (isLocalhost && !hostname.includes('.localhost'));
+  // 1. Check if the request is for the main application root:
+  // (e.g. all41.app, www.all41.app, localhost, 127.0.0.1, or local LAN IP like 192.168.88.112)
+  const isDirectRoot =
+    host === rootDomain ||
+    host === `www.${rootDomain}` ||
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host.startsWith('192.168.') ||
+    host.startsWith('10.') ||
+    host.startsWith('172.');
 
-  // 1. Root Domain -> Main App & Marketing & Dashboard
-  if (isRootDomain) {
+  if (isDirectRoot) {
     return NextResponse.next();
   }
 
-  // 2. Subdomain routing (e.g. wedding-dina-budi.all41.app or demo.localhost:3000)
+  // 2. Subdomain check: <clientname>.all41.app or <clientname>.localhost
   let subdomain: string | null = null;
-  if (isLocalhost && hostname.endsWith('.localhost:3000')) {
-    subdomain = hostname.replace('.localhost:3000', '');
-  } else if (!isLocalhost && hostname.endsWith(`.${rootDomain}`)) {
-    subdomain = hostname.replace(`.${rootDomain}`, '');
+
+  if (host.endsWith(`.${rootDomain}`)) {
+    // Production client subdomain: clientname.all41.app
+    subdomain = host.slice(0, -(rootDomain.length + 1));
+  } else if (host.endsWith('.localhost')) {
+    // Local development client subdomain: clientname.localhost(:3000)
+    subdomain = host.slice(0, -'.localhost'.length);
   }
 
-  if (subdomain && subdomain !== 'www' && subdomain !== 'app') {
-    // Rewrite to the event page route: /events/[slug]/...
-    url.pathname = `/events/${subdomain}${url.pathname === '/' ? '' : url.pathname}`;
+  // Ignore reserved system subdomains
+  if (subdomain && subdomain !== 'www' && subdomain !== 'app' && subdomain !== 'admin' && subdomain !== 'api') {
+    // If the path already starts with /events/[subdomain], avoid duplicating the prefix
+    let targetPath = url.pathname;
+    if (!targetPath.startsWith(`/events/${subdomain}`)) {
+      targetPath = `/events/${subdomain}${url.pathname === '/' ? '' : url.pathname}`;
+    }
+
+    // Alias /games to /play
+    if (targetPath.endsWith('/games')) {
+      targetPath = targetPath.replace(/\/games$/, '/play');
+    }
+
+    url.pathname = targetPath;
+
     const response = NextResponse.rewrite(url);
+    response.headers.set('x-client-subdomain', `${subdomain}.${rootDomain}`);
     response.headers.set('x-event-slug', subdomain);
     return response;
   }
 
-  // 3. Custom Domain (Bring Your Own Domain - White Label)
-  // Rewrite to custom domain handler
-  url.pathname = `/custom/${hostname}${url.pathname === '/' ? '' : url.pathname}`;
+  // 3. Custom Domain Support (Bring Your Own Domain - White Label Add-on)
+  // e.g. wedding.ariadaniel.com -> rewrites to custom domain handler
+  url.pathname = `/custom/${host}${url.pathname === '/' ? '' : url.pathname}`;
   const response = NextResponse.rewrite(url);
-  response.headers.set('x-custom-domain', hostname);
+  response.headers.set('x-custom-domain', host);
   return response;
 }
 

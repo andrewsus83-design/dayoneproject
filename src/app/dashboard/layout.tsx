@@ -12,8 +12,8 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen bg-[#0b0d13] text-[#f8fafc]">
-      <Suspense fallback={<aside className="w-64 bg-[#0d101a] border-r border-[#1e263d] hidden md:block" />}>
+    <div className="flex min-h-screen bg-premium-black text-zinc-100 font-sans">
+      <Suspense fallback={<aside className="w-72 bg-premium-black border-r border-premium-borderDark hidden md:block" />}>
         <Sidebar />
       </Suspense>
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">

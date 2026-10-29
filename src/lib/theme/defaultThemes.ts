@@ -1,48 +1,215 @@
-import { ThemeConfig } from '../types';
+import { ThemeConfig, ThemeCategory } from '../types';
 
-export const THEME_PRESETS: Record<string, ThemeConfig> = {
-  neon_dark_gold: {
-    preset: 'neon_dark_gold',
-    primaryColor: '#00f0ff', // Electric Cyan
-    secondaryColor: '#dfb76c', // Dark Gold
-    accentColor: '#ff007f', // Neon Pink
-    backgroundColor: '#0b0d13', // Deep Void
-    textColor: '#f8fafc',
-    fontFamily: 'Inter',
-    bannerUrl: null,
+export const CORPORATE_THEMES: Record<string, ThemeConfig> = {
+  corporate_executive_gold: {
+    preset: 'corporate_executive_gold',
+    name: 'Executive Gold Summit',
+    category: 'corporate',
+    description: 'Deep obsidian black with signature gold and steel charcoal accents. Tailored for tech summits, executive conferences, and VC dinners.',
+    primaryColor: '#C5A059', // Master UI Kit Gold
+    secondaryColor: '#27272A',
+    accentColor: '#00F0FF', // Electric Cyan
+    backgroundColor: '#09090B',
+    textColor: '#FFFFFF',
+    fontFamily: 'Outfit',
+    bannerUrl: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80',
     logoUrl: null,
+    landingSchema: {
+      layoutType: 'corporate_keynote',
+      showSpeakers: true,
+      showSponsors: true,
+      showLoveStory: false,
+      showDigitalAngpao: false,
+      showMenuBanquet: true,
+      showTableSeating: true,
+      accentBadge: 'APAC Executive Summit',
+    },
   },
-  elegant_wedding_gold: {
-    preset: 'elegant_wedding_gold',
-    primaryColor: '#c5a059', // Classic Warm Gold
-    secondaryColor: '#e5d3b3', // Champagne Cream
-    accentColor: '#8a6d3b', // Deep Amber
-    backgroundColor: '#faf7f2', // Soft Ivory
-    textColor: '#292524', // Warm Charcoal
-    fontFamily: 'Playfair Display',
-    bannerUrl: null,
+  corporate_cyber_quantum: {
+    preset: 'corporate_cyber_quantum',
+    name: 'Cyber Quantum Neon',
+    category: 'corporate',
+    description: 'High-contrast cyan lasers and deep charcoal panels designed for developer arenas, AI product reveals, and keynote streams.',
+    primaryColor: '#00F0FF',
+    secondaryColor: '#18181B',
+    accentColor: '#FF3366',
+    backgroundColor: '#09090B',
+    textColor: '#F8FAFC',
+    fontFamily: 'Outfit',
+    bannerUrl: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=1200&q=80',
     logoUrl: null,
+    landingSchema: {
+      layoutType: 'corporate_keynote',
+      showSpeakers: true,
+      showSponsors: true,
+      showLoveStory: false,
+      showDigitalAngpao: false,
+      showMenuBanquet: false,
+      showTableSeating: true,
+      accentBadge: 'Tech Keynote & Arena',
+    },
   },
-  corporate_midnight: {
-    preset: 'corporate_midnight',
-    primaryColor: '#3b82f6', // Sapphire Blue
-    secondaryColor: '#6366f1', // Indigo
-    accentColor: '#10b981', // Emerald
-    backgroundColor: '#0f172a', // Midnight Slate
-    textColor: '#f1f5f9',
-    fontFamily: 'Inter',
-    bannerUrl: null,
+  corporate_monolith_noir: {
+    preset: 'corporate_monolith_noir',
+    name: 'Monolith Noir Swiss',
+    category: 'corporate',
+    description: 'Minimalist editorial aesthetic with pegboard dot grids, crisp typography, and understated gold foil highlights.',
+    primaryColor: '#E4E4E7',
+    secondaryColor: '#27272A',
+    accentColor: '#C5A059',
+    backgroundColor: '#09090B',
+    textColor: '#FFFFFF',
+    fontFamily: 'Manrope',
+    bannerUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
     logoUrl: null,
+    landingSchema: {
+      layoutType: 'corporate_keynote',
+      showSpeakers: true,
+      showSponsors: true,
+      showLoveStory: false,
+      showDigitalAngpao: false,
+      showMenuBanquet: true,
+      showTableSeating: true,
+      accentBadge: 'Global Enterprise Forum',
+    },
   },
-  romantic_blush: {
-    preset: 'romantic_blush',
-    primaryColor: '#f43f5e', // Rose
-    secondaryColor: '#fecdd3', // Blush Pink
-    accentColor: '#e11d48', // Ruby
-    backgroundColor: '#fff1f2', // Soft Rose Light
-    textColor: '#4c0519',
-    fontFamily: 'Cinzel',
-    bannerUrl: null,
+  corporate_midnight_sapphire: {
+    preset: 'corporate_midnight_sapphire',
+    name: 'Midnight Sapphire Enterprise',
+    category: 'corporate',
+    description: 'Deep navy and cobalt glass panels designed for banking institutions, cross-border treasury summits, and corporate AGMs.',
+    primaryColor: '#3B82F6',
+    secondaryColor: '#1E293B',
+    accentColor: '#10B981',
+    backgroundColor: '#0B1120',
+    textColor: '#F1F5F9',
+    fontFamily: 'Outfit',
+    bannerUrl: 'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?auto=format&fit=crop&w=1200&q=80',
     logoUrl: null,
+    landingSchema: {
+      layoutType: 'corporate_keynote',
+      showSpeakers: true,
+      showSponsors: true,
+      showLoveStory: false,
+      showDigitalAngpao: false,
+      showMenuBanquet: true,
+      showTableSeating: true,
+      accentBadge: 'Cross-Border Fintech Rail',
+    },
   },
 };
+
+export const WEDDING_THEMES: Record<string, ThemeConfig> = {
+  wedding_champagne_gold: {
+    preset: 'wedding_champagne_gold',
+    name: 'Champagne Royale & Gold',
+    category: 'wedding',
+    description: 'Warm champagne tones, candlelight gold, and romantic serif typography. Specially crafted for 5-star hotel ballroom wedding celebrations.',
+    primaryColor: '#C5A059',
+    secondaryColor: '#2D261E',
+    accentColor: '#E5D3B3',
+    backgroundColor: '#0E0C0A',
+    textColor: '#FDFBF7',
+    fontFamily: 'Playfair Display',
+    bannerUrl: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80',
+    logoUrl: null,
+    landingSchema: {
+      layoutType: 'wedding_romance',
+      showSpeakers: false,
+      showSponsors: false,
+      showLoveStory: true,
+      showDigitalAngpao: true,
+      showMenuBanquet: true,
+      showTableSeating: true,
+      accentBadge: 'The Wedding Celebration',
+    },
+  },
+  wedding_romantic_rose: {
+    preset: 'wedding_romantic_rose',
+    name: 'Romantic Blush & Dusty Rose',
+    category: 'wedding',
+    description: 'Velvet rose petals, blush gold trims, and romantic storytelling layout. Perfect for sunset outdoor vows and beachside garden receptions.',
+    primaryColor: '#F43F5E',
+    secondaryColor: '#2A161C',
+    accentColor: '#C5A059',
+    backgroundColor: '#0E0A0C',
+    textColor: '#FFF1F2',
+    fontFamily: 'Cinzel',
+    bannerUrl: 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=1200&q=80',
+    logoUrl: null,
+    landingSchema: {
+      layoutType: 'wedding_romance',
+      showSpeakers: false,
+      showSponsors: false,
+      showLoveStory: true,
+      showDigitalAngpao: true,
+      showMenuBanquet: true,
+      showTableSeating: true,
+      accentBadge: 'A Sacred Union of Hearts',
+    },
+  },
+  wedding_glasshouse_emerald: {
+    preset: 'wedding_glasshouse_emerald',
+    name: 'Glasshouse Botanical Emerald',
+    category: 'wedding',
+    description: 'Lush botanical emerald paired with warm gold foiling, tailored for destination cliffside glasshouses and conservatory weddings.',
+    primaryColor: '#10B981',
+    secondaryColor: '#14251E',
+    accentColor: '#C5A059',
+    backgroundColor: '#0A100D',
+    textColor: '#ECFDF5',
+    fontFamily: 'Playfair Display',
+    bannerUrl: 'https://images.unsplash.com/photo-1520854221256-17451cc331bf?auto=format&fit=crop&w=1200&q=80',
+    logoUrl: null,
+    landingSchema: {
+      layoutType: 'wedding_romance',
+      showSpeakers: false,
+      showSponsors: false,
+      showLoveStory: true,
+      showDigitalAngpao: true,
+      showMenuBanquet: true,
+      showTableSeating: true,
+      accentBadge: 'Glasshouse Pavilion Nuptials',
+    },
+  },
+  wedding_royal_velvet_maroon: {
+    preset: 'wedding_royal_velvet_maroon',
+    name: 'Royal Velvet & Burgundy',
+    category: 'wedding',
+    description: 'Opulent deep burgundy wine with imperial gold accents and regal serif styling for prestigious high-society galas.',
+    primaryColor: '#BE123C',
+    secondaryColor: '#2B1218',
+    accentColor: '#C5A059',
+    backgroundColor: '#0E0608',
+    textColor: '#FFF1F2',
+    fontFamily: 'Cinzel',
+    bannerUrl: 'https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?auto=format&fit=crop&w=1200&q=80',
+    logoUrl: null,
+    landingSchema: {
+      layoutType: 'wedding_romance',
+      showSpeakers: false,
+      showSponsors: false,
+      showLoveStory: true,
+      showDigitalAngpao: true,
+      showMenuBanquet: true,
+      showTableSeating: true,
+      accentBadge: 'Imperial Royal Gala',
+    },
+  },
+};
+
+export const THEME_PRESETS: Record<string, ThemeConfig> = {
+  ...CORPORATE_THEMES,
+  ...WEDDING_THEMES,
+  // Backward compatibility alias keys
+  neon_dark_gold: CORPORATE_THEMES.corporate_executive_gold,
+  elegant_wedding_gold: WEDDING_THEMES.wedding_champagne_gold,
+  corporate_midnight: CORPORATE_THEMES.corporate_midnight_sapphire,
+  romantic_blush: WEDDING_THEMES.wedding_romantic_rose,
+};
+
+export function getThemesByCategory(category: ThemeCategory): ThemeConfig[] {
+  return category === 'wedding'
+    ? Object.values(WEDDING_THEMES)
+    : Object.values(CORPORATE_THEMES);
+}

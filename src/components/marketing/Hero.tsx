@@ -1,131 +1,154 @@
 'use client';
 
 import Link from 'next/link';
-import { Sparkles, QrCode, Camera, Trophy, Gift, Mail, Globe, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, CheckCircle2, QrCode, Camera, Gift, Trophy } from 'lucide-react';
 
 export function Hero() {
   return (
-    <section className="relative overflow-hidden pt-12 pb-20 md:pt-20 md:pb-32">
-      {/* Background Neon Ambient Glows */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] h-[350px] bg-gradient-to-tr from-[#00f0ff]/15 via-[#dfb76c]/10 to-[#ff007f]/15 blur-[120px] pointer-events-none rounded-full" />
-      <div className="absolute top-1/3 left-10 w-72 h-72 bg-[#00f0ff]/10 blur-[100px] pointer-events-none rounded-full" />
-      <div className="absolute top-1/2 right-10 w-80 h-80 bg-[#ff007f]/10 blur-[100px] pointer-events-none rounded-full" />
+    <section className="relative overflow-hidden min-h-[92vh] flex items-center pt-8 pb-24 md:pb-32 font-sans">
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
-        {/* Top Announcement Pill */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#161c2c] border border-[#232d44] text-xs font-semibold text-gray-300 mb-8 shadow-inner hover:border-[#dfb76c]/50 transition-colors">
-          <span className="flex h-2 w-2 rounded-full bg-[#00f0ff] animate-ping" />
-          <span className="text-[#dfb76c]">Next-Gen Platform</span>
-          <span className="text-gray-500">•</span>
-          <span>Corporate Galas & Modern Weddings</span>
-        </div>
+      {/* Background ambient glows */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-0 left-[30%] w-[900px] h-[600px] bg-premium-gold/[0.06] blur-[180px] rounded-full" />
+        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-premium-neon/[0.05] blur-[140px] rounded-full" />
+        <div className="absolute top-1/2 right-0 w-[400px] h-[400px] bg-premium-gold/[0.04] blur-[120px] rounded-full" />
+      </div>
 
-        {/* Main Headline */}
-        <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-white max-w-5xl mx-auto leading-[1.12]">
-          Everything you need <br />
-          for your <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00f0ff] via-[#dfb76c] to-[#ff007f]">unforgettable event</span>.
-        </h1>
+      <div className="max-w-[1440px] mx-auto px-6 md:px-12 lg:px-16 relative z-10 w-full">
+        <div className="grid lg:grid-cols-2 gap-16 lg:gap-20 items-center">
 
-        {/* Subtitle */}
-        <p className="mt-6 text-lg sm:text-xl text-gray-400 max-w-3xl mx-auto leading-relaxed">
-          Say goodbye to juggling 5 different apps. From branded landing pages, RSVP invitations, and high-speed QR check-ins, to live photo walls, claw machine raffles, and interactive trivia.
-        </p>
+          {/* ── Left column ── */}
+          <div className="space-y-8 lg:space-y-10">
 
-        {/* Primary CTA Buttons */}
-        <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Link
-            href="/dashboard/events/new"
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl font-bold text-base text-[#0b0d13] bg-gradient-to-r from-[#00f0ff] via-[#dfb76c] to-[#ff007f] hover:brightness-110 transition-all shadow-[0_0_30px_rgba(223,183,108,0.3)] active:scale-95"
-          >
-            <span>Start Free Event (≤5 Guests)</span>
-            <ArrowRight className="w-5 h-5" />
-          </Link>
-          <Link
-            href="/events/techunite"
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl font-semibold text-base text-gray-200 bg-[#141926] border border-[#232c42] hover:bg-[#1a2133] hover:text-white hover:border-[#00f0ff]/50 transition-all"
-          >
-            <span>Explore Live Demo Experience</span>
-          </Link>
-        </div>
+            {/* Eyebrow */}
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 text-[11px] font-bold bg-premium-gold/15 text-premium-gold border border-premium-gold/25 rounded-full tracking-[0.16em] uppercase">
+              <span className="w-1.5 h-1.5 rounded-full bg-premium-gold animate-pulse" />
+              Southeast Asia&apos;s Event OS
+            </span>
 
-        {/* Trust Badges */}
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-y-2 gap-x-6 text-xs text-gray-400">
-          <div className="flex items-center gap-1.5">
-            <CheckCircle2 className="w-4 h-4 text-[#00ff88]" />
-            <span>Zero App Downloads Required</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <CheckCircle2 className="w-4 h-4 text-[#00f0ff]" />
-            <span>Multi-device Realtime Sync</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <CheckCircle2 className="w-4 h-4 text-[#dfb76c]" />
-            <span>Subdomain & Custom Domain Ready</span>
-          </div>
-        </div>
+            {/* Main headline */}
+            <h1 className="text-5xl sm:text-6xl lg:text-[72px] xl:text-[80px] font-display font-medium tracking-[-0.025em] text-white leading-[1.05]">
+              Everything you{' '}
+              <br className="hidden sm:block" />
+              need for your{' '}
+              <br className="hidden sm:block" />
+              <span className="text-premium-gold">unforgettable</span>
+              <br className="hidden sm:block" />
+              event.
+            </h1>
 
-        {/* Visual Interactive Dashboard Preview Teaser */}
-        <div className="mt-16 relative mx-auto max-w-5xl rounded-2xl border border-[#242d45] bg-[#0e121c]/90 p-3 sm:p-4 shadow-2xl backdrop-blur-xl">
-          <div className="relative rounded-xl border border-[#1e263d] bg-[#121624] overflow-hidden">
-            {/* Top Bar Window Controls */}
-            <div className="flex items-center justify-between px-4 py-3 bg-[#0d101a] border-b border-[#1e263d]">
+            {/* Subtitle */}
+            <p className="text-lg sm:text-xl text-zinc-400 font-light leading-relaxed max-w-lg">
+              One platform, one theme, zero friction. Branded invitations,
+              sub-second QR check-ins, live photo walls, prize raffles and
+              interactive leaderboards — all unified.
+            </p>
+
+            {/* CTA buttons */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <Link
+                href="/dashboard/events/new"
+                className="inline-flex items-center gap-2.5 bg-premium-gold hover:bg-premium-goldHover text-black px-8 py-4 rounded-[1.5rem] text-[15px] font-bold transition-all shadow-gold scale-on-click"
+              >
+                <span>Create Your Event</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link
+                href="/events/techunite"
+                className="inline-flex items-center gap-2.5 bg-transparent border border-white/10 hover:border-white/25 text-white/80 hover:text-white px-8 py-4 rounded-[1.5rem] text-[15px] font-medium transition-all scale-on-click"
+              >
+                <span>Explore Live Demo</span>
+              </Link>
+            </div>
+
+            {/* Trust row */}
+            <div className="flex flex-wrap items-center gap-y-3 gap-x-7 text-[11px] font-medium text-zinc-500 uppercase tracking-wider pt-2">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-[#ff5f56]" />
-                <div className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
-                <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
-                <span className="text-xs font-mono text-gray-400 ml-2">live.all41.app / techunite-summit-2026</span>
+                <CheckCircle2 className="w-3.5 h-3.5 text-premium-success flex-shrink-0" />
+                Zero app downloads
               </div>
-              <div className="flex items-center gap-3">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#00ff88] animate-pulse" />
-                  Realtime Gate Active
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 text-premium-neon flex-shrink-0" />
+                Realtime cloud sync
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 text-premium-gold flex-shrink-0" />
+                Custom subdomains
+              </div>
+            </div>
+          </div>
+
+          {/* ── Right column — dashboard preview ── */}
+          <div className="relative lg:pl-4">
+
+            {/* Floating badge */}
+            <div className="absolute -top-5 -left-4 z-20 hidden lg:flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-premium-charcoal border border-premium-borderDark shadow-2xl">
+              <span className="w-2.5 h-2.5 rounded-full bg-premium-success shadow-[0_0_10px_#00E676] animate-pulse" />
+              <span className="text-xs font-bold text-white">418 / 650</span>
+              <span className="text-xs text-zinc-400">checked in</span>
+            </div>
+
+            {/* Main card */}
+            <div className="rounded-[2.5rem] bg-premium-charcoal border border-white/[0.08] shadow-2xl overflow-hidden">
+
+              {/* Window bar */}
+              <div className="flex items-center gap-3 px-6 py-4 bg-premium-black border-b border-white/[0.06]">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-[#FF5F57]" />
+                  <div className="w-3 h-3 rounded-full bg-[#FEBC2E]" />
+                  <div className="w-3 h-3 rounded-full bg-[#28C840]" />
+                </div>
+                <span className="text-[11px] font-mono text-zinc-500 ml-2">techunite.all41.app</span>
+                <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-premium-success font-medium">
+                  <span className="w-2 h-2 rounded-full bg-premium-success animate-pulse" />
+                  Live
                 </span>
-                <span className="text-xs text-gray-400">Checked-in: <strong className="text-white">418 / 650</strong></span>
+              </div>
+
+              {/* Module cards */}
+              <div className="p-5 grid grid-cols-2 gap-3">
+                {[
+                  { icon: QrCode, label: 'QR Check-in', sub: 'Sub-second gate', color: 'premium-neon' },
+                  { icon: Camera, label: 'Photo Wall', sub: 'WebP live stream', color: 'premium-gold' },
+                  { icon: Gift, label: 'Door Prize', sub: '3D raffle machine', color: 'premium-gold' },
+                  { icon: Trophy, label: 'Live Trivia', sub: 'Kahoot-style blitz', color: 'premium-neon' },
+                ].map(({ icon: Icon, label, sub, color }) => (
+                  <div key={label} className="p-4 rounded-2xl bg-premium-surfaceDark border border-white/[0.05] flex items-center gap-3.5">
+                    <div className={`w-11 h-11 rounded-xl bg-${color}/15 text-${color} flex items-center justify-center flex-shrink-0`}>
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-zinc-500 font-bold uppercase tracking-wider leading-none mb-1">{sub}</div>
+                      <div className="text-[14px] font-display font-bold text-white">{label}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Bottom stats bar */}
+              <div className="px-5 pb-5 grid grid-cols-3 gap-3">
+                {[
+                  { value: '2,500+', label: 'Max guests' },
+                  { value: '<0.6s', label: 'Check-in speed' },
+                  { value: '7', label: 'Stage modules' },
+                ].map(({ value, label }) => (
+                  <div key={label} className="p-3.5 rounded-xl bg-premium-black/50 border border-white/[0.04] text-center">
+                    <div className="text-[18px] font-display font-bold text-premium-gold leading-none">{value}</div>
+                    <div className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider mt-1">{label}</div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Quick module feature bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 sm:p-6 bg-[#0e121e]">
-              <div className="p-4 rounded-xl bg-[#151a2a] border border-[#222b42] flex items-center gap-3 hover:border-[#00f0ff]/40 transition-colors">
-                <div className="p-2.5 rounded-lg bg-[#00f0ff]/10 text-[#00f0ff]">
-                  <QrCode className="w-6 h-6" />
-                </div>
-                <div className="text-left">
-                  <div className="text-xs text-gray-400">Fast Gate</div>
-                  <div className="text-sm font-bold text-white">QR Check-in</div>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#151a2a] border border-[#222b42] flex items-center gap-3 hover:border-[#dfb76c]/40 transition-colors">
-                <div className="p-2.5 rounded-lg bg-[#dfb76c]/10 text-[#dfb76c]">
-                  <Camera className="w-6 h-6" />
-                </div>
-                <div className="text-left">
-                  <div className="text-xs text-gray-400">Live WebP</div>
-                  <div className="text-sm font-bold text-white">Photo Wall</div>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#151a2a] border border-[#222b42] flex items-center gap-3 hover:border-[#ff007f]/40 transition-colors">
-                <div className="p-2.5 rounded-lg bg-[#ff007f]/10 text-[#ff007f]">
-                  <Gift className="w-6 h-6" />
-                </div>
-                <div className="text-left">
-                  <div className="text-xs text-gray-400">Door Prize</div>
-                  <div className="text-sm font-bold text-white">Raffle Wheel</div>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#151a2a] border border-[#222b42] flex items-center gap-3 hover:border-[#9d00ff]/40 transition-colors">
-                <div className="p-2.5 rounded-lg bg-[#9d00ff]/10 text-[#9d00ff]">
-                  <Trophy className="w-6 h-6" />
-                </div>
-                <div className="text-left">
-                  <div className="text-xs text-gray-400">Interactive</div>
-                  <div className="text-sm font-bold text-white">Kahoot Quiz</div>
-                </div>
+            {/* Second floating badge — bottom right */}
+            <div className="absolute -bottom-4 -right-2 z-20 hidden lg:flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-premium-charcoal border border-premium-borderDark shadow-2xl">
+              <span className="text-xl">🎰</span>
+              <div>
+                <div className="text-[11px] font-bold text-white">Door Prize Draw</div>
+                <div className="text-[10px] text-zinc-400">Only checked-in guests win</div>
               </div>
             </div>
+
           </div>
         </div>
       </div>

@@ -60,7 +60,48 @@ function InteractiveGamesContent({ slug }: { slug: string }) {
     { name: 'Hendrik Wijaya', score: 2400, table: 'Diamond 02' },
   ]);
 
-  const currentQ = QUESTIONS[currentQIndex];
+  const currentQ = QUESTIONS[currentQIndex % QUESTIONS.length];
+
+  // Sync question index, reveal state, and podium from Operator Broadcast Switcher
+  useEffect(() => {
+    const applyState = (data: {
+      activeQuestionIdx?: number;
+      gameStep?: 'question_active' | 'answers_locked' | 'reveal' | 'podium';
+    }) => {
+      if (typeof data.activeQuestionIdx === 'number') {
+        setCurrentQIndex(data.activeQuestionIdx % QUESTIONS.length);
+      }
+      if (data.gameStep === 'question_active') {
+        setGameFinished(false);
+        setIsAnswerSubmitted(false);
+        setSelectedAnswer(null);
+        setTimer(15);
+      } else if (data.gameStep === 'answers_locked' || data.gameStep === 'reveal') {
+        setGameFinished(false);
+        setIsAnswerSubmitted(true);
+      } else if (data.gameStep === 'podium') {
+        setGameFinished(true);
+        confetti({ particleCount: 120, spread: 80, origin: { y: 0.5 } });
+      }
+    };
+
+    try {
+      const saved = localStorage.getItem('all41_live_stage_state');
+      if (saved) applyState(JSON.parse(saved));
+    } catch {
+      // Ignore storage error
+    }
+
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      const channel = new BroadcastChannel('all41_stage_bus');
+      channel.onmessage = (ev) => {
+        if (ev.data?.type === 'STAGE_PUSH_LIVE') {
+          applyState(ev.data);
+        }
+      };
+      return () => channel.close();
+    }
+  }, []);
 
   const handleAnswerSubmit = (optionIdx: number) => {
     setSelectedAnswer(optionIdx);
@@ -113,62 +154,62 @@ function InteractiveGamesContent({ slug }: { slug: string }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#080a11] text-[#f8fafc] flex flex-col justify-between select-none relative overflow-hidden">
+    <div className="min-h-screen bg-premium-black text-zinc-100 flex flex-col justify-between select-none relative overflow-hidden font-sans">
       {/* Ambient Lighting */}
-      <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-[#9d00ff]/10 blur-[150px] pointer-events-none rounded-full" />
-      <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-[#00f0ff]/10 blur-[150px] pointer-events-none rounded-full" />
+      <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-premium-neon/10 blur-[150px] pointer-events-none rounded-full" />
+      <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-premium-gold/10 blur-[150px] pointer-events-none rounded-full" />
 
       {/* Top Header */}
-      <header className="h-16 px-6 border-b border-[#1b2234] bg-[#0c101a] flex items-center justify-between z-20">
-        <div className="flex items-center gap-3">
+      <header className="h-20 px-6 sm:px-8 border-b border-premium-borderDark bg-premium-black/80 backdrop-blur-xl flex items-center justify-between z-20">
+        <div className="flex items-center gap-4">
           <Link
             href={`/events/${slug}`}
-            className="p-2 rounded-lg bg-[#141926] text-gray-400 hover:text-white border border-[#232d44]"
+            className="p-2.5 rounded-2xl bg-premium-charcoal text-zinc-400 hover:text-white border border-premium-borderDark scale-on-click"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <h1 className="text-sm font-bold text-white flex items-center gap-2">
+            <h1 className="text-base font-display font-medium text-white flex items-center gap-2">
               <span>Kahoot-Style Trivia Blitz</span>
-              <span className="w-2 h-2 rounded-full bg-[#9d00ff] animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-premium-neon shadow-[0_0_8px_#00F0FF] animate-pulse" />
             </h1>
-            <p className="text-[10px] text-gray-400 font-mono">{MOCK_EVENT.name}</p>
+            <p className="text-xs text-zinc-400 font-mono">{MOCK_EVENT.name}</p>
           </div>
         </div>
 
         <div className="flex items-center gap-4 text-xs font-mono">
           <div className="text-right">
-            <span className="text-gray-400">Your Score: </span>
-            <strong className="text-[#00ff88] text-sm">{score} pts</strong>
+            <span className="text-zinc-500">Your Score: </span>
+            <strong className="text-premium-neon font-display font-bold text-base">{score} pts</strong>
           </div>
         </div>
       </header>
 
       {/* Main Game Container */}
-      <main className="flex-1 p-6 max-w-4xl mx-auto w-full flex flex-col justify-center items-center z-10">
+      <main className="flex-1 p-6 sm:p-8 max-w-4xl mx-auto w-full flex flex-col justify-center items-center z-10">
         {!gameFinished ? (
           <div className="w-full space-y-6">
             {/* Top Bar: Question # & Timer */}
             <div className="flex items-center justify-between">
-              <span className="px-3 py-1 rounded-full bg-[#181d2e] border border-[#25324e] text-xs font-mono text-[#00f0ff]">
+              <span className="px-4 py-1.5 rounded-full bg-premium-surfaceDark border border-premium-borderDark text-xs font-mono text-premium-neon font-bold">
                 Question {currentQIndex + 1} of {QUESTIONS.length}
               </span>
 
               <div
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border font-mono ${
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold border font-mono ${
                   timer <= 5
-                    ? 'bg-red-500/20 text-red-400 border-red-500 animate-pulse'
-                    : 'bg-[#181d2e] text-[#dfb76c] border-[#25324e]'
+                    ? 'bg-premium-danger/20 text-premium-danger border-premium-danger animate-pulse shadow-danger'
+                    : 'bg-premium-surfaceDark text-premium-gold border-premium-gold/30'
                 }`}
               >
-                <Clock className="w-3.5 h-3.5" />
+                <Clock className="w-4 h-4" />
                 <span>{timer}s left</span>
               </div>
             </div>
 
             {/* Question Card */}
-            <div className="p-8 rounded-3xl bg-[#121624] border border-[#232d42] text-center shadow-2xl">
-              <h2 className="text-xl sm:text-2xl font-black text-white leading-snug">
+            <div className="p-8 sm:p-12 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark text-center shadow-2xl">
+              <h2 className="text-2xl sm:text-3xl font-display font-medium text-white leading-snug">
                 {currentQ.question}
               </h2>
             </div>
@@ -179,27 +220,27 @@ function InteractiveGamesContent({ slug }: { slug: string }) {
                 const isSelected = selectedAnswer === idx;
                 const isCorrect = idx === currentQ.correctIndex;
 
-                let btnStyle = 'bg-[#151a2a] border-[#253047] text-white hover:border-[#dfb76c]';
+                let btnStyle = 'bg-premium-charcoal border-premium-borderDark text-white hover:border-premium-gold';
 
                 if (isAnswerSubmitted) {
                   if (isCorrect) {
-                    btnStyle = 'bg-[#0b291d] border-[#00ff88] text-[#00ff88] font-bold';
+                    btnStyle = 'bg-premium-surfaceDark border-premium-success text-premium-success font-bold shadow-[0_0_15px_rgba(0,230,118,0.2)]';
                   } else if (isSelected) {
-                    btnStyle = 'bg-[#291218] border-red-500 text-red-400';
+                    btnStyle = 'bg-premium-surfaceDark border-premium-danger text-premium-danger shadow-danger';
                   } else {
-                    btnStyle = 'bg-[#121622] border-[#1d2538] text-gray-500 opacity-50';
+                    btnStyle = 'bg-premium-surfaceDark border-premium-borderDark text-zinc-600 opacity-40';
                   }
                 }
 
                 // Quadrant accent colors
                 const badgeColor =
                   idx === 0
-                    ? 'bg-red-500'
+                    ? 'bg-premium-danger text-white'
                     : idx === 1
-                    ? 'bg-blue-500'
+                    ? 'bg-premium-neon text-black'
                     : idx === 2
-                    ? 'bg-amber-500'
-                    : 'bg-green-500';
+                    ? 'bg-premium-gold text-black'
+                    : 'bg-premium-success text-black';
 
                 return (
                   <button
@@ -207,14 +248,14 @@ function InteractiveGamesContent({ slug }: { slug: string }) {
                     type="button"
                     disabled={isAnswerSubmitted}
                     onClick={() => handleAnswerSubmit(idx)}
-                    className={`p-5 rounded-2xl border text-left flex items-center gap-4 transition-all duration-200 active:scale-95 shadow-md ${btnStyle}`}
+                    className={`p-6 rounded-[2rem] border text-left flex items-center gap-4 transition-all duration-200 scale-on-click shadow-md ${btnStyle}`}
                   >
-                    <div className={`w-8 h-8 rounded-xl ${badgeColor} text-white font-black text-xs flex items-center justify-center flex-shrink-0 shadow`}>
+                    <div className={`w-10 h-10 rounded-2xl ${badgeColor} font-display font-bold text-sm flex items-center justify-center flex-shrink-0 shadow`}>
                       {String.fromCharCode(65 + idx)}
                     </div>
-                    <span className="text-sm font-semibold flex-1">{opt}</span>
+                    <span className="text-base font-display font-medium flex-1">{opt}</span>
                     {isAnswerSubmitted && isCorrect && (
-                      <CheckCircle2 className="w-5 h-5 text-[#00ff88]" />
+                      <CheckCircle2 className="w-6 h-6 text-premium-success" />
                     )}
                   </button>
                 );
@@ -223,11 +264,11 @@ function InteractiveGamesContent({ slug }: { slug: string }) {
 
             {/* Next Question Control */}
             {isAnswerSubmitted && (
-              <div className="flex justify-end pt-2">
+              <div className="flex justify-end pt-4">
                 <button
                   type="button"
                   onClick={handleNextQuestion}
-                  className="px-8 py-3 rounded-xl font-bold text-xs text-[#0b0d13] bg-gradient-to-r from-[#00f0ff] to-[#dfb76c] hover:brightness-110 transition-all shadow-md"
+                  className="px-8 py-4 rounded-2xl font-bold text-sm text-black bg-premium-gold hover:bg-premium-goldHover transition-all shadow-gold scale-on-click"
                 >
                   {currentQIndex + 1 < QUESTIONS.length ? 'Next Question →' : 'See Podium Results →'}
                 </button>
@@ -236,40 +277,40 @@ function InteractiveGamesContent({ slug }: { slug: string }) {
           </div>
         ) : (
           /* Game Finished Podium */
-          <div className="w-full max-w-lg p-8 rounded-3xl bg-[#121624] border border-[#25324e] text-center shadow-2xl space-y-6 animate-fadeIn">
-            <div className="w-16 h-16 rounded-full bg-[#dfb76c]/20 text-[#dfb76c] mx-auto flex items-center justify-center">
+          <div className="w-full max-w-lg p-10 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark text-center shadow-2xl space-y-8 animate-fadeIn">
+            <div className="w-20 h-20 rounded-full bg-premium-gold/15 text-premium-gold mx-auto flex items-center justify-center shadow-gold">
               <Crown className="w-10 h-10" />
             </div>
 
             <div>
-              <span className="text-xs font-mono uppercase text-[#00ff88] font-bold">
+              <span className="text-xs font-mono uppercase text-premium-neon font-bold tracking-wider">
                 Trivia Blitz Concluded
               </span>
-              <h2 className="text-2xl font-black text-white mt-1">Leaderboard Podium</h2>
-              <p className="text-xs text-gray-400 mt-1">
-                Your final score: <strong className="text-[#00ff88]">{score} points</strong>
+              <h2 className="text-3xl font-display font-medium text-white mt-1">Leaderboard Podium</h2>
+              <p className="text-sm text-zinc-400 mt-1">
+                Your final score: <strong className="text-premium-success font-display text-base">{score} points</strong>
               </p>
             </div>
 
             {/* Top 3 Leaderboard List */}
-            <div className="space-y-2.5 text-left">
+            <div className="space-y-3 text-left">
               {leaderboard.map((user, idx) => (
                 <div
                   key={idx}
-                  className={`p-3.5 rounded-xl border flex items-center justify-between text-xs ${
+                  className={`p-4 rounded-2xl border flex items-center justify-between text-xs ${
                     idx === 0
-                      ? 'bg-[#1c1a24] border-[#dfb76c] shadow-[0_0_15px_rgba(223,183,108,0.2)]'
-                      : 'bg-[#151a2a] border-[#222b40]'
+                      ? 'bg-premium-surfaceDark border-premium-gold shadow-gold'
+                      : 'bg-premium-surfaceDark/50 border-premium-borderDark'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="font-mono font-bold text-sm text-[#dfb76c]">#{idx + 1}</span>
+                    <span className="font-display font-bold text-base text-premium-gold">#{idx + 1}</span>
                     <div>
-                      <div className="font-bold text-white">{user.name}</div>
-                      <div className="text-[10px] text-gray-400">{user.table}</div>
+                      <div className="font-bold text-white text-sm font-display">{user.name}</div>
+                      <div className="text-[11px] text-zinc-500 font-mono mt-0.5">{user.table}</div>
                     </div>
                   </div>
-                  <span className="font-mono font-extrabold text-[#00ff88]">{user.score} pts</span>
+                  <span className="font-display font-bold text-premium-neon text-sm">{user.score} pts</span>
                 </div>
               ))}
             </div>
@@ -277,7 +318,7 @@ function InteractiveGamesContent({ slug }: { slug: string }) {
             <button
               type="button"
               onClick={handleRestart}
-              className="w-full py-3 rounded-xl font-bold text-xs text-[#0b0d13] bg-gradient-to-r from-[#00f0ff] to-[#dfb76c] hover:brightness-110 transition-all flex items-center justify-center gap-2"
+              className="w-full py-4 rounded-2xl font-bold text-sm text-black bg-premium-gold hover:bg-premium-goldHover transition-all shadow-gold scale-on-click flex items-center justify-center gap-2"
             >
               <RotateCcw className="w-4 h-4" />
               <span>Play Again</span>

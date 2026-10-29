@@ -21,8 +21,11 @@ import {
   Download,
   AlertCircle,
   ExternalLink,
+  Globe,
+  Copy,
 } from 'lucide-react';
 import QRCode from 'qrcode';
+import { getClientUrl, getClientDomain } from '@/lib/domain';
 
 function GuestListContent({ eventId }: { eventId: string }) {
   const [guests, setGuests] = useState<Guest[]>(MOCK_GUESTS);
@@ -112,21 +115,23 @@ function GuestListContent({ eventId }: { eventId: string }) {
   const checkedInCount = guests.filter((g) => g.is_checked_in).length;
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col font-sans select-none">
       <Header
         title={`${MOCK_EVENT.name} • Attendees`}
         subtitle="Manage guest roster, issue dynamic QR passes, and trigger Resend email invites"
+        actionText="Back to Operations"
+        actionHref="/dashboard"
       />
 
-      <div className="p-6 sm:p-8 space-y-6 max-w-7xl">
+      <div className="p-6 sm:p-8 space-y-8 max-w-7xl">
         {/* Email Dispatched Alert */}
         {emailSentAlert && (
-          <div className="p-4 rounded-xl bg-[#00ff88]/10 border border-[#00ff88]/30 text-[#00ff88] text-xs font-semibold flex items-center justify-between animate-fadeIn">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4" />
+          <div className="p-4 rounded-2xl bg-premium-charcoal border border-premium-gold/40 text-premium-gold flex items-center justify-between text-sm shadow-gold">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-5 h-5 text-premium-gold flex-shrink-0" />
               <span>{emailSentAlert}</span>
             </div>
-            <button onClick={() => setEmailSentAlert(null)} className="text-gray-400 hover:text-white">
+            <button onClick={() => setEmailSentAlert(null)} className="text-zinc-400 hover:text-white scale-on-click">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -135,26 +140,26 @@ function GuestListContent({ eventId }: { eventId: string }) {
         {/* Top Control Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-[#00f0ff]/10 text-[#00f0ff] border border-[#00f0ff]/20">
+            <div className="p-3 rounded-2xl bg-premium-gold/15 text-premium-gold border border-premium-gold/30 shadow-gold">
               <Users className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-base font-bold text-white flex items-center gap-2">
+              <div className="text-xl font-display font-medium text-white flex items-center gap-3">
                 <span>Guest Roster & Passports</span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-[#182033] border border-[#263554] text-gray-300 font-mono">
+                <span className="text-xs px-3 py-1 rounded-full bg-premium-charcoal border border-premium-borderDark text-zinc-300 font-mono">
                   {guests.length} Registered
                 </span>
               </div>
-              <div className="text-xs text-gray-400">
-                Gate Check-in: <strong className="text-[#00ff88]">{checkedInCount}</strong> / {guests.length} checked-in ({((checkedInCount / guests.length) * 100).toFixed(0)}%)
+              <div className="text-xs text-zinc-400 mt-0.5">
+                Gate Check-in: <strong className="text-premium-success">{checkedInCount}</strong> / {guests.length} checked-in ({((checkedInCount / guests.length) * 100).toFixed(0)}%)
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
             <Link
               href={`/dashboard/events/${eventId}/checkin`}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#172138] border border-[#27385c] text-xs font-semibold text-[#00f0ff] hover:bg-[#202c48] transition-colors"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-premium-charcoal border border-premium-borderDark text-xs font-bold text-premium-neon hover:border-premium-neon transition-colors scale-on-click"
             >
               <QrCode className="w-4 h-4" />
               <span>Launch Gate Scanner</span>
@@ -163,7 +168,7 @@ function GuestListContent({ eventId }: { eventId: string }) {
             <button
               type="button"
               onClick={() => setIsAddModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#00f0ff] to-[#dfb76c] text-[#0b0d13] text-xs font-bold hover:brightness-110 transition-all shadow-sm"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black text-xs font-bold transition-all shadow-gold scale-on-click"
             >
               <UserPlus className="w-4 h-4" />
               <span>Add Guest</span>
@@ -171,136 +176,159 @@ function GuestListContent({ eventId }: { eventId: string }) {
           </div>
         </div>
 
-        {/* Search & Filters */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-[#121624] p-3 rounded-2xl border border-[#1e263d]">
-          <div className="relative w-full sm:w-80">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by name, email, table..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 rounded-xl bg-[#0c0e17] border border-[#1e263d] text-xs text-white placeholder-gray-400 focus:outline-none focus:border-[#00f0ff]"
-            />
+        {/* Guest Roster Master Table */}
+        <div className="bg-premium-charcoal rounded-[2.5rem] border border-premium-borderDark overflow-hidden shadow-2xl">
+          <div className="p-6 border-b border-premium-borderDark flex flex-wrap gap-4 items-center justify-between bg-premium-surfaceDark">
+            <div className="relative max-w-md w-full">
+              <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <input
+                type="text"
+                placeholder="Search guests by name, email, table..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 bg-premium-black border border-premium-borderDark rounded-xl text-sm outline-none focus:border-premium-gold text-white"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setStatusFilter('all')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all scale-on-click ${
+                  statusFilter === 'all'
+                    ? 'bg-premium-gold text-black shadow-gold'
+                    : 'text-zinc-400 hover:text-white bg-premium-black border border-premium-borderDark'
+                }`}
+              >
+                All ({guests.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('checked_in')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all scale-on-click ${
+                  statusFilter === 'checked_in'
+                    ? 'bg-premium-success/20 text-premium-success border border-premium-success/30'
+                    : 'text-zinc-400 hover:text-white bg-premium-black border border-premium-borderDark'
+                }`}
+              >
+                Checked-in ({checkedInCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('pending')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all scale-on-click ${
+                  statusFilter === 'pending'
+                    ? 'bg-zinc-800 text-zinc-200 border border-zinc-700'
+                    : 'text-zinc-400 hover:text-white bg-premium-black border border-premium-borderDark'
+                }`}
+              >
+                Pending ({guests.length - checkedInCount})
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={() => setStatusFilter('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                statusFilter === 'all'
-                  ? 'bg-[#1b2338] text-white'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              All ({guests.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter('checked_in')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                statusFilter === 'checked_in'
-                  ? 'bg-[#00ff88]/20 text-[#00ff88]'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              Checked-in ({checkedInCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter('pending')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                statusFilter === 'pending'
-                  ? 'bg-amber-400/20 text-amber-300'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              Pending ({guests.length - checkedInCount})
-            </button>
-          </div>
-        </div>
-
-        {/* Guest Table */}
-        <div className="rounded-2xl bg-[#121624] border border-[#1e263d] overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-gray-300">
-              <thead className="bg-[#0e121e] border-b border-[#1e263d] text-gray-400 uppercase font-mono text-[10px]">
+            <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead className="bg-premium-black text-zinc-500 font-bold uppercase tracking-widest text-xs">
                 <tr>
-                  <th className="px-5 py-3.5">Attendee Name</th>
-                  <th className="px-5 py-3.5">Category</th>
-                  <th className="px-5 py-3.5">Table #</th>
-                  <th className="px-5 py-3.5">Gate Status</th>
-                  <th className="px-5 py-3.5">Pass Token</th>
-                  <th className="px-5 py-3.5 text-right">Actions</th>
+                  <th className="px-8 py-5">Guest Name</th>
+                  <th className="px-8 py-5">Tag / Category</th>
+                  <th className="px-8 py-5">Table #</th>
+                  <th className="px-8 py-5">Gate Status</th>
+                  <th className="px-8 py-5">Pass Token</th>
+                  <th className="px-8 py-5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#182035]">
-                {filtered.map((guest) => (
-                  <tr key={guest.id} className="hover:bg-[#151a2c] transition-colors">
-                    <td className="px-5 py-4">
-                      <div className="font-bold text-white text-sm">{guest.name}</div>
-                      <div className="text-[11px] text-gray-400 font-mono">
-                        {guest.email || 'No email'} • {guest.phone || 'No phone'}
-                      </div>
-                    </td>
+              <tbody className="divide-y divide-premium-borderDark">
+                {filtered.map((guest) => {
+                  const initials = guest.name
+                    .split(' ')
+                    .map((n) => n[0])
+                    .slice(0, 2)
+                    .join('')
+                    .toUpperCase();
+                  const isVip = guest.category.toLowerCase().includes('vip');
 
-                    <td className="px-5 py-4">
-                      <span className="px-2 py-0.5 rounded bg-[#182035] border border-[#253250] text-[#00f0ff] font-medium text-[11px]">
-                        {guest.category}
-                      </span>
-                    </td>
-
-                    <td className="px-5 py-4 font-semibold text-white">
-                      {guest.table_number || 'Unassigned'}
-                    </td>
-
-                    <td className="px-5 py-4">
-                      {guest.is_checked_in ? (
-                        <div className="flex items-center gap-1.5 text-[#00ff88]">
-                          <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                  return (
+                    <tr key={guest.id} className="hover:bg-premium-surfaceDark transition-colors group">
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-4">
+                          <div
+                            className={`w-12 h-12 rounded-full flex items-center justify-center font-display font-bold text-lg border ${
+                              isVip
+                                ? 'bg-premium-gold/10 text-premium-gold border-premium-gold/30'
+                                : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                            }`}
+                          >
+                            {initials}
+                          </div>
                           <div>
-                            <div className="font-semibold">Checked In</div>
-                            <div className="text-[10px] text-gray-400 font-mono">
-                              {guest.checked_in_at ? formatDateTime(guest.checked_in_at) : 'Active'}
+                            <div className="font-bold text-white text-base font-display">{guest.name}</div>
+                            <div className="text-zinc-500 text-xs font-mono">
+                              {guest.email || 'No email registered'}
                             </div>
                           </div>
                         </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 text-amber-400">
-                          <Clock className="w-4 h-4 flex-shrink-0" />
-                          <span>Awaiting Gate</span>
+                      </td>
+
+                      <td className="px-8 py-6">
+                        {isVip ? (
+                          <span className="px-3 py-1 bg-premium-gold/20 text-premium-gold border border-premium-gold/30 rounded-full text-xs font-bold uppercase tracking-wider">
+                            {guest.category}
+                          </span>
+                        ) : (
+                          <span className="px-3 py-1 bg-zinc-800 text-zinc-300 rounded-full text-xs font-bold uppercase border border-zinc-700 tracking-wider">
+                            {guest.category}
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="px-8 py-6 font-display font-medium text-white text-base">
+                        {guest.table_number || 'Unassigned'}
+                      </td>
+
+                      <td className="px-8 py-6">
+                        {guest.is_checked_in ? (
+                          <span className="flex items-center gap-2 text-premium-success font-medium">
+                            <span className="w-2.5 h-2.5 rounded-full bg-premium-success shadow-[0_0_8px_#00E676]"></span>
+                            Checked-in
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-2 text-zinc-400 font-medium">
+                            <span className="w-2.5 h-2.5 rounded-full bg-zinc-600"></span>
+                            Pending
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="px-8 py-6 font-mono text-zinc-400 text-xs">
+                        {guest.qr_code_token}
+                      </td>
+
+                      <td className="px-8 py-6 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenQr(guest)}
+                            className="p-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-zinc-400 hover:text-premium-gold hover:border-premium-gold/50 transition-colors scale-on-click"
+                            title="View QR Entry Pass"
+                          >
+                            <QrCode className="w-4 h-4" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSendEmail(guest)}
+                            className="p-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-zinc-400 hover:text-premium-neon hover:border-premium-neon/50 transition-colors scale-on-click"
+                            title="Send Resend Email Ticket"
+                          >
+                            <Mail className="w-4 h-4" />
+                          </button>
                         </div>
-                      )}
-                    </td>
-
-                    <td className="px-5 py-4 font-mono text-gray-400 text-[11px]">
-                      {guest.qr_code_token}
-                    </td>
-
-                    <td className="px-5 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenQr(guest)}
-                          className="p-1.5 rounded-lg bg-[#192237] border border-[#27375a] text-gray-300 hover:text-[#00f0ff] hover:border-[#00f0ff]/50 transition-colors"
-                          title="View QR Entry Pass"
-                        >
-                          <QrCode className="w-4 h-4" />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleSendEmail(guest)}
-                          className="p-1.5 rounded-lg bg-[#192237] border border-[#27375a] text-gray-300 hover:text-[#dfb76c] hover:border-[#dfb76c]/50 transition-colors"
-                          title="Send Resend Email Ticket"
-                        >
-                          <Mail className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -308,21 +336,22 @@ function GuestListContent({ eventId }: { eventId: string }) {
 
         {/* QR Code Pass Modal */}
         {selectedGuestQr && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-[#121624] border border-[#27375a] rounded-3xl p-6 sm:p-8 max-w-sm w-full relative shadow-2xl text-center">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
+            <div className="bg-premium-charcoal border border-premium-borderDark rounded-[2.5rem] p-8 max-w-sm w-full relative shadow-2xl text-center">
               <button
                 type="button"
                 onClick={() => setSelectedGuestQr(null)}
-                className="absolute top-4 right-4 text-gray-400 hover:text-white"
+                className="absolute top-6 right-6 text-zinc-500 hover:text-white scale-on-click"
               >
                 <X className="w-5 h-5" />
               </button>
 
-              <div className="text-xs font-mono uppercase text-[#dfb76c] tracking-wider mb-1">
-                Official Event Passport
+              <div className="w-16 h-16 mx-auto bg-premium-gold/10 rounded-full flex items-center justify-center mb-4 shadow-gold border border-premium-gold/30">
+                <QrCode className="w-8 h-8 text-premium-gold" />
               </div>
-              <h3 className="text-xl font-black text-white">{selectedGuestQr.name}</h3>
-              <p className="text-xs text-gray-400 mb-6">
+              <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-1">VIP Access Pass</p>
+              <h3 className="text-2xl font-display font-medium text-white mb-1">{selectedGuestQr.name}</h3>
+              <p className="text-zinc-400 text-sm mb-6">
                 {selectedGuestQr.category} • Table {selectedGuestQr.table_number || 'N/A'}
               </p>
 
@@ -332,23 +361,30 @@ function GuestListContent({ eventId }: { eventId: string }) {
                   <img
                     src={qrDataUrl}
                     alt="Attendee QR Code"
-                    className="w-52 h-52 object-contain mx-auto"
+                    className="w-48 h-48 object-contain mx-auto"
                   />
                 )}
               </div>
 
-              <div className="font-mono text-xs text-gray-400 mb-6 bg-[#0c0e17] py-2 px-3 rounded-lg border border-[#1b2234]">
+              <div className="font-mono text-xs text-zinc-400 mb-4 bg-premium-surfaceDark py-2.5 px-3 rounded-xl border border-premium-borderDark">
                 {selectedGuestQr.qr_code_token}
               </div>
 
-              <div className="flex gap-2">
+              <div className="space-y-3">
                 <button
                   type="button"
                   onClick={() => handleSendEmail(selectedGuestQr)}
-                  className="w-full py-2.5 rounded-xl font-bold text-xs text-[#0b0d13] bg-gradient-to-r from-[#00f0ff] to-[#dfb76c] hover:brightness-110 transition-all flex items-center justify-center gap-1.5"
+                  className="w-full py-4 rounded-xl font-bold text-sm bg-premium-gold hover:bg-premium-goldHover text-black transition-all shadow-gold scale-on-click flex items-center justify-center gap-2"
                 >
-                  <Send className="w-3.5 h-3.5" />
+                  <Send className="w-4 h-4" />
                   <span>Send Ticket by Email</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedGuestQr(null)}
+                  className="w-full bg-transparent border border-zinc-700 text-white py-3 rounded-xl font-bold scale-on-click text-sm"
+                >
+                  Close
                 </button>
               </div>
             </div>
@@ -357,77 +393,77 @@ function GuestListContent({ eventId }: { eventId: string }) {
 
         {/* Add Guest Modal */}
         {isAddModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-[#121624] border border-[#27375a] rounded-3xl p-6 sm:p-8 max-w-md w-full relative shadow-2xl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
+            <div className="bg-premium-charcoal border border-premium-borderDark rounded-[2.5rem] p-8 max-w-md w-full relative shadow-2xl">
               <button
                 type="button"
                 onClick={() => setIsAddModalOpen(false)}
-                className="absolute top-4 right-4 text-gray-400 hover:text-white"
+                className="absolute top-6 right-6 text-zinc-500 hover:text-white scale-on-click"
               >
                 <X className="w-5 h-5" />
               </button>
 
-              <h3 className="text-lg font-bold text-white mb-1">Add Event Attendee</h3>
-              <p className="text-xs text-gray-400 mb-6">Create a verified guest pass token for gate entry</p>
+              <h3 className="text-2xl font-display font-medium text-white mb-2">Add Event Attendee</h3>
+              <p className="text-zinc-400 text-sm mb-6">Create a verified guest pass token for gate entry</p>
 
               <form onSubmit={handleAddGuest} className="space-y-4">
                 <div>
-                  <label className="text-xs font-semibold text-gray-300 block mb-1">Full Name *</label>
+                  <label className="block text-sm font-bold text-zinc-400 mb-2">Full Name *</label>
                   <input
                     type="text"
                     required
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     placeholder="e.g. Jessica Tan"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c0e17] border border-[#1e263d] text-xs text-white focus:outline-none focus:border-[#00f0ff]"
+                    className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white px-5 py-3.5 rounded-2xl text-sm focus:border-premium-gold outline-none transition-all"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-gray-300 block mb-1">Email Address</label>
+                  <label className="block text-sm font-bold text-zinc-400 mb-2">Email Address</label>
                   <input
                     type="email"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
                     placeholder="e.g. jessica@example.com"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c0e17] border border-[#1e263d] text-xs text-white focus:outline-none focus:border-[#00f0ff]"
+                    className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white px-5 py-3.5 rounded-2xl text-sm focus:border-premium-gold outline-none transition-all"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-semibold text-gray-300 block mb-1">Category</label>
+                    <label className="block text-sm font-bold text-zinc-400 mb-2">Category</label>
                     <input
                       type="text"
                       value={newCategory}
                       onChange={(e) => setNewCategory(e.target.value)}
                       placeholder="VIP Delegate"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c0e17] border border-[#1e263d] text-xs text-white focus:outline-none focus:border-[#00f0ff]"
+                      className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white px-5 py-3.5 rounded-2xl text-sm focus:border-premium-gold outline-none transition-all"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-gray-300 block mb-1">Table Number</label>
+                    <label className="block text-sm font-bold text-zinc-400 mb-2">Table Number</label>
                     <input
                       type="text"
                       value={newTable}
                       onChange={(e) => setNewTable(e.target.value)}
                       placeholder="Table 05"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c0e17] border border-[#1e263d] text-xs text-white focus:outline-none focus:border-[#00f0ff]"
+                      className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white px-5 py-3.5 rounded-2xl text-sm focus:border-premium-gold outline-none transition-all"
                     />
                   </div>
                 </div>
 
-                <div className="pt-4 flex justify-end gap-2">
+                <div className="pt-4 flex gap-3">
                   <button
                     type="button"
                     onClick={() => setIsAddModalOpen(false)}
-                    className="px-4 py-2.5 rounded-xl bg-[#182035] text-xs font-semibold text-gray-300 hover:text-white"
+                    className="flex-1 bg-transparent border border-zinc-700 text-white py-3.5 rounded-2xl font-bold scale-on-click text-sm"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2.5 rounded-xl font-bold text-xs text-[#0b0d13] bg-gradient-to-r from-[#00f0ff] to-[#dfb76c] hover:brightness-110"
+                    className="flex-1 bg-premium-gold hover:bg-premium-goldHover text-black py-3.5 rounded-2xl font-bold shadow-gold scale-on-click text-sm"
                   >
                     Generate Pass
                   </button>
