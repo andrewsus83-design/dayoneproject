@@ -373,12 +373,18 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
             {/* Sub-tab 2: Landing Page Builder */}
             {overviewSubTab === 'landing' && (
               <div className="p-6 sm:p-8 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark space-y-6 shadow-xl">
-                <div>
-                  <h3 className="text-xl font-display font-bold text-white">Landing Page Visual Builder</h3>
-                  <p className="text-xs text-zinc-400 mt-1">Configure layout blocks, hero banners, and attendee modules.</p>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="text-xl font-display font-bold text-white">Landing Page Visual Builder</h3>
+                    <p className="text-xs text-zinc-400 mt-1">Configure layout blocks, hero banners, and schema-specific attendee modules.</p>
+                  </div>
+                  <span className={`shrink-0 px-3 py-1.5 rounded-xl font-mono text-[10px] font-bold border ${isWedding ? 'bg-pink-950/60 border-pink-800/50 text-pink-300' : 'bg-amber-950/60 border-amber-800/50 text-premium-gold'}`}>
+                    {event.theme_config.landingSchema.layoutType}
+                  </span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                {/* Hero Cover + Accent Badge */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="p-5 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark space-y-3">
                     <span className="text-xs font-bold text-white block">Hero Cover Poster</span>
                     <div className="aspect-video rounded-xl overflow-hidden relative border border-white/10">
@@ -390,29 +396,98 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                     </div>
                   </div>
 
+                  <div className="p-5 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark space-y-3 flex flex-col justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-white block mb-1">{isWedding ? 'Couple Accent Title' : 'Event Tagline / Badge'}</span>
+                      <span className="text-[10px] text-zinc-400">{isWedding ? 'e.g. "The Ariana & Daniel Wedding"' : 'e.g. "APAC Executive Summit 2026"'}</span>
+                    </div>
+                    <div className="rounded-xl border border-premium-gold/40 bg-premium-black/60 px-4 py-3 font-mono text-xs text-premium-gold">
+                      {event.theme_config.landingSchema.accentBadge || (isWedding ? 'Enter couple names…' : 'Enter event tagline…')}
+                    </div>
+                    <span className="text-[10px] text-zinc-500">Edit via Event Parameters → Event Name / Accent</span>
+                  </div>
+                </div>
+
+                {/* Common Block: Countdown */}
+                <div>
+                  <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">Common Blocks</p>
+                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-xs">
+                    <div>
+                      <span className="font-bold text-white block">Event Countdown Clock</span>
+                      <span className="text-[10px] text-zinc-400">Real-time countdown to event start</span>
+                    </div>
+                    <input type="checkbox" defaultChecked className="toggle-checkbox w-5 h-5 accent-premium-gold cursor-pointer" />
+                  </div>
+                </div>
+
+                {/* Schema-specific blocks */}
+                <div>
+                  <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">
+                    {isWedding ? 'Wedding Romance Modules' : 'Corporate Keynote Modules'}
+                  </p>
+                  <div className="space-y-3 text-xs">
+                    {isWedding ? (
+                      <>
+                        <div className="flex items-center justify-between p-3.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark">
+                          <div>
+                            <span className="font-bold text-white block">Love Story Timeline</span>
+                            <span className="text-[10px] text-zinc-400">Milestone reel — first date to engagement to wedding day</span>
+                          </div>
+                          <input type="checkbox" defaultChecked={event.theme_config.landingSchema.showLoveStory !== false} className="toggle-checkbox w-5 h-5 accent-premium-gold cursor-pointer" />
+                        </div>
+                        <div className="flex items-center justify-between p-3.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark">
+                          <div>
+                            <span className="font-bold text-white block">Digital Angpao Registry</span>
+                            <span className="text-[10px] text-zinc-400">QRIS scan + bank transfer for cashless blessings</span>
+                          </div>
+                          <input type="checkbox" defaultChecked={event.theme_config.landingSchema.showDigitalAngpao !== false} className="toggle-checkbox w-5 h-5 accent-premium-gold cursor-pointer" />
+                        </div>
+                        <div className="flex items-center justify-between p-3.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark">
+                          <div>
+                            <span className="font-bold text-white block">Dress Code Swatch Panel</span>
+                            <span className="text-[10px] text-zinc-400">Colour palette guide for guests on the portal</span>
+                          </div>
+                          <input type="checkbox" defaultChecked className="toggle-checkbox w-5 h-5 accent-premium-gold cursor-pointer" />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between p-3.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark">
+                          <div>
+                            <span className="font-bold text-white block">Keynote Speakers Grid</span>
+                            <span className="text-[10px] text-zinc-400">Speaker cards with name, title, company and headshot</span>
+                          </div>
+                          <input type="checkbox" defaultChecked={event.theme_config.landingSchema.showSpeakers !== false} className="toggle-checkbox w-5 h-5 accent-premium-gold cursor-pointer" />
+                        </div>
+                        <div className="flex items-center justify-between p-3.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark">
+                          <div>
+                            <span className="font-bold text-white block">Tiered Sponsors Showcase</span>
+                            <span className="text-[10px] text-zinc-400">Gold / Silver / Bronze logo bands with website links</span>
+                          </div>
+                          <input type="checkbox" defaultChecked={event.theme_config.landingSchema.showSponsors !== false} className="toggle-checkbox w-5 h-5 accent-premium-gold cursor-pointer" />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Shared optional blocks */}
+                <div>
+                  <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">Optional Shared Blocks</p>
                   <div className="space-y-3 text-xs">
                     <div className="flex items-center justify-between p-3.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark">
                       <div>
-                        <span className="font-bold text-white block">Event Countdown Clock</span>
-                        <span className="text-[10px] text-zinc-400">Show real-time countdown to start</span>
+                        <span className="font-bold text-white block">{isWedding ? 'Reception Banquet Menu' : 'Gala Dining Menu'}</span>
+                        <span className="text-[10px] text-zinc-400">Course listing with dietary flags and chef's notes</span>
                       </div>
-                      <input type="checkbox" defaultChecked className="toggle-checkbox w-5 h-5 accent-premium-gold cursor-pointer" />
+                      <input type="checkbox" defaultChecked={event.theme_config.landingSchema.showMenuBanquet !== false} className="toggle-checkbox w-5 h-5 accent-premium-gold cursor-pointer" />
                     </div>
-
                     <div className="flex items-center justify-between p-3.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark">
                       <div>
-                        <span className="font-bold text-white block">{isWedding ? 'Love Story Timeline' : 'Keynote Speakers Grid'}</span>
-                        <span className="text-[10px] text-zinc-400">Display prominent highlight block</span>
+                        <span className="font-bold text-white block">Table Seating Assignment</span>
+                        <span className="text-[10px] text-zinc-400">Interactive floor plan showing guest table number</span>
                       </div>
-                      <input type="checkbox" defaultChecked className="toggle-checkbox w-5 h-5 accent-premium-gold cursor-pointer" />
-                    </div>
-
-                    <div className="flex items-center justify-between p-3.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark">
-                      <div>
-                        <span className="font-bold text-white block">{isWedding ? 'Digital Angpao Registry' : 'Tiered Sponsors Showcase'}</span>
-                        <span className="text-[10px] text-zinc-400">Enable cashless blessings or sponsor logos</span>
-                      </div>
-                      <input type="checkbox" defaultChecked className="toggle-checkbox w-5 h-5 accent-premium-gold cursor-pointer" />
+                      <input type="checkbox" defaultChecked={event.theme_config.landingSchema.showTableSeating !== false} className="toggle-checkbox w-5 h-5 accent-premium-gold cursor-pointer" />
                     </div>
                   </div>
                 </div>
@@ -422,31 +497,111 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
             {/* Sub-tab 3: Invitation Form Builder */}
             {overviewSubTab === 'invitation' && (
               <div className="p-6 sm:p-8 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark space-y-6 shadow-xl">
-                <div>
-                  <h3 className="text-xl font-display font-bold text-white">RSVP Invitation Form Fields</h3>
-                  <p className="text-xs text-zinc-400 mt-1">Select and customize questionnaire fields required from guests.</p>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="text-xl font-display font-bold text-white">RSVP Invitation Form Fields</h3>
+                    <p className="text-xs text-zinc-400 mt-1">Questionnaire fields sent to guests — schema-gated by event type.</p>
+                  </div>
+                  <span className={`shrink-0 px-3 py-1.5 rounded-xl font-mono text-[10px] font-bold border ${isWedding ? 'bg-pink-950/60 border-pink-800/50 text-pink-300' : 'bg-amber-950/60 border-amber-800/50 text-premium-gold'}`}>
+                    {event.theme_config.landingSchema.layoutType}
+                  </span>
                 </div>
 
-                <div className="space-y-3">
-                  {[
-                    { label: 'Full Attendee Name', required: true, fixed: true },
-                    { label: 'WhatsApp Phone Number', required: true, fixed: true },
-                    { label: 'Email Address (for QR Pass dispatch)', required: true, fixed: true },
-                    { label: isWedding ? 'Dietary Flags (Halal, Vegetarian, Gluten-Free)' : 'Company / Organization Title', required: true, fixed: false },
-                    { label: isWedding ? 'Plus-One Companion Details' : 'Designation / Job Role', required: false, fixed: false },
-                    { label: 'Seating Table Preference / Notes', required: false, fixed: false },
-                  ].map((field, idx) => (
-                    <div key={idx} className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-3">
-                        <Check className="w-4 h-4 text-premium-gold" />
-                        <div>
-                          <span className="font-bold text-white">{field.label}</span>
-                          {field.required && <span className="ml-2 text-premium-danger font-mono text-[10px]">*Required</span>}
+                {/* System mandatory fields */}
+                <div>
+                  <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">System Mandatory</p>
+                  <div className="space-y-2">
+                    {[
+                      { label: 'Full Attendee Name', desc: 'Used on QR pass and gate check-in' },
+                      { label: 'WhatsApp Phone Number', desc: 'Broadcast + reminder delivery' },
+                      { label: 'Email Address', desc: 'QR Pass PDF dispatch + calendar invite' },
+                    ].map((field, idx) => (
+                      <div key={idx} className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-3">
+                          <Lock className="w-4 h-4 text-zinc-500" />
+                          <div>
+                            <span className="font-bold text-white">{field.label}</span>
+                            <span className="block text-[10px] text-zinc-400">{field.desc}</span>
+                          </div>
                         </div>
+                        <span className="text-zinc-500 font-mono text-[10px]">Locked</span>
                       </div>
-                      <span className="text-zinc-500 font-mono text-[11px]">{field.fixed ? 'System Mandatory' : 'Custom Field'}</span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                </div>
+
+                {/* Schema-specific fields */}
+                <div>
+                  <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">
+                    {isWedding ? 'Wedding-Specific Fields' : 'Corporate-Specific Fields'}
+                  </p>
+                  <div className="space-y-2">
+                    {isWedding ? (
+                      <>
+                        {[
+                          { label: 'Dietary Preferences', desc: 'Halal · Vegetarian · Gluten-Free · Standard', required: true },
+                          { label: 'Plus-One Companion Details', desc: 'Name and relation of companion guest', required: false },
+                          { label: 'RSVP Song Request', desc: 'Optional song dedication for reception playlist', required: false },
+                          { label: 'Dress Code Confirmation', desc: 'Guest confirms adherence to colour theme', required: false },
+                        ].map((field, idx) => (
+                          <div key={idx} className="p-4 rounded-2xl bg-premium-surfaceDark border border-pink-900/30 flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-3">
+                              <Heart className="w-4 h-4 text-pink-400" />
+                              <div>
+                                <span className="font-bold text-white">{field.label}</span>
+                                {field.required && <span className="ml-2 text-premium-danger font-mono text-[10px]">*Required</span>}
+                                <span className="block text-[10px] text-zinc-400">{field.desc}</span>
+                              </div>
+                            </div>
+                            <input type="checkbox" defaultChecked className="toggle-checkbox w-4 h-4 accent-pink-400 cursor-pointer" />
+                          </div>
+                        ))}
+                      </>
+                    ) : (
+                      <>
+                        {[
+                          { label: 'Company / Organization Name', desc: 'Employer or institution attending from', required: true },
+                          { label: 'Designation / Job Role', desc: 'Title shown on delegate name badge', required: true },
+                          { label: 'Industry Vertical', desc: 'Optional sector classification for insights', required: false },
+                          { label: 'LinkedIn Profile URL', desc: 'Optional for networking / digital badge', required: false },
+                        ].map((field, idx) => (
+                          <div key={idx} className="p-4 rounded-2xl bg-premium-surfaceDark border border-amber-900/30 flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-3">
+                              <Briefcase className="w-4 h-4 text-premium-gold" />
+                              <div>
+                                <span className="font-bold text-white">{field.label}</span>
+                                {field.required && <span className="ml-2 text-premium-danger font-mono text-[10px]">*Required</span>}
+                                <span className="block text-[10px] text-zinc-400">{field.desc}</span>
+                              </div>
+                            </div>
+                            <input type="checkbox" defaultChecked={field.required} className="toggle-checkbox w-4 h-4 accent-premium-gold cursor-pointer" />
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Shared optional fields */}
+                <div>
+                  <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">Shared Optional Fields</p>
+                  <div className="space-y-2">
+                    {[
+                      { label: 'Seating Table Preference / Notes', desc: 'Guest may request a preferred table or special arrangement' },
+                      { label: 'Accessibility Requirements', desc: 'Wheelchair access, hearing loops, visual aids' },
+                    ].map((field, idx) => (
+                      <div key={idx} className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-3">
+                          <Check className="w-4 h-4 text-premium-gold" />
+                          <div>
+                            <span className="font-bold text-white">{field.label}</span>
+                            <span className="block text-[10px] text-zinc-400">{field.desc}</span>
+                          </div>
+                        </div>
+                        <input type="checkbox" defaultChecked={idx === 0} className="toggle-checkbox w-4 h-4 accent-premium-gold cursor-pointer" />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
