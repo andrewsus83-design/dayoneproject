@@ -116,6 +116,49 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
   const [photosList, setPhotosList] = useState<PhotoWallUpload[]>(MOCK_PHOTO_WALL_UPLOADS);
   const [captionsOn, setCaptionsOn] = useState(true);
 
+  // Games sub-tab
+  const [gamesSubTab, setGamesSubTab] = useState<'quiz' | 'scavenger'>('quiz');
+
+  // Guests sub-tab
+  const [guestsSubTab, setGuestsSubTab] = useState<'list' | 'invitation' | 'import'>('list');
+
+  // Module config for sidebar visibility
+  const TOGGLEABLE_MODULES = [
+    { tab: 'guests', label: 'Guests & Seating', icon: Users },
+    { tab: 'registrations', label: 'Registrations Queue', icon: ClipboardCheck },
+    { tab: 'broadcast', label: 'Broadcast', icon: Radio },
+    { tab: 'games', label: 'Live Games', icon: Gamepad2 },
+    { tab: 'doorprize', label: 'Door Prize', icon: Gift },
+    { tab: 'photos', label: 'Photo Wall', icon: Camera },
+    { tab: 'insights', label: 'Insights', icon: BarChart3 },
+    { tab: 'live', label: 'LIVE Launchers', icon: Play },
+  ] as const;
+
+  const [moduleConfig, setModuleConfig] = useState<Record<string, boolean>>(() => {
+    const defaults = Object.fromEntries(TOGGLEABLE_MODULES.map((m) => [m.tab, true]));
+    if (typeof window === 'undefined') return defaults;
+    try {
+      const stored = localStorage.getItem(`all41-mods-${eventId}`);
+      if (stored) {
+        const arr: string[] = JSON.parse(stored);
+        return Object.fromEntries(TOGGLEABLE_MODULES.map((m) => [m.tab, arr.includes(m.tab)]));
+      }
+    } catch {}
+    return defaults;
+  });
+
+  const handleModuleToggle = (tab: string, enabled: boolean) => {
+    setModuleConfig((prev) => {
+      const next = { ...prev, [tab]: enabled };
+      const arr = ['overview', 'setting', ...Object.entries(next).filter(([, v]) => v).map(([k]) => k)];
+      try {
+        localStorage.setItem(`all41-mods-${eventId}`, JSON.stringify(arr));
+        window.dispatchEvent(new CustomEvent('all41-modules-changed'));
+      } catch {}
+      return next;
+    });
+  };
+
   // Games Question Bank State
   const [quizQuestions, setQuizQuestions] = useState([
     { id: 'q-1', text: 'In what year was All41 founded?', options: ['2023', '2024', '2025', '2026'], answer: 1, points: 1000 },
@@ -615,31 +658,66 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
           <div className="space-y-6 animate-in fade-in duration-200">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h3 className="text-2xl font-display font-bold text-white">Guest Roster & Seating Table</h3>
+                <h3 className="text-2xl font-display font-bold text-white">Guests</h3>
                 <p className="text-xs text-zinc-400">Total {guestsList.length} VIP delegates enrolled • Gate Check-in Active</p>
               </div>
 
-              <div className="flex items-center gap-3">
+              {guestsSubTab === 'list' && (
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => alert('CSV Roster Exported!')}
+                    className="px-4 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-xs font-bold text-white hover:border-premium-gold scale-on-click flex items-center gap-2"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Export CSV</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => alert('Add Guest dialog opened')}
+                    className="px-5 py-2.5 rounded-xl bg-premium-gold text-black font-bold text-xs shadow-gold scale-on-click flex items-center gap-2"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Attendee</span>
+                  </button>
+                </div>
+              )}
+              {guestsSubTab === 'import' && (
                 <button
                   type="button"
-                  onClick={() => alert('CSV Roster Exported!')}
-                  className="px-4 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-xs font-bold text-white hover:border-premium-gold scale-on-click flex items-center gap-2"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Export CSV</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => alert('Add Guest dialog opened')}
+                  onClick={() => alert('CSV import dialog')}
                   className="px-5 py-2.5 rounded-xl bg-premium-gold text-black font-bold text-xs shadow-gold scale-on-click flex items-center gap-2"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>Add Attendee</span>
+                  <span>Upload CSV</span>
                 </button>
-              </div>
+              )}
             </div>
 
-            {/* Guests Table */}
+            {/* Sub-tab pills */}
+            <div className="flex items-center gap-2 overflow-x-auto">
+              {([
+                { id: 'list', label: 'Guest Roster' },
+                { id: 'invitation', label: 'Invitation Form' },
+                { id: 'import', label: 'Import CSV' },
+              ] as const).map((st) => (
+                <button
+                  key={st.id}
+                  type="button"
+                  onClick={() => setGuestsSubTab(st.id)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap scale-on-click transition-all ${
+                    guestsSubTab === st.id
+                      ? 'bg-premium-gold/15 text-white border border-premium-gold/40'
+                      : 'bg-premium-surfaceDark text-zinc-400 border border-premium-borderDark hover:text-white'
+                  }`}
+                >
+                  {st.label}
+                </button>
+              ))}
+            </div>
+
+            {/* ── Guest Roster sub-tab ── */}
+            {guestsSubTab === 'list' && (
             <div className="rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark overflow-hidden shadow-2xl">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
@@ -681,6 +759,47 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                 </tbody>
               </table>
             </div>
+            )}
+
+            {/* ── Invitation Form sub-tab ── */}
+            {guestsSubTab === 'invitation' && (
+              <div className="p-8 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark shadow-xl flex flex-col items-center gap-4 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-premium-gold/15 flex items-center justify-center">
+                  <ClipboardCheck className="w-7 h-7 text-premium-gold" />
+                </div>
+                <div>
+                  <h4 className="font-display font-bold text-white text-base">Invitation & RSVP Form Builder</h4>
+                  <p className="text-xs text-zinc-400 mt-1 max-w-sm">Manage your Typeform-style registration form, field toggles, and RSVP confirmation flow.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('overview')}
+                  className="px-5 py-2.5 rounded-xl bg-premium-gold text-black font-bold text-xs shadow-gold scale-on-click"
+                >
+                  Open Invitation Builder →
+                </button>
+              </div>
+            )}
+
+            {/* ── Import CSV sub-tab ── */}
+            {guestsSubTab === 'import' && (
+              <div className="p-8 rounded-[2.5rem] bg-premium-charcoal border border-dashed border-premium-borderDark shadow-xl flex flex-col items-center gap-4 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark flex items-center justify-center">
+                  <Download className="w-7 h-7 text-zinc-400" />
+                </div>
+                <div>
+                  <h4 className="font-display font-bold text-white text-base">Bulk Import via CSV</h4>
+                  <p className="text-xs text-zinc-400 mt-1 max-w-sm">Upload a CSV with columns: Name, Phone / Email, Category, Table No. Duplicate check runs automatically.</p>
+                </div>
+                <a
+                  href="#"
+                  className="text-[11px] font-mono text-premium-neon hover:underline"
+                  onClick={(e) => e.preventDefault()}
+                >
+                  Download CSV template ↓
+                </a>
+              </div>
+            )}
           </div>
         )}
 
@@ -894,11 +1013,13 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
           <div className="space-y-6 animate-in fade-in duration-200">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h3 className="text-2xl font-display font-bold text-white">Live Trivia Arena & Quiz Blitz</h3>
-                <p className="text-xs text-zinc-400">Configure Kahoot-style synchronized 4-quadrant mobile buzzer questions.</p>
+                <h3 className="text-2xl font-display font-bold text-white">Live Games</h3>
+                <p className="text-xs text-zinc-400">
+                  {gamesSubTab === 'quiz' ? 'Kahoot-style synchronized 4-quadrant mobile buzzer questions.' : 'Scavenger Hunt — location-based challenges and QR clue chains.'}
+                </p>
               </div>
 
-              <div className="flex items-center gap-3">
+              {gamesSubTab === 'quiz' && (
                 <Link
                   href={`/events/${event.slug}/games`}
                   target="_blank"
@@ -907,10 +1028,32 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                   <Play className="w-3.5 h-3.5 fill-current" />
                   <span>Launch Arena Game</span>
                 </Link>
-              </div>
+              )}
             </div>
 
-            {/* Questions Bank */}
+            {/* Sub-tab pills */}
+            <div className="flex items-center gap-2">
+              {([
+                { id: 'quiz', label: 'Quiz Blitz' },
+                { id: 'scavenger', label: 'Scavenger Hunt' },
+              ] as const).map((st) => (
+                <button
+                  key={st.id}
+                  type="button"
+                  onClick={() => setGamesSubTab(st.id)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap scale-on-click transition-all ${
+                    gamesSubTab === st.id
+                      ? 'bg-premium-neon/15 text-white border border-premium-neon/40'
+                      : 'bg-premium-surfaceDark text-zinc-400 border border-premium-borderDark hover:text-white'
+                  }`}
+                >
+                  {st.label}
+                </button>
+              ))}
+            </div>
+
+            {/* ── Quiz Blitz sub-tab ── */}
+            {gamesSubTab === 'quiz' && (
             <div className="space-y-4">
               {quizQuestions.map((q, idx) => (
                 <div key={q.id} className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4 shadow-xl">
@@ -939,6 +1082,23 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                 </div>
               ))}
             </div>
+            )}
+
+            {/* ── Scavenger Hunt sub-tab ── */}
+            {gamesSubTab === 'scavenger' && (
+              <div className="p-8 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark shadow-xl flex flex-col items-center gap-4 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-premium-neon/10 flex items-center justify-center">
+                  <Gamepad2 className="w-7 h-7 text-premium-neon" />
+                </div>
+                <div>
+                  <h4 className="font-display font-bold text-white text-base">Scavenger Hunt</h4>
+                  <p className="text-xs text-zinc-400 mt-1 max-w-sm">Create QR-based clue chains and location challenges. Guests scan codes around the venue to progress through rounds.</p>
+                </div>
+                <span className="px-3 py-1 rounded-full bg-premium-gold/10 text-premium-gold text-[11px] font-bold font-mono border border-premium-gold/20">
+                  Coming Soon
+                </span>
+              </div>
+            )}
           </div>
         )}
 
@@ -1212,6 +1372,40 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
             <div>
               <h3 className="text-2xl font-display font-bold text-white">Event Integrations & Policies</h3>
               <p className="text-xs text-zinc-400">Custom domain BYOD, WhatsApp Fonnte gateway, Resend email, and legal disclosures.</p>
+            </div>
+
+            {/* Module Visibility */}
+            <div className="p-6 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark space-y-4 shadow-xl">
+              <div>
+                <span className="text-[10px] font-mono uppercase text-premium-gold font-bold">0. Module Visibility</span>
+                <p className="text-[11px] text-zinc-500 mt-1">Choose which modules appear in your event sidebar. Overview and Setting are always shown.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {TOGGLEABLE_MODULES.map((mod) => {
+                  const Icon = mod.icon;
+                  const enabled = moduleConfig[mod.tab] ?? true;
+                  return (
+                    <button
+                      key={mod.tab}
+                      type="button"
+                      onClick={() => handleModuleToggle(mod.tab, !enabled)}
+                      className={`flex items-center justify-between px-4 py-3 rounded-2xl border text-xs font-bold scale-on-click transition-all ${
+                        enabled
+                          ? 'border-premium-gold/30 bg-premium-gold/10 text-white'
+                          : 'border-premium-borderDark bg-premium-surfaceDark text-zinc-500'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Icon className={`w-4 h-4 ${enabled ? 'text-premium-gold' : 'text-zinc-600'}`} />
+                        <span>{mod.label}</span>
+                      </div>
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${enabled ? 'bg-premium-success/15 text-premium-success border-premium-success/25' : 'bg-zinc-800 text-zinc-600 border-zinc-700'}`}>
+                        {enabled ? 'ON' : 'OFF'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

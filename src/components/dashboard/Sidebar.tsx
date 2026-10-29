@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
@@ -42,6 +43,18 @@ const EVENT_MENU_ITEMS = [
   { label: 'Setting', tab: 'setting', icon: Settings },
 ];
 
+const ALL_EVENT_TABS = EVENT_MENU_ITEMS.map((i) => i.tab);
+const ALWAYS_ON = new Set(['overview', 'setting']);
+const STORAGE_KEY = (id: string) => `all41-mods-${id}`;
+
+function readEnabledTabs(eventId: string): string[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY(eventId));
+    if (raw) return JSON.parse(raw) as string[];
+  } catch {}
+  return ALL_EVENT_TABS;
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -52,6 +65,20 @@ export function Sidebar() {
   const eventIdMatch = pathname.match(/\/dashboard\/events\/([^/?]+)/);
   const currentEventId = eventIdMatch ? eventIdMatch[1] : '';
   const isWedding = currentEventId.includes('wedding');
+
+  const [enabledTabs, setEnabledTabs] = useState<string[]>(ALL_EVENT_TABS);
+
+  useEffect(() => {
+    if (!isInsideEvent || !currentEventId) return;
+    setEnabledTabs(readEnabledTabs(currentEventId));
+    const handler = () => setEnabledTabs(readEnabledTabs(currentEventId));
+    window.addEventListener('all41-modules-changed', handler);
+    return () => window.removeEventListener('all41-modules-changed', handler);
+  }, [isInsideEvent, currentEventId]);
+
+  const visibleEventItems = EVENT_MENU_ITEMS.filter(
+    (item) => ALWAYS_ON.has(item.tab) || enabledTabs.includes(item.tab)
+  );
 
   return (
     <aside className="w-72 flex-shrink-0 bg-premium-black border-r border-premium-borderDark flex flex-col justify-between hidden md:flex min-h-screen select-none font-sans">
@@ -104,7 +131,7 @@ export function Sidebar() {
               <div className="text-[10px] font-bold text-zinc-600 uppercase tracking-[0.2em] px-3 py-2">
                 Event Command
               </div>
-              {EVENT_MENU_ITEMS.map((item) => {
+              {visibleEventItems.map((item) => {
                 const Icon = item.icon;
                 const isActive =
                   pathname === `/dashboard/events/${currentEventId}` &&
