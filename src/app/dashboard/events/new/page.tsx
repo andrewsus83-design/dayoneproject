@@ -148,6 +148,33 @@ export default function AISmartSetupPage() {
   );
   const [gameType, setGameType] = useState<GameType>('quiz');
   const [scavengerStations, setScavengerStations] = useState(6);
+
+  // Landing page schema items (tied to eventType from Step 1)
+  type LandingItem = 'speakers' | 'sponsors' | 'lovestory' | 'angpao' | 'dresscode' | 'menu' | 'seating';
+  const defaultLandingItems = (): Set<LandingItem> =>
+    eventType === 'wedding'
+      ? new Set<LandingItem>(['lovestory', 'angpao', 'dresscode'])
+      : new Set<LandingItem>(['speakers', 'sponsors']);
+  const [activeLandingItems, setActiveLandingItems] = useState<Set<LandingItem>>(defaultLandingItems);
+  const [accentBadge, setAccentBadge] = useState('');
+
+  const toggleLandingItem = (id: LandingItem) => {
+    setActiveLandingItems((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  // Reset landing items when eventType changes (Step 1)
+  React.useEffect(() => {
+    setActiveLandingItems(
+      eventType === 'wedding'
+        ? new Set<LandingItem>(['lovestory', 'angpao', 'dresscode'])
+        : new Set<LandingItem>(['speakers', 'sponsors'])
+    );
+    setAccentBadge('');
+  }, [eventType]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState<TeamRole>('gate');
@@ -651,6 +678,65 @@ export default function AISmartSetupPage() {
                   );
                 })}
               </div>
+
+              {/* Landing Page sub-config */}
+              {activeModules.has('landing') && (
+                <div className="p-5 rounded-[2rem] bg-premium-charcoal border border-premium-gold/30 space-y-4">
+                  <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-premium-gold flex items-center gap-2">
+                    <Globe className="w-4 h-4" /> Landing Page Sections
+                    <span className={`ml-auto px-2 py-0.5 rounded-lg font-mono text-[9px] border ${eventType === 'wedding' ? 'bg-pink-950/60 border-pink-800/50 text-pink-300' : 'bg-amber-950/60 border-amber-800/50 text-premium-gold'}`}>
+                      {eventType === 'wedding' ? 'wedding_romance' : 'corporate_keynote'}
+                    </span>
+                  </div>
+
+                  {/* Accent badge input */}
+                  <div className="space-y-1.5">
+                    <div className="text-[11px] text-zinc-400 font-bold">{eventType === 'wedding' ? 'Couple Accent Title' : 'Event Tagline / Badge'}</div>
+                    <input
+                      type="text"
+                      value={accentBadge}
+                      onChange={(e) => setAccentBadge(e.target.value)}
+                      placeholder={eventType === 'wedding' ? 'e.g. "The Ariana & Daniel Wedding"' : 'e.g. "APAC Executive Summit 2026"'}
+                      className="w-full px-4 py-3 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-[12px] text-white focus:outline-none focus:border-premium-gold placeholder-zinc-600 transition-colors font-mono"
+                    />
+                  </div>
+
+                  {/* Schema-specific section picks */}
+                  <div className="space-y-1.5">
+                    <div className="text-[11px] text-zinc-400 font-bold">Choose sections to display</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(eventType === 'wedding' ? [
+                        { id: 'lovestory' as LandingItem,  label: 'Love Story Timeline',   desc: 'Couple milestones reel' },
+                        { id: 'angpao'    as LandingItem,  label: 'Digital Angpao',         desc: 'QRIS + bank transfer' },
+                        { id: 'dresscode' as LandingItem,  label: 'Dress Code Swatches',    desc: 'Colour palette guide' },
+                        { id: 'menu'      as LandingItem,  label: 'Banquet Menu',           desc: 'Reception course listing' },
+                        { id: 'seating'   as LandingItem,  label: 'Table Seating Map',      desc: 'Interactive floor plan' },
+                      ] : [
+                        { id: 'speakers' as LandingItem,   label: 'Keynote Speakers Grid',  desc: 'Speaker cards + bios' },
+                        { id: 'sponsors' as LandingItem,   label: 'Tiered Sponsors',        desc: 'Gold / Silver / Bronze' },
+                        { id: 'menu'     as LandingItem,   label: 'Gala Dining Menu',       desc: 'Course listing' },
+                        { id: 'seating'  as LandingItem,   label: 'Table Seating Map',      desc: 'Interactive floor plan' },
+                      ]).map(({ id, label, desc }) => {
+                        const isOn = activeLandingItems.has(id);
+                        return (
+                          <button key={id} type="button" onClick={() => toggleLandingItem(id)}
+                            className={`p-3 rounded-2xl border text-left transition-all scale-on-click relative ${
+                              isOn ? 'border-premium-gold bg-premium-gold/10' : 'border-premium-borderDark bg-premium-surfaceDark/60 hover:border-zinc-600'
+                            }`}>
+                            {isOn && (
+                              <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-premium-gold flex items-center justify-center">
+                                <Check className="w-2.5 h-2.5 text-black stroke-[3]" />
+                              </div>
+                            )}
+                            <div className={`text-[12px] font-display font-bold leading-tight pr-5 ${isOn ? 'text-white' : 'text-zinc-300'}`}>{label}</div>
+                            <div className="text-[10px] text-zinc-500 mt-0.5 leading-tight">{desc}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Games sub-config */}
               {activeModules.has('games') && (
