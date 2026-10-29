@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Header } from '@/components/dashboard/Header';
-import { MOCK_EVENT, MOCK_WEDDING_EVENT } from '@/lib/mockData';
 import { PRICING_PLANS } from '@/lib/pricing';
+import { Event } from '@/lib/types';
 import { formatIDR, formatDate } from '@/lib/utils';
 import {
   Calendar,
@@ -13,7 +13,6 @@ import {
   Sparkles,
   Building,
   Heart,
-  TrendingUp,
   Globe,
   ExternalLink,
   Plus,
@@ -26,7 +25,7 @@ import {
 export default function DashboardPage() {
   const [filter, setFilter] = useState<'all' | 'corporate' | 'wedding'>('all');
 
-  const events = [MOCK_EVENT, MOCK_WEDDING_EVENT];
+  const events: Event[] = [];
   const filteredEvents =
     filter === 'all' ? events : events.filter((e) => e.event_type === filter);
 
@@ -46,46 +45,34 @@ export default function DashboardPage() {
           {[
             {
               label: 'Active Events',
-              value: '2 Events',
-              sub: '1 Corporate · 1 Wedding',
+              value: '0 Events',
+              sub: 'No events yet',
               icon: Calendar,
               iconBg: 'bg-premium-neon/10 text-premium-neon border-premium-neon/20',
-              subEl: (
-                <span className="inline-flex items-center gap-1.5 text-premium-success font-semibold text-[11px]">
-                  <span className="w-2 h-2 rounded-full bg-premium-success shadow-[0_0_8px_#00E676]" />
-                  Live
-                </span>
-              ),
             },
             {
               label: 'Total Capacity',
-              value: '970 Guests',
-              sub: '650 TechUnite · 320 Daniel & Aria',
+              value: '—',
+              sub: 'Create your first event',
               icon: Users,
               iconBg: 'bg-premium-gold/10 text-premium-gold border-premium-gold/20',
             },
             {
               label: 'Checked In Today',
-              value: '418 Pax',
-              sub: '',
+              value: '—',
+              sub: 'No active gate',
               icon: QrCode,
               iconBg: 'bg-premium-success/10 text-premium-success border-premium-success/20',
-              subEl: (
-                <span className="inline-flex items-center gap-1 text-premium-success text-[11px] font-semibold">
-                  <TrendingUp className="w-3 h-3" />
-                  Gate Active (64.3%)
-                </span>
-              ),
             },
             {
               label: 'EO/WO Cashback',
-              value: formatIDR(268500),
+              value: formatIDR(0),
               valueClass: 'text-premium-gold',
-              sub: '18% Partner Rebate Active',
+              sub: 'No referral yet',
               icon: Sparkles,
               iconBg: 'bg-premium-gold/10 text-premium-gold border-premium-gold/20',
             },
-          ].map(({ label, value, valueClass, sub, subEl, icon: Icon, iconBg }) => (
+          ].map(({ label, value, valueClass, sub, icon: Icon, iconBg }) => (
             <div
               key={label}
               className="p-7 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark hover:border-white/10 transition-colors"
@@ -102,7 +89,7 @@ export default function DashboardPage() {
                 {value}
               </div>
               <div className="mt-3 text-[12px] text-zinc-500">
-                {subEl ?? sub}
+                {sub}
               </div>
             </div>
           ))}
