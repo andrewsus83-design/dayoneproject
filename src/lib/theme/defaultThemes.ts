@@ -12,7 +12,7 @@ export const CORPORATE_THEMES: Record<string, ThemeConfig> = {
     backgroundColor: '#09090B',
     textColor: '#FFFFFF',
     fontFamily: 'Outfit',
-    bannerUrl: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80',
+    bannerUrl: 'https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793292945064_3db61a35_1793292945141_4c570f70.png',
     logoUrl: null,
     landingSchema: {
       layoutType: 'corporate_keynote',
@@ -36,7 +36,7 @@ export const CORPORATE_THEMES: Record<string, ThemeConfig> = {
     backgroundColor: '#09090B',
     textColor: '#F8FAFC',
     fontFamily: 'Outfit',
-    bannerUrl: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=1200&q=80',
+    bannerUrl: 'https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793292946387_ff484c47_1793292947180_42ab5d6b.png',
     logoUrl: null,
     landingSchema: {
       layoutType: 'corporate_keynote',
@@ -60,7 +60,7 @@ export const CORPORATE_THEMES: Record<string, ThemeConfig> = {
     backgroundColor: '#09090B',
     textColor: '#FFFFFF',
     fontFamily: 'Manrope',
-    bannerUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
+    bannerUrl: 'https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793292948223_f74fd3e1_1793292948859_d378ab3f.png',
     logoUrl: null,
     landingSchema: {
       layoutType: 'corporate_keynote',
@@ -84,7 +84,7 @@ export const CORPORATE_THEMES: Record<string, ThemeConfig> = {
     backgroundColor: '#0B1120',
     textColor: '#F1F5F9',
     fontFamily: 'Outfit',
-    bannerUrl: 'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?auto=format&fit=crop&w=1200&q=80',
+    bannerUrl: 'https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793292959049_24b5dd49_1793292959217_a611583f.png',
     logoUrl: null,
     landingSchema: {
       layoutType: 'corporate_keynote',
@@ -111,7 +111,7 @@ export const WEDDING_THEMES: Record<string, ThemeConfig> = {
     backgroundColor: '#0E0C0A',
     textColor: '#FDFBF7',
     fontFamily: 'Playfair Display',
-    bannerUrl: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80',
+    bannerUrl: 'https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793292968663_de87fb08_1793292969087_81bb9def.png',
     logoUrl: null,
     landingSchema: {
       layoutType: 'wedding_romance',
@@ -135,7 +135,7 @@ export const WEDDING_THEMES: Record<string, ThemeConfig> = {
     backgroundColor: '#0E0A0C',
     textColor: '#FFF1F2',
     fontFamily: 'Cinzel',
-    bannerUrl: 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=1200&q=80',
+    bannerUrl: 'https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793292969603_ed035be1_1793292969682_d9d52030.png',
     logoUrl: null,
     landingSchema: {
       layoutType: 'wedding_romance',
@@ -159,7 +159,7 @@ export const WEDDING_THEMES: Record<string, ThemeConfig> = {
     backgroundColor: '#0A100D',
     textColor: '#ECFDF5',
     fontFamily: 'Playfair Display',
-    bannerUrl: 'https://images.unsplash.com/photo-1520854221256-17451cc331bf?auto=format&fit=crop&w=1200&q=80',
+    bannerUrl: 'https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793292972946_d7371fac_1793292973634_2f8e503a.png',
     logoUrl: null,
     landingSchema: {
       layoutType: 'wedding_romance',
@@ -183,7 +183,7 @@ export const WEDDING_THEMES: Record<string, ThemeConfig> = {
     backgroundColor: '#0E0608',
     textColor: '#FFF1F2',
     fontFamily: 'Cinzel',
-    bannerUrl: 'https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?auto=format&fit=crop&w=1200&q=80',
+    bannerUrl: 'https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793292974389_15dcd30b_1793292974801_beef1cba.png',
     logoUrl: null,
     landingSchema: {
       layoutType: 'wedding_romance',

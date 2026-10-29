@@ -44,7 +44,11 @@ function LandingPrototype({ theme, isCorporate }: { theme: ThemeConfig; isCorpor
       <div
         className="relative px-3 pt-3 pb-4"
         style={{
-          background: `linear-gradient(160deg, ${secondary}ee 0%, ${bg} 100%)`,
+          backgroundImage: theme.bannerUrl
+            ? `linear-gradient(160deg, ${bg}CC 0%, ${bg}99 60%, ${bg}EE 100%), url(${theme.bannerUrl})`
+            : `linear-gradient(160deg, ${secondary}ee 0%, ${bg} 100%)`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
           borderBottom: `1px solid ${secondary}`,
         }}
       >

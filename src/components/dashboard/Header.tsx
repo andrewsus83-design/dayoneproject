@@ -1,7 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-import { Bell, Search, Plus } from 'lucide-react';
+import { Bell, Search } from 'lucide-react';
 
 interface HeaderProps {
   title?: string;
@@ -13,8 +12,6 @@ interface HeaderProps {
 export function Header({
   title = 'Dashboard',
   subtitle,
-  actionText,
-  actionHref,
 }: HeaderProps) {
   return (
     <header className="h-20 border-b border-premium-borderDark bg-premium-black/90 backdrop-blur-xl px-8 md:px-10 flex items-center justify-between sticky top-0 z-40 flex-shrink-0">
@@ -47,17 +44,6 @@ export function Header({
           <Bell className="w-4 h-4" />
           <span className="w-1.5 h-1.5 rounded-full bg-premium-danger absolute top-2 right-2" />
         </button>
-
-        {/* Primary CTA */}
-        {actionText && actionHref && (
-          <Link
-            href={actionHref}
-            className="bg-premium-gold hover:bg-premium-goldHover text-black px-5 py-2.5 rounded-2xl font-bold transition-all shadow-gold scale-on-click text-[13px] flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>{actionText}</span>
-          </Link>
-        )}
       </div>
     </header>
   );
