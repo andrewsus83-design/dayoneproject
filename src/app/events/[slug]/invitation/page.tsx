@@ -2,12 +2,13 @@
 
 import React, { use, Suspense, useMemo } from 'react';
 import {
-  addResponse, readGuests, useAssetUrl, useEventConfigBySlug, useGuests, useResponses, writeGuests, formatEventDate,
+  addResponse, readGuests, useAssetUrl, useEventConfigBySlug, useResponses, useSampleGuests, writeGuests, formatEventDate,
   nextGuestNumber, numberDigits,
   type FormResponse,
 } from '@/lib/eventStore';
+import { isServerEventId, registerGuest, useStoredPass, type RegisterResult } from '@/lib/guestsApi';
 import { resolveTheme } from '@/lib/eventTheme';
-import { InvitationFormView } from '@/components/events/InvitationFormView';
+import { InvitationFormView, type SubmitResult } from '@/components/events/InvitationFormView';
 import { EventFonts } from '@/components/events/EventFonts';
 import type { Guest } from '@/lib/types';
 
@@ -16,10 +17,39 @@ function todayIso() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** What the guest sees when the server refuses a reply. */
+function refusal(res: Extract<RegisterResult, { ok: false }>, maxPerReply: number): SubmitResult {
+  switch (res.reason) {
+    case 'closed':
+      return { ok: false, closedReason: 'Replies are closed.' };
+    case 'paused':
+      return { ok: false, closedReason: 'The host has paused new replies.' };
+    case 'not_open':
+      return { ok: false, closedReason: 'Replies are not open yet. Please come back later.' };
+    case 'not_found':
+      return { ok: false, closedReason: "This event isn't taking replies right now." };
+    case 'full':
+      return { ok: false, closedReason: 'All seats have been taken.' };
+    case 'rate_limited':
+      return { ok: false, error: 'Too many replies from here. Please wait a few minutes and try again.' };
+    default:
+      if (res.field === 'email') return { ok: false, error: 'Please check your email address.' };
+      if (res.field === 'phone') return { ok: false, error: 'Please check your phone number.' };
+      if (res.field === 'name') return { ok: false, error: 'Please enter your name.' };
+      if (res.field === 'party_size') {
+        return { ok: false, error: `Up to ${Math.min(maxPerReply || 10, 10)} guests per reply.` };
+      }
+      return { ok: false, error: 'Your reply could not be saved. Please check your answers.' };
+  }
+}
+
 function InvitationContent({ slug }: { slug: string }) {
   const { eventId, hydrated, config, event } = useEventConfigBySlug(slug);
-  const responses = useResponses(eventId);
-  const guests = useGuests(eventId);
+  // Saved events take replies on the server; the built-in samples keep them on this device.
+  const sample = !isServerEventId(eventId);
+  const responses = useResponses(sample ? eventId : '');
+  const sampleGuests = useSampleGuests(eventId);
+  const heldPass = useStoredPass(slug);
   const inv = config.invitation;
   const photo = useAssetUrl(inv.photoUrl);
   const heroBlock = config.landing.blocks.find((b) => b.type === 'hero');
@@ -27,25 +57,27 @@ function InvitationContent({ slug }: { slug: string }) {
   const coverUrl = photo || hero || event.cover_image_url || '';
   const theme = useMemo(() => resolveTheme(config.design), [config.design]);
   const isWedding = event.event_type === 'wedding';
+  const maxPerReply = parseInt(inv.maxPerReply || '0', 10) || 0;
 
   const closedReason = useMemo(() => {
     if (!hydrated) return null;
     if (!inv.accepting) return 'The host has paused new replies.';
     if (inv.replyBy && todayIso() > inv.replyBy) return `Replies closed on ${formatEventDate(inv.replyBy)}.`;
+    // The server counts seats for saved events when the reply is sent.
     const limit = parseInt(inv.guestLimit || '0', 10);
-    if (limit > 0) {
+    if (sample && limit > 0) {
       const seated = responses.filter((r) => r.attending).reduce((sum, r) => sum + r.party, 0);
       if (seated >= limit) return 'All seats have been taken.';
     }
     return null;
-  }, [hydrated, inv.accepting, inv.replyBy, inv.guestLimit, responses]);
+  }, [hydrated, inv.accepting, inv.replyBy, inv.guestLimit, responses, sample]);
 
   const notOpenUntil = useMemo(() => {
     if (!hydrated || inv.opensMode !== 'scheduled' || !inv.opensAt) return null;
     return new Date(inv.opensAt).getTime() > Date.now() ? inv.opensAt : null;
   }, [hydrated, inv.opensMode, inv.opensAt]);
 
-  const handleSubmit = (r: FormResponse) => {
+  const handleSampleSubmit = (r: FormResponse): SubmitResult => {
     const current = readGuests(eventId);
     const number = r.attending ? nextGuestNumber(current) : undefined;
     const saved = addResponse(eventId, { ...r, number });
@@ -78,6 +110,23 @@ function InvitationContent({ slug }: { slug: string }) {
     return { ...saved, number };
   };
 
+  const handleSubmit = async (r: FormResponse): Promise<SubmitResult> => {
+    if (sample) return handleSampleSubmit(r);
+    // registerGuest keeps the pass on this phone (d1-pass-<slug>) for the pass page, trivia and the photo wall.
+    const res = await registerGuest(slug, {
+      name: r.name,
+      email: r.email,
+      phone: r.phone,
+      attending: r.attending,
+      partySize: r.party || 1,
+      answers: r.answers,
+      token: heldPass,
+    });
+    if (!res.ok) return refusal(res, maxPerReply);
+    if (!res.stored) return { ok: true };
+    return { ok: true, token: res.token, number: res.guest_number, name: res.name };
+  };
+
   if (!hydrated) {
     return <div className="min-h-screen bg-premium-black flex items-center justify-center text-zinc-500 text-sm">Loading invitation…</div>;
   }
@@ -96,7 +145,7 @@ function InvitationContent({ slug }: { slug: string }) {
         closedReason={closedReason}
         notOpenUntil={notOpenUntil}
         onSubmit={handleSubmit}
-        numberPad={numberDigits(guests, config.info.capacity)}
+        numberPad={numberDigits(sample ? sampleGuests : [], config.info.capacity)}
         backHref={`/events/${slug}`}
       />
     </>
