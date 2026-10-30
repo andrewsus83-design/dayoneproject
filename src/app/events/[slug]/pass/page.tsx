@@ -1,7 +1,7 @@
 'use client';
 
 import { formatEventDate, formatEventTime, formatGuestNumber, numberDigits, useEventConfigBySlug, useHydrated, useSampleGuests } from '@/lib/eventStore';
-import { forgetPass, isServerEventId, passCode, readStoredPass, storePass, useMyPass, type GuestTab } from '@/lib/guestsApi';
+import { forgetPass, isServerEventId, passCode, readStoredPass, registerGuestOffline, storePass, useMyPass, type GuestTab } from '@/lib/guestsApi';
 import { publicWinnerLabel, usePublicDoorPrizes, type ServerWinner } from '@/lib/doorPrizeApi';
 import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState, useEffect, use, Suspense } from 'react';
@@ -232,6 +232,9 @@ function GuestAppContent({ slug }: { slug: string }) {
     const qs = q.toString();
     router.replace(qs ? `?${qs}` : `/events/${slug}/pass`, { scroll: false });
   };
+
+  // Next time, the guest app opens even with no signal.
+  useEffect(() => registerGuestOffline(), []);
 
   // A pass link opened on this phone becomes this phone's pass (for trivia and the photo wall).
   const openedToken = !sample && linkToken && mine.status === 'ready' ? mine.pass?.token ?? null : null;

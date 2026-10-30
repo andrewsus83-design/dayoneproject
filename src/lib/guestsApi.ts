@@ -388,6 +388,14 @@ export async function registerGuest(slug: string, input: RegisterInput): Promise
   return result;
 }
 
+/* ───────────────────────── Working with no signal ───────────────────────── */
+
+/** Lets the guest app and invitation open with no signal (public/guest-sw.js). Production builds only. */
+export function registerGuestOffline() {
+  if (process.env.NODE_ENV !== 'production' || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('/guest-sw.js', { scope: '/events/' }).catch(() => undefined);
+}
+
 /* ───────────────────────── Replies sent with no signal ───────────────────────── */
 
 /** No internet (as opposed to the server saying no). */
@@ -511,16 +519,32 @@ interface PassState {
 const passes = new Map<string, PassState>();
 const passInflight = new Map<string, Promise<void>>();
 
+/** The last pass loaded on this phone, so the QR pass still shows with no signal. */
+const passCacheKey = (token: string) => `d1-pass-cache-${token}`;
+
+function readCachedPass(token: string): GuestPass | null {
+  try {
+    const raw = localStorage.getItem(passCacheKey(token));
+    return raw ? (JSON.parse(raw) as GuestPass) : null;
+  } catch {
+    return null;
+  }
+}
+
 function loadPass(token: string): Promise<void> {
   const running = passInflight.get(token);
   if (running) return running;
   const p = getPass(token)
     .then((pass) => {
       passes.set(token, { token, pass, status: pass ? 'ready' : 'missing', loadedAt: Date.now() });
+      try {
+        if (pass) localStorage.setItem(passCacheKey(token), JSON.stringify(pass));
+        else localStorage.removeItem(passCacheKey(token));
+      } catch {}
     })
     .catch(() => {
-      const prev = passes.get(token);
-      passes.set(token, { token, pass: prev?.pass ?? null, status: prev?.pass ? 'ready' : 'error', loadedAt: Date.now() });
+      const prev = passes.get(token)?.pass ?? readCachedPass(token);
+      passes.set(token, { token, pass: prev, status: prev ? 'ready' : 'error', loadedAt: Date.now() });
     })
     .finally(() => {
       passInflight.delete(token);
@@ -533,7 +557,8 @@ function loadPass(token: string): Promise<void> {
 /**
  * The guest on this phone: the pass saved by the invitation form (or opened from a pass link), loaded from the
  * server. `checkedIn` is what trivia, the photo wall and the door prize gate on. Pass a token to look at that
- * pass instead of the saved one. pollMs keeps it fresh (e.g. the pass page waiting for the door).
+ * pass instead of the saved one. pollMs keeps it fresh (e.g. the pass page waiting for the door); once the guest
+ * is checked in the pass no longer changes, so it is asked for at most once a minute.
  */
 export function useMyPass(slug: string, opts: { token?: string | null; pollMs?: number } = {}) {
   const stored = useStoredPass(slug);
@@ -543,7 +568,8 @@ export function useMyPass(slug: string, opts: { token?: string | null; pollMs?: 
     () => (token ? passes.get(token) : undefined),
     () => undefined,
   );
-  const pollMs = opts.pollMs ?? 0;
+  const checkedInNow = !!state?.pass?.checked_in_at;
+  const pollMs = opts.pollMs && checkedInNow ? Math.max(opts.pollMs, 60_000) : opts.pollMs ?? 0;
 
   useEffect(() => {
     if (!token) return;

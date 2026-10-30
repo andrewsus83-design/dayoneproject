@@ -102,6 +102,16 @@ export function photoUrl(path: string): string {
   return `${SUPABASE_URL}/storage/v1/object/public/${PHOTO_BUCKET}/${path}`;
 }
 
+/**
+ * A smaller copy of a stored photo for wall and album tiles (Supabase resizes it on the fly and caches it), so
+ * phones download about a tenth of the full photo. Videos and anything not in our storage come back unchanged.
+ */
+export function thumbUrl(url: string, width = 640): string {
+  const marker = '/storage/v1/object/public/';
+  if (!url.includes(marker) || isVideoPath(url)) return url;
+  return `${url.replace(marker, '/storage/v1/render/image/public/')}?width=${width}&quality=65&resize=contain`;
+}
+
 /** Videos are stored as .mp4 / .webm; everything else on the wall is a photo. */
 export function isVideoPath(urlOrPath: string): boolean {
   return /\.(mp4|webm)(\?|#|$)/i.test(urlOrPath);
@@ -378,7 +388,7 @@ export function feedToUploads(photos: WallPhoto[], eventId = ''): PhotoWallUploa
     media_type: isVideoPath(p.url) ? 'video' : 'image',
     image_url: p.url,
     video_url: isVideoPath(p.url) ? p.url : null,
-    thumbnail_url: null,
+    thumbnail_url: isVideoPath(p.url) ? null : thumbUrl(p.url),
     filter_used: null,
     frame_used: null,
     caption: p.caption,

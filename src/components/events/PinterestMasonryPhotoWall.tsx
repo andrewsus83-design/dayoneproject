@@ -19,6 +19,8 @@ interface PinterestMasonryPhotoWallProps {
   onUploadClick?: () => void;
   canLike?: boolean;
   frameOverlayUrl?: string;
+  /** Videos play by themselves on the tiles (big screens). Off on phones, so a video downloads only when opened. */
+  autoplayVideos?: boolean;
 }
 
 export function PinterestMasonryPhotoWall({
@@ -27,6 +29,7 @@ export function PinterestMasonryPhotoWall({
   onUploadClick,
   canLike = true,
   frameOverlayUrl,
+  autoplayVideos = true,
 }: PinterestMasonryPhotoWallProps) {
   // Photos come straight from props, so a polling parent (live wall, album) shows new ones as they arrive.
   const [likedIds, setLikedIds] = useState<Record<string, boolean>>({});
@@ -121,14 +124,14 @@ export function PinterestMasonryPhotoWall({
                     src={item.video_url}
                     muted
                     loop
-                    autoPlay
+                    autoPlay={autoplayVideos}
                     playsInline
                     preload="metadata"
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                 ) : (
                   <img
-                    src={item.image_url}
+                    src={item.thumbnail_url || item.image_url}
                     alt={item.caption || 'Event capture'}
                     loading="lazy"
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"

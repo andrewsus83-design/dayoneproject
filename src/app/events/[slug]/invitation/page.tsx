@@ -8,7 +8,8 @@ import {
   type FormResponse,
 } from '@/lib/eventStore';
 import {
-  guestAppPath, isOfflineError, isServerEventId, queueReply, registerGuest, sendQueuedReply, useStoredPass, type RegisterInput, type RegisterResult,
+  guestAppPath, isOfflineError, isServerEventId, queueReply, registerGuest, registerGuestOffline, sendQueuedReply, useStoredPass,
+  type RegisterInput, type RegisterResult,
 } from '@/lib/guestsApi';
 import { resolveTheme } from '@/lib/eventTheme';
 import { InvitationFormView, type SubmitResult } from '@/components/events/InvitationFormView';
@@ -148,6 +149,9 @@ function InvitationContent({ slug }: { slug: string }) {
     if (!res.stored) return { ok: true };
     return { ok: true, token: res.token, number: res.guest_number, name: res.name };
   };
+
+  // The invitation (and the guest app after it) open even with no signal next time.
+  useEffect(() => registerGuestOffline(), []);
 
   // A reply saved with no signal is sent when the phone is back online (on load, on "online", and every 10 s).
   useEffect(() => {

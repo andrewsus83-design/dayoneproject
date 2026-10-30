@@ -242,7 +242,7 @@ function GuestPhotoWall({ slug, token, fallbackName }: { slug: string; token: st
             <span className="text-[11px] font-mono font-normal text-zinc-500">{feed?.total ?? 0} on the wall</span>
           </h2>
           {album.length ? (
-            <PinterestMasonryPhotoWall photos={album} showCaptions={feed?.captions ?? true} canLike={false} />
+            <PinterestMasonryPhotoWall photos={album} showCaptions={feed?.captions ?? true} canLike={false} autoplayVideos={false} />
           ) : (
             <p className="text-xs text-zinc-500 p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark">
               No photos on the wall yet.
