@@ -1,6 +1,8 @@
 import type { Event } from './types';
 import type { Testimony } from './eventStore';
 
+// 'register' is kept so pages saved before the invitation form replaced registration still load;
+// it opens the invitation form like 'invitation'.
 export type CtaTarget = 'invitation' | 'register' | 'custom';
 export type TitleStyle = 'solid' | 'gradient' | 'prism';
 
@@ -94,7 +96,7 @@ export function createBlock(type: BlockType, isWedding = false): LandingBlock {
         id, type, layout: 'left', imageUrl: '', overlay: true, decoration: 'none', showLogo: true,
         badge: isWedding ? 'Wedding Celebration' : 'Corporate Summit', eyebrow: '', title: '', titleStyle: 'solid', tagline: '',
         showDescription: true, meta: 'inline', showCountdown: false,
-        ctaLabel: isWedding ? 'RSVP to Attend' : 'Register Now', ctaTarget: 'register', ctaUrl: '', secondaryLabel: 'Learn More', note: '',
+        ctaLabel: isWedding ? 'RSVP to Attend' : 'Register Now', ctaTarget: 'invitation', ctaUrl: '', secondaryLabel: 'Learn More', note: '',
       };
     case 'countdown':
       return { id, type, label: 'Event starts in' };
@@ -147,7 +149,7 @@ export function createBlock(type: BlockType, isWedding = false): LandingBlock {
         body: isWedding
           ? 'RSVP so we can ensure your seat and a personalised place card.'
           : 'Seats are limited. Register now and receive your digital QR pass instantly.',
-        ctaLabel: isWedding ? 'RSVP Now' : 'Register Free', ctaTarget: 'register', ctaUrl: '',
+        ctaLabel: isWedding ? 'RSVP Now' : 'Register Free', ctaTarget: 'invitation', ctaUrl: '',
         note: 'Instant confirmation · Digital QR pass sent by email & WhatsApp',
       };
   }
@@ -167,7 +169,7 @@ function popverseBlocks(): LandingBlock[] {
       id: 'pv-hero', type: 'hero', layout: 'center', imageUrl: POPVERSE.hero, overlay: true, decoration: 'prism', showLogo: true,
       badge: '', eyebrow: 'Year-End Party 2026', title: 'P★PVERSE', titleStyle: 'prism', tagline: 'Different Tunes. One Beat.',
       showDescription: false, meta: 'pills', showCountdown: true,
-      ctaLabel: '✦ Confirm Attendance', ctaTarget: 'register', ctaUrl: '', secondaryLabel: 'Learn More', note: 'Confirm by October 9, 2026',
+      ctaLabel: '✦ Confirm Attendance', ctaTarget: 'invitation', ctaUrl: '', secondaryLabel: 'Learn More', note: 'Confirm by October 9, 2026',
     },
     {
       id: 'pv-story', type: 'text', label: 'Our Why', heading: 'The Story Behind POPVERSE', align: 'left', card: true,
@@ -200,7 +202,7 @@ function popverseBlocks(): LandingBlock[] {
     {
       id: 'pv-cta', type: 'cta', label: 'Join the Celebration', heading: 'Ready to be part of POPVERSE?',
       body: "Confirm your attendance and join 1,550 colleagues for Converge's biggest year-end celebration.",
-      ctaLabel: '✦ Confirm My Attendance', ctaTarget: 'register', ctaUrl: '', note: '',
+      ctaLabel: '✦ Confirm My Attendance', ctaTarget: 'invitation', ctaUrl: '', note: '',
     },
   ];
 }

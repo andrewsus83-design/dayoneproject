@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, type CSSProperties } from 'react';
 import Link from 'next/link';
-import { Calendar, Clock, MapPin, Users, Globe, Copy, CheckCircle2, QrCode, Star, Quote, ChevronDown, Navigation, ArrowRight, Sparkles } from 'lucide-react';
+import { Calendar, Clock, MapPin, Users, Globe, Copy, CheckCircle2, Star, Quote, ChevronDown, Navigation, ArrowRight, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { formatEventTime, useAssetUrl, type EventInfo, type LandingConfig, type DesignConfig } from '@/lib/eventStore';
 import type { LandingBlock, HeroBlock, CtaTarget } from '@/lib/landingBlocks';
@@ -55,9 +55,9 @@ function useCountdown(date: string, time: string) {
 }
 
 function ctaHref(slug: string, target: CtaTarget, url: string) {
-  if (target === 'invitation') return `/events/${slug}/invitation`;
   if (target === 'custom') return url ? (url.startsWith('http') || url.startsWith('/') ? url : `https://${url}`) : '#';
-  return `/events/${slug}/register`;
+  // 'invitation' and the older 'register' both open the invitation form.
+  return `/events/${slug}/invitation`;
 }
 
 function Logo({ refId, size, fallback }: { refId: string; size: 's' | 'm' | 'l'; fallback?: boolean }) {
@@ -160,11 +160,8 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
       <nav className="relative z-10 flex items-center justify-between px-6 pt-6 gap-3">
         <Logo refId={design.logoUrl} size={design.logoSize} fallback />
         <div className="flex items-center gap-2">
-          <Link href={`/events/${slug}/register`} className="hidden @md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur border border-white/20 text-white text-xs font-bold hover:bg-white/20 transition-all scale-on-click">
+          <Link href={`/events/${slug}/invitation`} className="hidden @md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur border border-white/20 text-white text-xs font-bold hover:bg-white/20 transition-all scale-on-click">
             Invitation Form
-          </Link>
-          <Link href={`/events/${slug}/gate`} target="_blank" className="hidden @md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur border border-white/20 text-white text-xs font-bold hover:bg-white/20 transition-all scale-on-click">
-            <QrCode className="w-3 h-3" /> Gate
           </Link>
           <button type="button" onClick={share} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold scale-on-click" style={{ background: theme.primary, color: theme.onPrimary, borderRadius: theme.buttonRadius }}>
             {copied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -553,7 +550,7 @@ export function LandingRenderer(p: RendererProps) {
       {!firstIsHero && (
         <nav className="flex items-center justify-between px-6 py-5" style={{ borderBottom: `1px solid ${theme.border}` }}>
           <Logo refId={p.design.logoUrl} size={p.design.logoSize} fallback />
-          <Link href={`/events/${slug}/register`} className="px-4 py-2 text-xs font-bold scale-on-click" style={{ background: theme.primary, color: theme.onPrimary, borderRadius: theme.buttonRadius }}>
+          <Link href={`/events/${slug}/invitation`} className="px-4 py-2 text-xs font-bold scale-on-click" style={{ background: theme.primary, color: theme.onPrimary, borderRadius: theme.buttonRadius }}>
             Invitation Form
           </Link>
         </nav>
@@ -587,7 +584,6 @@ export function LandingRenderer(p: RendererProps) {
             <span className="text-xs" style={{ color: theme.subtle }}>Powered by dayoneproject.xyz</span>
           </div>
           <div className="flex items-center gap-4 text-xs" style={{ color: theme.subtle }}>
-            <Link href={`/events/${slug}/gate`} className="hover:underline">Gate Scanner</Link>
             <Link href={`/events/${slug}/stage`} className="hover:underline">Stage Display</Link>
             <Link href="/dashboard" className="hover:underline">Organizer Login</Link>
           </div>
