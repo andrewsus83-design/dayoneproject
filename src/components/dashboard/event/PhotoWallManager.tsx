@@ -277,7 +277,7 @@ export function PhotoWallManager() {
             <p className="text-xs text-zinc-400">Share this link so guests can upload photos and view the live wall.</p>
           </div>
           <div className="flex items-center gap-2 bg-premium-surfaceDark border border-premium-borderDark rounded-2xl px-4 py-3">
-            <span className="text-premium-neon font-mono text-sm flex-1 truncate">https://photos.all41.app/your-event-slug</span>
+            <span className="text-premium-neon font-mono text-sm flex-1 truncate">https://app.dayoneproject.xyz/events/your-event-slug/photowall</span>
             <button type="button" onClick={() => { setCopiedLink(true); setTimeout(() => setCopiedLink(false), 2000); }} className="p-2 rounded-xl bg-premium-black border border-premium-borderDark hover:border-zinc-600 transition-all scale-on-click">
               {copiedLink ? <Check className="w-4 h-4 text-premium-success" /> : <Copy className="w-4 h-4 text-zinc-400" />}
             </button>
@@ -298,14 +298,14 @@ export function PhotoWallManager() {
             <div className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark space-y-1">
               <p className="text-[10px] font-mono text-zinc-500 uppercase">Wall Display</p>
               <div className="flex items-center gap-2">
-                <span className="text-premium-neon font-mono text-xs truncate">https://wall.all41.app/your-event-slug</span>
+                <span className="text-premium-neon font-mono text-xs truncate">https://app.dayoneproject.xyz/events/your-event-slug/photowall/live</span>
                 <Copy className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" />
               </div>
             </div>
             <div className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark space-y-1">
               <p className="text-[10px] font-mono text-zinc-500 uppercase">Guest Upload</p>
               <div className="flex items-center gap-2">
-                <span className="text-premium-neon font-mono text-xs truncate">https://upload.all41.app/your-event-slug</span>
+                <span className="text-premium-neon font-mono text-xs truncate">https://app.dayoneproject.xyz/events/your-event-slug/photowall</span>
                 <Copy className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" />
               </div>
             </div>

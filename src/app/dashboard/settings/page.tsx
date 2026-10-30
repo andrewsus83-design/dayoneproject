@@ -93,7 +93,7 @@ export default function IntegrationsSettingsPage() {
                 <input
                   type="text"
                   disabled
-                  value="all41 <invitations@all41.app>"
+                  value="dayoneproject.xyz <invitations@dayoneproject.xyz>"
                   className="w-full px-5 py-3.5 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-xs font-mono text-zinc-300"
                 />
               </div>
@@ -140,7 +140,7 @@ export default function IntegrationsSettingsPage() {
                 </div>
                 <div>
                   <h3 className="text-xl font-display font-medium text-white">Client Subdomains & Custom White Label</h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">All events get free high-speed SSL subdomains: &lt;clientname&gt;.all41.app</p>
+                  <p className="text-xs text-zinc-400 mt-0.5">Every event gets its own secure link: app.dayoneproject.xyz/events/&lt;clientname&gt;</p>
                 </div>
               </div>
               <span className="text-xs text-premium-success font-bold uppercase bg-premium-success/20 px-3.5 py-1.5 rounded-full border border-premium-success/30">
@@ -151,9 +151,9 @@ export default function IntegrationsSettingsPage() {
             <div className="space-y-4 pt-2">
               <div className="p-5 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <span className="text-xs font-bold uppercase tracking-widest text-zinc-500 block">Default Event Subdomain</span>
+                  <span className="text-xs font-bold uppercase tracking-widest text-zinc-500 block">Default Event Link</span>
                   <div className="text-sm font-mono font-bold text-premium-neon mt-1">
-                    https://&lt;clientname&gt;.all41.app
+                    https://app.dayoneproject.xyz/events/&lt;clientname&gt;
                   </div>
                 </div>
                 <div className="text-xs text-zinc-400 max-w-sm font-light">
@@ -179,7 +179,7 @@ export default function IntegrationsSettingsPage() {
                   </button>
                 </div>
                 <p className="text-xs text-zinc-500 mt-2 font-mono">
-                  Point a CNAME record from <code className="text-premium-neon">{customDomain}</code> to <code className="text-zinc-300">cname.all41.app</code>
+                  Point a CNAME record from <code className="text-premium-neon">{customDomain}</code> to <code className="text-zinc-300">cname.vercel-dns.com</code>
                 </p>
               </div>
             </div>
@@ -277,7 +277,7 @@ export default function IntegrationsSettingsPage() {
                     <span>System Rate-Limiting Protection Active</span>
                   </div>
                   <p className="text-xs text-zinc-400 leading-relaxed font-light">
-                    Messages are automatically spaced with jitter delays by our background worker queue to preserve number reputation in compliance with all41 Terms & Conditions.
+                    Messages are automatically spaced with jitter delays by our background worker queue to preserve number reputation in compliance with dayoneproject.xyz Terms & Conditions.
                   </p>
                 </div>
               </div>
@@ -352,10 +352,10 @@ export default function IntegrationsSettingsPage() {
                   <strong className="text-white font-bold">1. Dedicated Event Number:</strong> We strongly advise using a dedicated event phone number instead of your primary personal or core business number.
                 </p>
                 <p>
-                  <strong className="text-white font-bold">2. System Rate Limiting & Pacing:</strong> To safeguard your number from automated WhatsApp anti-spam bans, all41 enforces background rate-limiting and sequential message delays automatically. You acknowledge that burst messages will be queued.
+                  <strong className="text-white font-bold">2. System Rate Limiting & Pacing:</strong> To safeguard your number from automated WhatsApp anti-spam bans, dayoneproject.xyz enforces background rate-limiting and sequential message delays automatically. You acknowledge that burst messages will be queued.
                 </p>
                 <p>
-                  <strong className="text-white font-bold">3. Terms Acceptance:</strong> By proceeding, you accept full responsibility for the number provided and agree that all41 is not liable for carrier or platform number suspensions resulting from unsolicited recipient reporting.
+                  <strong className="text-white font-bold">3. Terms Acceptance:</strong> By proceeding, you accept full responsibility for the number provided and agree that dayoneproject.xyz is not liable for carrier or platform number suspensions resulting from unsolicited recipient reporting.
                 </p>
               </div>
 

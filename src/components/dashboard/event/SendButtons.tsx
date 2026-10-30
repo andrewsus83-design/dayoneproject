@@ -8,7 +8,7 @@ import type { Guest } from '@/lib/types';
 
 const noop = () => () => {};
 export function useOrigin() {
-  return useSyncExternalStore(noop, () => window.location.origin, () => 'https://www.all41.app');
+  return useSyncExternalStore(noop, () => window.location.origin, () => 'https://app.dayoneproject.xyz');
 }
 
 /** One-tap WhatsApp / email send of a broadcast template to one guest. Marks the guest as sent. */

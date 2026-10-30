@@ -46,7 +46,7 @@ ${isWedding
   : 'Join industry leaders, innovators, and visionaries at the premier summit of the year.'}
 
 To confirm your attendance, please register at:
-→ all41.app/events/event-slug/register
+→ app.dayoneproject.xyz/events/event-slug/register
 
 Your personalised QR pass will be sent instantly upon registration.
 
@@ -55,7 +55,7 @@ The ${eventName} Team
 
 ──────────────────────────
 This invitation is personal and non-transferable.
-Powered by all41.app
+Powered by dayoneproject.xyz
     `.trim(),
   },
   rsvp_pass: {
@@ -122,16 +122,16 @@ Dear ${name},
 It was a joy to share this experience with you. We hope it created memories that will last a lifetime.
 
 Your photo wall contributions are available at:
-→ all41.app/events/event-slug/photos
+→ app.dayoneproject.xyz/events/event-slug/photos
 
 If you have a moment, we'd love your feedback:
-→ all41.app/events/event-slug/feedback
+→ app.dayoneproject.xyz/events/event-slug/feedback
 
 Until next time,
 The ${eventName} Team
 
 ──────────────────────────
-Powered by all41.app
+Powered by dayoneproject.xyz
     `.trim(),
   },
 };
@@ -158,7 +158,7 @@ function BroadcastContent({ eventId }: { eventId: string }) {
   }, [event.start_date]);
 
   const tpl = TEMPLATES[activeTemplate];
-  const mockQrToken = 'ALL41-X7K2M4';
+  const mockQrToken = 'D1-X7K2M4';
   const mockName = isWedding ? 'Sophia Rossi' : 'Alex Chen';
   const preview = tpl.preview(mockName, event.name, mockDate, mockQrToken, isWedding);
   const subject = tpl.subject.replace('{eventName}', event.name);
@@ -308,7 +308,7 @@ function BroadcastContent({ eventId }: { eventId: string }) {
                     <div className="bg-premium-surfaceDark px-5 py-3 border-b border-premium-borderDark space-y-1">
                       <div className="flex items-center gap-2 text-xs">
                         <span className="text-zinc-600 w-14">From:</span>
-                        <span className="text-zinc-400">events@all41.app</span>
+                        <span className="text-zinc-400">events@dayoneproject.xyz</span>
                       </div>
                       <div className="flex items-center gap-2 text-xs">
                         <span className="text-zinc-600 w-14">To:</span>
@@ -324,7 +324,7 @@ function BroadcastContent({ eventId }: { eventId: string }) {
                       <div className="max-w-sm mx-auto space-y-5">
                         {/* Header banner */}
                         <div className="rounded-xl overflow-hidden bg-premium-surfaceDark border border-premium-borderDark py-4 px-5 flex items-center gap-3">
-                          <div className="w-8 h-8 bg-premium-gold rounded-full flex items-center justify-center text-black font-display font-bold text-sm">41</div>
+                          <div className="w-8 h-8 bg-premium-gold rounded-full flex items-center justify-center text-black font-display font-bold text-sm">D1</div>
                           <div>
                             <div className="text-xs font-display font-bold text-white">{event.name}</div>
                             <div className="text-[10px] text-zinc-500">{mockDate}</div>
@@ -336,7 +336,7 @@ function BroadcastContent({ eventId }: { eventId: string }) {
                         </pre>
                         {/* Footer */}
                         <div className="border-t border-premium-borderDark pt-4 text-[10px] text-zinc-700 text-center font-mono">
-                          Powered by all41.app · Unsubscribe
+                          Powered by dayoneproject.xyz · Unsubscribe
                         </div>
                       </div>
                     </div>
@@ -345,7 +345,7 @@ function BroadcastContent({ eventId }: { eventId: string }) {
                   <div className="p-6 flex flex-col items-center">
                     <div className="w-full max-w-xs bg-[#128C7E] rounded-2xl overflow-hidden shadow-lg">
                       <div className="bg-[#075E54] px-4 py-3 flex items-center gap-2">
-                        <div className="w-8 h-8 bg-premium-gold rounded-full flex items-center justify-center text-black font-bold text-sm">41</div>
+                        <div className="w-8 h-8 bg-premium-gold rounded-full flex items-center justify-center text-black font-bold text-sm">D1</div>
                         <div>
                           <div className="text-xs font-bold text-white">{event.name}</div>
                           <div className="text-[10px] text-green-300">Official Channel</div>

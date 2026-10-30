@@ -51,7 +51,7 @@ interface Props {
 
 const SAMPLE: FormResponse = {
   id: 'preview', submittedAt: '', answers: {}, name: 'Rafael Cruz', email: 'rafael@example.com', phone: '',
-  attending: true, party: 2, token: 'ALL41-7K2PBEA9', number: 18,
+  attending: true, party: 2, token: 'D1-7K2PBEA9', number: 18,
 };
 
 function buildPages(items: FormItem[]): Page[] {
@@ -88,8 +88,8 @@ function downloadIcs(info: EventInfo, token: string) {
   const dt = (d: string, t: string) => `${d.replaceAll('-', '')}T${(t || '00:00').replace(':', '')}00`;
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   const lines = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//all41//Event//EN', 'BEGIN:VEVENT',
-    `UID:${token}@all41.app`, `DTSTAMP:${stamp}`,
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//dayoneproject.xyz//Event//EN', 'BEGIN:VEVENT',
+    `UID:${token}@dayoneproject.xyz`, `DTSTAMP:${stamp}`,
     `DTSTART:${dt(info.startDate, info.startTime)}`,
     `DTEND:${dt(info.endDate || info.startDate, info.endTime || info.startTime)}`,
     `SUMMARY:${icsEscape(info.name)}`,
@@ -753,13 +753,13 @@ export function InvitationFormView({
             </a>
           ) : <span />}
           {logoRef ? <LogoMark refId={logoRef} size="s" /> : (
-            <div className="w-8 h-8 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-sm shadow-gold">41</div>
+            <div className="w-8 h-8 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-sm shadow-gold">D1</div>
           )}
         </nav>
       )}
       <div className={`flex flex-col ${embedded ? 'min-h-full' : 'flex-1 w-full max-w-lg mx-auto'}`}>{body}</div>
       {!embedded && (screen.kind === 'done' || screen.kind === 'closed') && (
-        <p className="text-center text-[11px] py-6" style={{ color: theme.subtle }}>{isWedding ? 'With love' : 'Powered by'} · all41.app</p>
+        <p className="text-center text-[11px] py-6" style={{ color: theme.subtle }}>{isWedding ? 'With love' : 'Powered by'} · dayoneproject.xyz</p>
       )}
     </div>
   );

@@ -568,7 +568,7 @@ export const POPVERSE_STAGE_FRAME =
   'https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793300675118_e65da6c9_1793300675879_1fc2362a.png';
 
 const DEFAULT_QUIZ: QuizItem[] = [
-  { id: 'q-1', text: 'In what year was All41 founded?', options: ['2023', '2024', '2025', '2026'], answer: 1, points: 1000, seconds: 15 },
+  { id: 'q-1', text: 'In what year was dayoneproject.xyz founded?', options: ['2023', '2024', '2025', '2026'], answer: 1, points: 1000, seconds: 15 },
   { id: 'q-2', text: 'Which payment rail powers QR check-in in Indonesia?', options: ['QRIS', 'Swift GPI', 'FedNow', 'SEPA'], answer: 0, points: 1000, seconds: 15 },
   { id: 'q-3', text: 'Which protocol is best suited for live audience quiz sync?', options: ['WebSockets', 'HTTP Polling', 'SMTP', 'FTP'], answer: 0, points: 1000, seconds: 15 },
 ];
@@ -642,7 +642,7 @@ export function newDoorPrize(base?: Event, index = 1): DoorPrize {
 
 function defaultDoorPrizes(base: Event): DoorPrizesConfig {
   const items: DoorPrize[] = [
-    { ...newDoorPrize(base), id: 'dp-grand', name: 'Grand Prize', prize: 'Apple MacBook Pro M4 Max (16-inch)', quantity: 1, sponsor: 'All41 Innovation' },
+    { ...newDoorPrize(base), id: 'dp-grand', name: 'Grand Prize', prize: 'Apple MacBook Pro M4 Max (16-inch)', quantity: 1, sponsor: 'dayoneproject.xyz Innovation' },
     { ...newDoorPrize(base), id: 'dp-second', name: 'Second Prize', prize: 'iPhone 16 Pro Max', quantity: 2, style: 'claw' },
     { ...newDoorPrize(base), id: 'dp-lucky', name: 'Lucky Draw', prize: 'Staycation Voucher', quantity: 3, style: 'picker' },
   ];
@@ -951,7 +951,7 @@ export function makePassToken() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let s = '';
   for (let i = 0; i < 8; i++) s += alphabet[Math.floor(Math.random() * alphabet.length)];
-  return `ALL41-${s}`;
+  return `D1-${s}`;
 }
 
 export function findQuestion(questions: FormQuestion[], role: QuestionRole): FormQuestion | undefined {
@@ -1013,7 +1013,7 @@ export function fillVariables(
     .replaceAll('{date}', vars.date)
     .replaceAll('{time}', vars.time)
     .replaceAll('{venue}', vars.venue)
-    .replaceAll('{code}', vars.code || 'ALL41-XXXXXXXX')
+    .replaceAll('{code}', vars.code || 'D1-XXXXXXXX')
     .replaceAll('{opens}', vars.opens || 'soon')
     .replaceAll('{number}', vars.number || '001');
 }

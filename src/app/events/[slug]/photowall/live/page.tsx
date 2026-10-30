@@ -85,7 +85,7 @@ function LivePhotoWallContent({ slug }: { slug: string }) {
       <header className="h-20 px-8 flex items-center justify-between z-20 backdrop-blur-md bg-premium-surfaceDark/80 border-b border-premium-borderDark">
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-xl shadow-gold flex-shrink-0">
-            41
+            D1
           </div>
           <div>
             <h1 className="text-xl font-display font-bold text-white flex items-center gap-2">

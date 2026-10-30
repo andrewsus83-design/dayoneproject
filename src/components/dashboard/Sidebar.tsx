@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEventConfig } from '@/lib/eventStore';
+import { UserMenu } from '@/components/auth/UserMenu';
 
 const WORKSPACE_NAV = [
   { label: 'My Events', href: '/dashboard', icon: Calendar, exact: true },
@@ -37,8 +38,8 @@ const EVENT_NAV_GROUPS = [
   {
     label: 'Build',
     items: [
-      { label: 'Overview', tab: 'overview', icon: LayoutDashboard },
       { label: 'Design Studio', tab: 'design', icon: Palette },
+      { label: 'Overview', tab: 'overview', icon: LayoutDashboard },
     ],
   },
   {
@@ -108,10 +109,10 @@ export function Sidebar() {
         className="flex items-center gap-3 px-5 h-16 border-b border-premium-borderDark flex-shrink-0 group"
       >
         <div className="w-8 h-8 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-base shadow-gold group-hover:scale-105 transition-transform">
-          41
+          D1
         </div>
         <div>
-          <div className="font-display font-bold text-[17px] text-white tracking-tight leading-none">all41</div>
+          <div className="font-display font-bold text-[17px] text-white tracking-tight leading-none">dayoneproject<span className="text-premium-gold">.xyz</span></div>
           <div className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest mt-0.5">Event Platform</div>
         </div>
       </Link>
@@ -142,7 +143,7 @@ export function Sidebar() {
                   {eventConfig.info.name || currentEventId}
                 </div>
                 <div className="text-[10px] font-mono text-premium-neon mt-1 truncate">
-                  {eventConfig.info.slug}.all41.app
+                  app.dayoneproject.xyz/events/{eventConfig.info.slug}
                 </div>
               </div>
             </div>
@@ -265,19 +266,7 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* User footer */}
-      <div className="px-4 py-3.5 border-t border-premium-borderDark flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-premium-charcoal border border-premium-gold/25 flex items-center justify-center font-display font-bold text-premium-gold text-xs flex-shrink-0">
-          AD
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-[12px] font-bold text-white truncate">Admin Organizer</div>
-          <div className="text-[10px] font-mono text-zinc-600 truncate">andrewsus83@all41.app</div>
-        </div>
-        <Link href="/dashboard/settings" className="text-zinc-600 hover:text-zinc-400 transition-colors flex-shrink-0">
-          <Settings className="w-3.5 h-3.5" />
-        </Link>
-      </div>
+      <UserMenu />
     </aside>
   );
 }

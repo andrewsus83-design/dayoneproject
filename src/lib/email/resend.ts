@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 
 const resendApiKey = process.env.RESEND_API_KEY || 're_placeholder';
-const defaultFrom = process.env.RESEND_FROM_EMAIL || 'all41 <invitations@all41.app>';
+const defaultFrom = process.env.RESEND_FROM_EMAIL || 'dayoneproject.xyz <invitations@dayoneproject.xyz>';
 
 export const resend = new Resend(resendApiKey);
 
@@ -108,7 +108,7 @@ export async function sendEventEmail(options: SendEventEmailOptions) {
             </div>
           </div>
           <div class="footer">
-            Powered by <strong>all41.app</strong> — Everything you need for your event
+            Powered by <strong>dayoneproject.xyz</strong> — Everything you need for your event
           </div>
         </div>
       </body>

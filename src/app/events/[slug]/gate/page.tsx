@@ -382,8 +382,8 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
                 <div className="text-[10px] font-mono font-bold text-zinc-600 uppercase tracking-wider">Demo tokens</div>
                 <div className="flex flex-wrap gap-2">
                   {[
-                    { token: 'QR-ALL41-SITI-3309', label: 'Siti', type: 'new' },
-                    { token: 'QR-ALL41-BUDI-9812', label: 'Budi', type: 'dup' },
+                    { token: 'QR-D1-SITI-3309', label: 'Siti', type: 'new' },
+                    { token: 'QR-D1-BUDI-9812', label: 'Budi', type: 'dup' },
                     { token: 'INVALID-TOKEN', label: 'Invalid', type: 'err' },
                   ].map(({ token, label, type }) => (
                     <button

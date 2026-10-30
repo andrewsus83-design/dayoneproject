@@ -458,7 +458,7 @@ export function EventDesignStudio({ eventId }: { eventId: string }) {
         <div className="flex items-center gap-3 flex-wrap" style={{ marginTop: theme.space.stack }}>
           <span className="px-5 py-2.5 text-sm font-bold" style={{ background: theme.primary, color: theme.onPrimary, borderRadius: theme.buttonRadius }}>Register Now</span>
           <span className="px-5 py-2.5 text-sm font-bold" style={{ border: `1px solid ${theme.secondary}`, color: theme.secondaryText, borderRadius: theme.buttonRadius }}>Learn More</span>
-          <span className="text-xs font-mono" style={{ color: theme.accentText }}>{config.info.slug}.all41.app</span>
+          <span className="text-xs font-mono" style={{ color: theme.accentText }}>app.dayoneproject.xyz/events/{config.info.slug}</span>
         </div>
       </div>
 

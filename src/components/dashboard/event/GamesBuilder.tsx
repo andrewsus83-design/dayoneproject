@@ -117,7 +117,7 @@ function QuizEditor({ questions, onChange }: { questions: QuizItem[]; onChange: 
 function ClueQr({ token }: { token: string }) {
   const [url, setUrl] = useState('');
   useEffect(() => {
-    QRCode.toDataURL(`ALL41-HUNT-${token}`, { width: 300, margin: 1 }).then(setUrl).catch(() => setUrl(''));
+    QRCode.toDataURL(`D1-HUNT-${token}`, { width: 300, margin: 1 }).then(setUrl).catch(() => setUrl(''));
   }, [token]);
   if (!url) return <div className="w-14 h-14 rounded-lg bg-white/10" />;
   return (
@@ -360,7 +360,7 @@ export function GamesBuilder({ eventId }: { eventId: string }) {
                 {activity.kind === 'scavenger' && (
                   <button
                     type="button"
-                    onClick={() => downloadBlob(`${activity.name}-clues.csv`, new Blob([toCsv([['#', 'Location', 'Riddle', 'Hint', 'QR value'], ...activity.clues.map((c, i) => [i + 1, c.location, c.riddle, c.hint, `ALL41-HUNT-${c.token}`])])], { type: 'text/csv' }))}
+                    onClick={() => downloadBlob(`${activity.name}-clues.csv`, new Blob([toCsv([['#', 'Location', 'Riddle', 'Hint', 'QR value'], ...activity.clues.map((c, i) => [i + 1, c.location, c.riddle, c.hint, `D1-HUNT-${c.token}`])])], { type: 'text/csv' }))}
                     className="px-4 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-white text-xs font-bold scale-on-click flex items-center gap-1.5"
                   >
                     <Download className="w-3.5 h-3.5" /> Export clue sheet

@@ -5,7 +5,7 @@ import { PartnerSection } from '@/components/marketing/PartnerSection';
 import { Footer } from '@/components/marketing/Footer';
 
 export const metadata = {
-  title: 'all41 | All-in-One Event Experience Platform',
+  title: 'dayoneproject.xyz | All-in-One Event Experience Platform',
   description:
     "Southeast Asia's premier all-in-one event platform. Landing builder, digital RSVP, QR check-in, live photo wall, raffle draws, and interactive trivia.",
 };

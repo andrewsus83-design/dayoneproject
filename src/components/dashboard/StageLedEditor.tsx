@@ -268,7 +268,7 @@ export function StageLedEditor({
           type="text"
           value={config.tickerText}
           onChange={(e) => handleTickerChange(e.target.value)}
-          placeholder="e.g. ★ Welcome to our celebration! Post your selfies at clientname.all41.app ★"
+          placeholder="e.g. ★ Welcome to our celebration! Post your selfies at app.dayoneproject.xyz/events/clientname ★"
           className="w-full px-5 py-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-sm font-mono text-white focus:border-premium-gold outline-none"
         />
       </div>

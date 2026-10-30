@@ -2,8 +2,8 @@ import Link from 'next/link';
 import { ArrowLeft, Shield } from 'lucide-react';
 
 export const metadata = {
-  title: 'Terms of Service | all41',
-  description: 'Terms of service, fair-use policies, and risk disclosures for all41 event platform',
+  title: 'Terms of Service | dayoneproject.xyz',
+  description: 'Terms of service, fair-use policies, and risk disclosures for dayoneproject.xyz event platform',
 };
 
 export default function TermsPage() {
@@ -15,7 +15,7 @@ export default function TermsPage() {
           className="inline-flex items-center gap-2 text-xs font-semibold text-gray-400 hover:text-white"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Back to all41.app</span>
+          <span>Back to dayoneproject.xyz</span>
         </Link>
 
         <div>
@@ -31,7 +31,7 @@ export default function TermsPage() {
           <section className="space-y-2">
             <h2 className="text-lg font-bold text-white">1. Service Scope & Platform Access</h2>
             <p>
-              all41 provides an all-in-one event experience platform including digital RSVP forms, QR gate attendance scanning, live photo wall streaming, interactive trivia games, and door prize raffles.
+              dayoneproject.xyz provides an all-in-one event experience platform including digital RSVP forms, QR gate attendance scanning, live photo wall streaming, interactive trivia games, and door prize raffles.
             </p>
           </section>
 
@@ -42,8 +42,8 @@ export default function TermsPage() {
             </p>
             <ul className="list-disc pl-5 space-y-1 text-xs text-gray-400">
               <li>Organizers are strictly advised to register a dedicated event number rather than primary personal numbers.</li>
-              <li>To safeguard against carrier or WhatsApp anti-spam bans, all41 automatically enforces background rate-limiting, message throttling, and randomized delivery jitter. Users acknowledge that delivery is paced by the system.</li>
-              <li>all41 is not liable for carrier or platform number suspensions resulting from spam reports from unsolicited recipients.</li>
+              <li>To safeguard against carrier or WhatsApp anti-spam bans, dayoneproject.xyz automatically enforces background rate-limiting, message throttling, and randomized delivery jitter. Users acknowledge that delivery is paced by the system.</li>
+              <li>dayoneproject.xyz is not liable for carrier or platform number suspensions resulting from spam reports from unsolicited recipients.</li>
             </ul>
           </section>
 

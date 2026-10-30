@@ -38,11 +38,11 @@ export function Footer() {
           <div className="space-y-5">
             <Link href="/" className="inline-flex items-center gap-3.5 group">
               <div className="w-10 h-10 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-xl shadow-gold transition-transform group-hover:scale-105">
-                41
+                D1
               </div>
               <div>
                 <div className="text-xl font-display font-bold text-white tracking-tight">
-                  all41<span className="text-premium-gold">.app</span>
+                  dayoneproject<span className="text-premium-gold">.xyz</span>
                 </div>
                 <div className="text-[10px] text-zinc-500 font-mono tracking-[0.18em] uppercase mt-0.5">
                   Event Experience Platform
@@ -56,8 +56,8 @@ export function Footer() {
             </p>
 
             <div className="text-[12px] text-zinc-600 font-mono">
-              <a href="mailto:info@all41.app" className="hover:text-premium-gold transition-colors">
-                info@all41.app
+              <a href="mailto:info@dayoneproject.xyz" className="hover:text-premium-gold transition-colors">
+                info@dayoneproject.xyz
               </a>
             </div>
           </div>
@@ -87,7 +87,7 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <p className="text-[12px] text-zinc-600 font-light">
-            © 2026 all41.app — All rights reserved. Built for Southeast Asia.
+            © 2026 dayoneproject.xyz — All rights reserved. Built for Southeast Asia.
           </p>
           <p className="text-[12px] text-zinc-600 font-mono">
             Next.js · Supabase · Cloudflare R2 · Vercel

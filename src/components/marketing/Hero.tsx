@@ -98,7 +98,7 @@ export function Hero() {
                   <div className="w-3 h-3 rounded-full bg-[#FEBC2E]" />
                   <div className="w-3 h-3 rounded-full bg-[#28C840]" />
                 </div>
-                <span className="text-[11px] font-mono text-zinc-500 ml-2">your-event.all41.app</span>
+                <span className="text-[11px] font-mono text-zinc-500 ml-2">app.dayoneproject.xyz/events/your-event</span>
                 <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-premium-success font-medium">
                   <span className="w-2 h-2 rounded-full bg-premium-success animate-pulse" />
                   Live

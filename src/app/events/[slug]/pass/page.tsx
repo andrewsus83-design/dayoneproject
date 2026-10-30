@@ -32,7 +32,7 @@ function GuestMobilePassContent({ slug }: { slug: string }) {
     id: 'guest-preview',
     event_id: event.id,
     name: 'Preview Guest',
-    email: 'preview@all41.app',
+    email: 'preview@dayoneproject.xyz',
     phone: null,
     category: 'General',
     table_number: null,
@@ -151,7 +151,7 @@ function GuestMobilePassContent({ slug }: { slug: string }) {
               <Wifi className="w-4 h-4 text-premium-success" />
               <span>Ballroom Wi-Fi:</span>
             </span>
-            <span className="font-mono text-premium-success font-bold">ALL41_GUEST / tech2026</span>
+            <span className="font-mono text-premium-success font-bold">DAYONE_GUEST / tech2026</span>
           </div>
         </div>
 
@@ -185,7 +185,7 @@ function GuestMobilePassContent({ slug }: { slug: string }) {
 
       {/* Footer */}
       <footer className="p-4 text-center text-[11px] text-zinc-500 border-t border-premium-borderDark bg-premium-surfaceDark font-mono">
-        all41 • Verified Cryptographic Token Gate Pass
+        dayoneproject.xyz • Verified Cryptographic Token Gate Pass
       </footer>
     </div>
   );

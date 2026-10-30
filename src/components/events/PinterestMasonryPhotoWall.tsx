@@ -74,8 +74,8 @@ export function PinterestMasonryPhotoWall({
   const handleShare = async (e: React.MouseEvent, item: PhotoWallUpload) => {
     e.stopPropagation();
     const shareData = {
-      title: 'Event Live Photo Wall • all41.app',
-      text: item.caption || 'Check out this live event moment on all41!',
+      title: 'Event Live Photo Wall • dayoneproject.xyz',
+      text: item.caption || 'Check out this live event moment on dayoneproject.xyz!',
       url: window.location.href,
     };
 

@@ -424,7 +424,7 @@ export function BroadcastStudio({ eventId }: { eventId: string }) {
                     </div>
                   </div>
                 </div>
-                <p className="text-[10px] text-center mt-3" style={{ color: theme.subtle }}>{config.info.name} · sent with all41.app</p>
+                <p className="text-[10px] text-center mt-3" style={{ color: theme.subtle }}>{config.info.name} · sent with dayoneproject.xyz</p>
               </div>
             </div>
           ) : (

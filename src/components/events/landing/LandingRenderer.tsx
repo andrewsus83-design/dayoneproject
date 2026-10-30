@@ -65,7 +65,7 @@ function Logo({ refId, size, fallback }: { refId: string; size: 's' | 'm' | 'l';
   const h = size === 's' ? 32 : size === 'l' ? 64 : 44;
   if (!url) {
     return fallback ? (
-      <div className="w-10 h-10 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-lg shadow-gold">41</div>
+      <div className="w-10 h-10 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-lg shadow-gold">D1</div>
     ) : null;
   }
   // eslint-disable-next-line @next/next/no-img-element
@@ -348,7 +348,7 @@ export function LandingRenderer(p: RendererProps) {
           b.showDate && { icon: Calendar, label: 'Date', val: shortDate(info.startDate) },
           b.showVenue && { icon: MapPin, label: 'Venue', val: info.venue.split(',')[0] ?? '' },
           b.showCapacity && { icon: Users, label: 'Capacity', val: `${info.capacity} Guests` },
-          b.showLink && { icon: Globe, label: 'Subdomain', val: `${info.slug}.all41.app` },
+          b.showLink && { icon: Globe, label: 'Link', val: `app.dayoneproject.xyz/events/${info.slug}` },
         ].filter(Boolean) as { icon: typeof Calendar; label: string; val: string }[];
         return (
           <div className="max-w-4xl mx-auto" style={{ padding: pad }}>
@@ -583,8 +583,8 @@ export function LandingRenderer(p: RendererProps) {
         {landing.footerText && <p className="text-xs mb-4" style={{ color: theme.subtle }}>{landing.footerText}</p>}
         <div className="flex flex-col @md:flex-row items-center justify-between gap-4 max-w-4xl mx-auto pt-2">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-sm shadow-gold">41</div>
-            <span className="text-xs" style={{ color: theme.subtle }}>Powered by all41.app</span>
+            <div className="w-8 h-8 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-sm shadow-gold">D1</div>
+            <span className="text-xs" style={{ color: theme.subtle }}>Powered by dayoneproject.xyz</span>
           </div>
           <div className="flex items-center gap-4 text-xs" style={{ color: theme.subtle }}>
             <Link href={`/events/${slug}/gate`} className="hover:underline">Gate Scanner</Link>

@@ -32,7 +32,7 @@ const CONFETTI = Array.from({ length: 64 }, (_, i) => {
 function FooterLogo({ refId }: { refId?: string }) {
   const url = useAssetUrl(refId);
   if (!url) {
-    return <span className="w-7 h-7 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-xs shadow-gold shrink-0">41</span>;
+    return <span className="w-7 h-7 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-xs shadow-gold shrink-0">D1</span>;
   }
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={url} alt="" className="h-7 w-auto object-contain shrink-0" />;
@@ -155,7 +155,7 @@ export function StageFrameShell({
             {frame.footerLogo && <FooterLogo refId={logoRef} />}
             <span className="font-display font-bold truncate">{frame.footerText}</span>
           </div>
-          <span className={`font-mono shrink-0 ${frame.footerStyle === 'gold' ? 'text-black/60' : 'text-zinc-500'}`}>Powered by all41.app</span>
+          <span className={`font-mono shrink-0 ${frame.footerStyle === 'gold' ? 'text-black/60' : 'text-zinc-500'}`}>Powered by dayoneproject.xyz</span>
         </footer>
       )}
     </div>

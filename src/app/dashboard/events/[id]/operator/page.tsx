@@ -71,8 +71,8 @@ const QUIZ_QUESTIONS = [
   {
     id: 3,
     question: 'What is the official interactive portal domain for all guests tonight?',
-    options: ['A. techunite.all41.app', 'B. summit.com', 'C. event.id', 'D. gala.org'],
-    correct: 'A. techunite.all41.app',
+    options: ['A. app.dayoneproject.xyz/events/techunite', 'B. summit.com', 'C. event.id', 'D. gala.org'],
+    correct: 'A. app.dayoneproject.xyz/events/techunite',
     points: 1500,
     timerSeconds: 20,
   },
@@ -369,7 +369,7 @@ function OperatorCommandCenterContent({ eventId }: { eventId: string }) {
                   {checkedInCount} Pax Checked In
                 </span>
                 <span className="px-3 py-1 rounded-xl bg-premium-charcoal border border-premium-borderDark text-xs font-mono text-premium-neon">
-                  {event.slug}.all41.app
+                  app.dayoneproject.xyz/events/{event.slug}
                 </span>
               </div>
             </div>
@@ -508,7 +508,7 @@ function OperatorCommandCenterContent({ eventId }: { eventId: string }) {
               <ArrowLeft className="w-4 h-4" />
             </Link>
             <div className="w-9 h-9 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-base shadow-gold">
-              41
+              D1
             </div>
             <div>
               <h1 className="text-base font-display font-bold text-white flex items-center gap-2">
@@ -516,7 +516,7 @@ function OperatorCommandCenterContent({ eventId }: { eventId: string }) {
                 <span className="w-2 h-2 rounded-full bg-premium-success shadow-[0_0_8px_#00E676] animate-pulse" />
               </h1>
               <p className="text-xs text-zinc-400 font-mono">
-                <span className="text-premium-neon font-semibold">{event.slug}.all41.app</span> • Preview Before Live • Timer & Click Control
+                <span className="text-premium-neon font-semibold">app.dayoneproject.xyz/events/{event.slug}</span> • Preview Before Live • Timer & Click Control
               </p>
             </div>
           </div>
@@ -1243,7 +1243,7 @@ function OperatorCommandCenterContent({ eventId }: { eventId: string }) {
                       <input
                         type="text"
                         autoFocus
-                        placeholder="Scan pass token (e.g. QR-ALL41-SITI-3309)..."
+                        placeholder="Scan pass token (e.g. QR-D1-SITI-3309)..."
                         value={tokenInput}
                         onChange={(e) => setTokenInput(e.target.value)}
                         className="flex-1 px-4 py-3.5 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-xs font-mono text-white focus:outline-none focus:border-premium-gold"
@@ -1260,14 +1260,14 @@ function OperatorCommandCenterContent({ eventId }: { eventId: string }) {
                       <span className="text-[11px] text-zinc-500 font-mono self-center">Quick Test Tokens:</span>
                       <button
                         type="button"
-                        onClick={() => handleVerifyGateToken('QR-ALL41-SITI-3309')}
+                        onClick={() => handleVerifyGateToken('QR-D1-SITI-3309')}
                         className="px-3 py-1.5 rounded-xl bg-premium-surfaceDark text-premium-success font-mono border border-premium-borderDark scale-on-click"
                       >
                         Siti (First Scan)
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleVerifyGateToken('QR-ALL41-BUDI-9812')}
+                        onClick={() => handleVerifyGateToken('QR-D1-BUDI-9812')}
                         className="px-3 py-1.5 rounded-xl bg-premium-surfaceDark text-premium-danger font-mono border border-premium-borderDark scale-on-click"
                       >
                         Budi (Duplicate Scan)

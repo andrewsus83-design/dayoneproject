@@ -25,11 +25,11 @@ interface Comment {
 
 const SAMPLE_COMMENTS: Comment[] = [
   { id: 'c1', guest: 'Alicia Santos', initials: 'AS', avatarColor: '#C5A059', message: 'Incredible event — the keynote was absolutely inspiring! Already looking forward to next year. 🙌', time: '2m ago', approved: true, flagged: false, likes: 14, liked: false, pinned: true },
-  { id: 'c2', guest: 'Marcus Tan', initials: 'MT', avatarColor: '#00F0FF', message: 'The networking lunch was incredible — met some amazing founders. Thank you All41 team! 🚀', time: '8m ago', approved: true, flagged: false, likes: 9, liked: false, pinned: false },
+  { id: 'c2', guest: 'Marcus Tan', initials: 'MT', avatarColor: '#00F0FF', message: 'The networking lunch was incredible — met some amazing founders. Thank you dayoneproject.xyz team! 🚀', time: '8m ago', approved: true, flagged: false, likes: 9, liked: false, pinned: false },
   { id: 'c3', guest: 'Priya Sharma', initials: 'PS', avatarColor: '#FF3366', message: 'First time attending and I\'m blown away by the production quality. The LED stage is stunning.', time: '12m ago', approved: true, flagged: false, likes: 6, liked: false, pinned: false },
   { id: 'c4', guest: 'Rafael Cruz', initials: 'RC', avatarColor: '#8B5CF6', message: 'Loved the door prize segment — congrats to all the winners!', time: '18m ago', approved: false, flagged: false, likes: 0, liked: false, pinned: false },
   { id: 'c5', guest: 'Hana Kim', initials: 'HK', avatarColor: '#10B981', message: 'The photo wall is such a fun touch. Already shared mine on Instagram!', time: '25m ago', approved: true, flagged: false, likes: 11, liked: false, pinned: false },
-  { id: 'c6', guest: 'Jordan Reyes', initials: 'JR', avatarColor: '#F59E0B', message: 'This is my third All41 event and honestly they keep getting better. Truly world-class.', time: '31m ago', approved: false, flagged: true, likes: 0, liked: false, pinned: false },
+  { id: 'c6', guest: 'Jordan Reyes', initials: 'JR', avatarColor: '#F59E0B', message: 'This is my third dayoneproject.xyz event and honestly they keep getting better. Truly world-class.', time: '31m ago', approved: false, flagged: true, likes: 0, liked: false, pinned: false },
 ];
 
 const COMMENT_THEMES = [
@@ -343,7 +343,7 @@ export function CommentsWall({ isWedding }: { isWedding: boolean }) {
             <div>
               <p className="text-[10px] text-zinc-500 mb-1.5 font-mono">Guest Submit URL</p>
               <div className="flex items-center gap-2 bg-premium-surfaceDark border border-premium-borderDark rounded-2xl px-4 py-3">
-                <span className="text-premium-neon font-mono text-sm flex-1 truncate">https://comment.all41.app/your-event-slug</span>
+                <span className="text-premium-neon font-mono text-sm flex-1 truncate">https://app.dayoneproject.xyz/events/your-event-slug/comments</span>
                 <button type="button" onClick={() => { setCopiedLink(true); setTimeout(() => setCopiedLink(false), 2000); }} className="p-2 rounded-xl bg-premium-black border border-premium-borderDark scale-on-click">
                   {copiedLink ? <Check className="w-4 h-4 text-premium-success" /> : <Copy className="w-4 h-4 text-zinc-400" />}
                 </button>
@@ -352,7 +352,7 @@ export function CommentsWall({ isWedding }: { isWedding: boolean }) {
             <div>
               <p className="text-[10px] text-zinc-500 mb-1.5 font-mono">Stage Display Wall URL</p>
               <div className="flex items-center gap-2 bg-premium-surfaceDark border border-premium-borderDark rounded-2xl px-4 py-3">
-                <span className="text-premium-neon font-mono text-sm flex-1 truncate">https://wall.all41.app/comments/your-event-slug</span>
+                <span className="text-premium-neon font-mono text-sm flex-1 truncate">https://app.dayoneproject.xyz/events/your-event-slug/comments/live</span>
                 <ExternalLink className="w-4 h-4 text-zinc-500 flex-shrink-0" />
               </div>
             </div>

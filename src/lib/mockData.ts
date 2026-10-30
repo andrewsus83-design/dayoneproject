@@ -15,7 +15,7 @@ export const DEFAULT_STAGE_CONFIG: StageConfig = {
   autoRotateIntervalSeconds: 20,
   showSubdomainQr: true,
   tickerText:
-    '★ Welcome to TechUnite APAC Summit 2026 • Wi-Fi: ALL41_GUEST / tech2026 • Post selfies to stage wall at techunite.all41.app ★',
+    '★ Welcome to TechUnite APAC Summit 2026 • Wi-Fi: DAYONE_GUEST / tech2026 • Post selfies to stage wall at app.dayoneproject.xyz/events/techunite ★',
   modules: [
     {
       id: 'welcome',

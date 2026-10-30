@@ -330,7 +330,7 @@ export default function AISmartSetupPage() {
         )}
 
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-premium-gold rounded-full text-black font-display font-bold text-sm flex items-center justify-center shadow-gold">41</div>
+          <div className="w-8 h-8 bg-premium-gold rounded-full text-black font-display font-bold text-sm flex items-center justify-center shadow-gold">D1</div>
           <span className="font-display font-bold text-sm text-white">AI Smart Setup</span>
         </div>
 
@@ -448,7 +448,7 @@ export default function AISmartSetupPage() {
                   {slug && (
                     <div className="flex items-center gap-2 mt-2">
                       <Globe className="w-3.5 h-3.5 text-premium-neon" />
-                      <span className="font-mono text-[12px] text-premium-neon">{slug}.all41.app</span>
+                      <span className="font-mono text-[12px] text-premium-neon">app.dayoneproject.xyz/events/{slug}</span>
                     </div>
                   )}
                 </div>
@@ -975,7 +975,7 @@ export default function AISmartSetupPage() {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {LINKS.map(({ label, href, icon: Icon, color }) => {
-                        const fullUrl = `${eventSlug}.all41.app${href.split('/').slice(2).join('/')}`;
+                        const fullUrl = `app.dayoneproject.xyz${href}`;
                         const isCopied = copiedLink === fullUrl;
                         return (
                           <div key={href}

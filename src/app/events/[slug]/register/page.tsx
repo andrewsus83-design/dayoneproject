@@ -36,7 +36,7 @@ const STEPS: Step[] = ['name', 'contact', 'details', 'confirm', 'success'];
 const STEP_LABELS = ['Your Name', 'Contact', 'Details', 'Confirm', 'Done'];
 
 function generateQRToken() {
-  return `ALL41-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+  return `D1-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
 }
 
 function ProgressBar({ step }: { step: Step }) {
@@ -109,7 +109,7 @@ function RSVPFormContent({ slug }: { slug: string }) {
           <ArrowLeft className="w-4 h-4" />
           Back to event
         </Link>
-        <div className="w-8 h-8 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-sm shadow-gold">41</div>
+        <div className="w-8 h-8 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-sm shadow-gold">D1</div>
       </nav>
 
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-10">
@@ -318,7 +318,7 @@ function RSVPFormContent({ slug }: { slug: string }) {
                 <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
                 <div className="relative p-8 space-y-5">
                   <div className="flex items-center justify-between">
-                    <div className="w-9 h-9 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-base shadow-gold">41</div>
+                    <div className="w-9 h-9 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-base shadow-gold">D1</div>
                     {isWedding
                       ? <span className="text-xs font-mono text-premium-danger flex items-center gap-1"><Heart className="w-3 h-3 fill-current" /> Wedding</span>
                       : <span className="text-xs font-mono text-premium-neon">Corporate</span>

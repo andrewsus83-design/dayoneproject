@@ -2,8 +2,8 @@ import Link from 'next/link';
 import { ArrowLeft, Lock } from 'lucide-react';
 
 export const metadata = {
-  title: 'Privacy Policy | all41',
-  description: 'Attendee data protection and privacy policies for all41 event platform',
+  title: 'Privacy Policy | dayoneproject.xyz',
+  description: 'Attendee data protection and privacy policies for dayoneproject.xyz event platform',
 };
 
 export default function PrivacyPage() {
@@ -15,7 +15,7 @@ export default function PrivacyPage() {
           className="inline-flex items-center gap-2 text-xs font-semibold text-gray-400 hover:text-white"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Back to all41.app</span>
+          <span>Back to dayoneproject.xyz</span>
         </Link>
 
         <div>

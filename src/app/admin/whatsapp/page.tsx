@@ -94,7 +94,7 @@ export default function AdminWhatsAppQueuePage() {
           <h3 className="text-sm font-bold text-white">Automated Background Policy (Hidden from End-User)</h3>
         </div>
         <p className="text-xs text-gray-300 leading-relaxed max-w-3xl">
-          As agreed in all41 policy, end-users do not need to manage timing delays. The queue worker automatically spaces outbound WhatsApp requests between <strong>3.5s to 7.0s</strong> with randomized jitter. Burst submissions are throttled without dropping to protect BYON numbers from suspension.
+          As agreed in dayoneproject.xyz policy, end-users do not need to manage timing delays. The queue worker automatically spaces outbound WhatsApp requests between <strong>3.5s to 7.0s</strong> with randomized jitter. Burst submissions are throttled without dropping to protect BYON numbers from suspension.
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">

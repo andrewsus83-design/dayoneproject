@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import { Sidebar } from '@/components/dashboard/Sidebar';
 
 export const metadata = {
-  title: 'Dashboard | all41',
+  title: 'Dashboard | dayoneproject.xyz',
   description: 'Manage events, attendees, photo walls, and raffle draws',
 };
 

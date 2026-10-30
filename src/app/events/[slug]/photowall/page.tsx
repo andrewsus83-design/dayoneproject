@@ -140,7 +140,7 @@ function GuestPhotoWallContent({ slug }: { slug: string }) {
               <span>Live Photo Wall Uploader</span>
               <span className="w-1.5 h-1.5 rounded-full bg-[#00f0ff] animate-pulse" />
             </h1>
-            <p className="text-[10px] text-gray-400 font-mono">{slug}.all41.app</p>
+            <p className="text-[10px] text-gray-400 font-mono">app.dayoneproject.xyz/events/{slug}</p>
           </div>
         </div>
 

@@ -93,7 +93,7 @@ export function RegisterDeskLock({ slug, children }: { slug: string; children: (
     <div className="min-h-screen bg-premium-black text-zinc-100 font-sans flex items-center justify-center px-6">
       <form onSubmit={submit} className="w-full max-w-sm space-y-6">
         <div className="flex flex-col items-center text-center gap-4">
-          <div className="w-14 h-14 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-2xl shadow-gold">41</div>
+          <div className="w-14 h-14 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-2xl shadow-gold">D1</div>
           <div>
             <p className="text-[10px] font-mono font-bold text-premium-gold uppercase tracking-[0.25em]">Register Desk</p>
             <h1 className="text-xl font-display font-bold text-white mt-1">{config.info.name}</h1>

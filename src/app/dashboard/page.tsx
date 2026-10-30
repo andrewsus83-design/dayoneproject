@@ -202,7 +202,7 @@ export default function DashboardPage() {
                     <div className="flex flex-wrap items-center gap-2 text-[12px]">
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-premium-surfaceDark border border-premium-borderDark font-mono text-premium-neon">
                         <Globe className="w-3 h-3" />
-                        {evt.slug}.all41.app
+                        app.dayoneproject.xyz/events/{evt.slug}
                       </span>
                       <span className="text-zinc-500">
                         {formatDate(evt.start_date)} · {evt.location_name}

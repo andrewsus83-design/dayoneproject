@@ -155,14 +155,14 @@ function CheckinScannerContent({ eventId }: { eventId: string }) {
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <button
                   type="button"
-                  onClick={() => handleProcessScan('QR-ALL41-SITI-3309')}
+                  onClick={() => handleProcessScan('QR-D1-SITI-3309')}
                   className="px-3 py-1.5 rounded-xl bg-premium-success/15 border border-premium-success/30 text-premium-success text-xs font-bold hover:bg-premium-success/25 transition-colors scale-on-click"
                 >
                   Scan Pending (Siti Rahmawati)
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleProcessScan('QR-ALL41-BUDI-9812')}
+                  onClick={() => handleProcessScan('QR-D1-BUDI-9812')}
                   className="px-3 py-1.5 rounded-xl bg-premium-danger/15 border border-premium-danger/30 text-premium-danger text-xs font-bold hover:bg-premium-danger/25 transition-colors scale-on-click"
                 >
                   Scan Duplicate (Budi Santoso)
@@ -187,7 +187,7 @@ function CheckinScannerContent({ eventId }: { eventId: string }) {
             >
               <input
                 type="text"
-                placeholder="Or manually enter token (e.g. QR-ALL41-SITI-3309)..."
+                placeholder="Or manually enter token (e.g. QR-D1-SITI-3309)..."
                 value={tokenInput}
                 onChange={(e) => setTokenInput(e.target.value)}
                 className="flex-1 px-5 py-3.5 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-xs font-mono text-white placeholder-zinc-500 focus:outline-none focus:border-premium-gold"

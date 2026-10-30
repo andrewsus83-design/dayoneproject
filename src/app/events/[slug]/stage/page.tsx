@@ -240,7 +240,7 @@ function StageBigScreenContent({ slug }: { slug: string }) {
       <header className="h-20 px-8 sm:px-12 flex items-center justify-between z-20 backdrop-blur-md bg-premium-surfaceDark/80 border-b border-premium-borderDark">
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-xl shadow-gold flex-shrink-0">
-            41
+            D1
           </div>
           <div>
             <h1 className="text-xl font-display font-bold text-white flex items-center gap-2">
@@ -306,7 +306,7 @@ function StageBigScreenContent({ slug }: { slug: string }) {
 
             <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark shadow-xl">
               <span className="text-xs font-mono uppercase text-zinc-400">Ballroom Wi-Fi</span>
-              <div className="text-xl font-mono font-bold text-white mt-2">ALL41_GUEST</div>
+              <div className="text-xl font-mono font-bold text-white mt-2">DAYONE_GUEST</div>
               <span className="text-xs text-premium-gold mt-1 font-mono block">Pass: tech2026</span>
             </div>
 
@@ -576,7 +576,7 @@ function StageBigScreenContent({ slug }: { slug: string }) {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 w-full pt-4">
-            {['Nexus Ventures', 'Alpha Global SG', 'CloudScale Asia', 'FintechSEA', 'CyberShield', 'VenturePulse', 'SummitAI', 'All41 Platform'].map((name, idx) => (
+            {['Nexus Ventures', 'Alpha Global SG', 'CloudScale Asia', 'FintechSEA', 'CyberShield', 'VenturePulse', 'SummitAI', 'dayoneproject.xyz Platform'].map((name, idx) => (
               <div
                 key={name}
                 className="p-8 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark flex flex-col items-center justify-center shadow-xl hover:border-premium-gold transition-colors"

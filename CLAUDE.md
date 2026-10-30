@@ -3,13 +3,15 @@
 > **Master Reference:** For the complete 20-page architectural, product, pricing, database, and design blueprint, always reference [`ALL41_MASTER_BLUEPRINT.md`](./ALL41_MASTER_BLUEPRINT.md) in the root of this repository.
 
 ## 1. Project Identity & Commands
-- **Project:** **all41.app** — Luxury All-in-One Event Experience Platform (Corporate Summits & Luxury Weddings).
+- **Project:** **dayoneproject.xyz** (renamed from all41.app on 2026-10-30; all41.app is retired and 308-redirects) — Luxury All-in-One Event Experience Platform (Corporate Summits & Luxury Weddings).
+- **Hosts:** app at `app.dayoneproject.xyz` (dashboard, `/admin`, events at `/events/<slug>`). The root `dayoneproject.xyz` and its `*.dayoneproject.xyz` wildcard belong to the separate Day One Project wedding site / RSVP app (Vercel project `dayoneproject`) — never take them over.
+- **Backend:** Supabase project **dayoneproject** (`pmuryumfyekjwqntcypo`). Use only the `a41_` tables/functions (other prefixes `cf_`, `wos_` belong to other products).
 - **Root Path:** `/Users/drew83/Projects/all41`
 - **Dev Server:** `pnpm dev` (Runs Next.js 16.4.2 Turbopack on `http://localhost:3000`)
 - **Typecheck (MANDATORY before finishing any task):** `pnpm tsc --noEmit`
 - **Production Build Verification:** `pnpm build`
 - **Next.js 16 Convention:**
-  - Use `src/proxy.ts` (NOT `middleware.ts`) for multi-tenant `<slug>.all41.app` and BYOD custom domain routing.
+  - Use `src/proxy.ts` (NOT `middleware.ts`) for host routing (app host, retired all41.app redirects, BYOD custom domains).
   - In dynamic routes (`[id]`, `[slug]`), `params` is a `Promise<{ id: string }>`—unwrap it with `React.use(params)` inside a `<Suspense>` boundary.
   - For multi-tab dashboard views, maintain local React state (`activeTab`) alongside `router.push(?tab=...)` so tab switching is instantaneous (`0ms` lag).
 
@@ -38,9 +40,9 @@ ALWAYS use the official `@theme` tokens defined in `src/app/globals.css`:
   - Primary Gold CTA buttons use: `bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold shadow-gold scale-on-click`.
   - Digital QR passes use `.ticket-cutout`. Floating mobile nav bars use `.glass-panel`. QR scanners use `.animate-scan-line`.
 - **Signature Brand Mark:**
-  - Always use the circular gold `41` badge:
+  - Always use the circular gold `D1` badge:
     ```tsx
-    <div className="w-10 h-10 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-xl shadow-gold">41</div>
+    <div className="w-10 h-10 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-xl shadow-gold">D1</div>
     ```
 - **Card Radii:** Major containers use `rounded-[2rem]` or `rounded-[2.5rem]`. Inputs/buttons use `rounded-xl` or `rounded-2xl`.
 

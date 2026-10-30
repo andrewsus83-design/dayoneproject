@@ -48,7 +48,7 @@ export function PartnerSection() {
           </h2>
           <p className="mt-6 text-[15px] md:text-base text-zinc-400 font-light leading-relaxed max-w-xl">
             Whether it&apos;s a 1,000-pax APAC summit or an intimate Bali wedding,
-            all41.app adapts its entire experience — themes, forms, modules, and stage
+            dayoneproject.xyz adapts its entire experience — themes, forms, modules, and stage
             display — to match your event&apos;s identity from day one.
           </p>
         </div>

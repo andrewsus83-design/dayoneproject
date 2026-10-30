@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'all41 | Event Experience Platform',
-    short_name: 'all41',
+    name: 'dayoneproject.xyz | Event Experience Platform',
+    short_name: 'dayoneproject',
     description: 'All-in-one digital invitations, QR check-in, live photo wall, and door prize raffles',
     start_url: '/',
     display: 'standalone',

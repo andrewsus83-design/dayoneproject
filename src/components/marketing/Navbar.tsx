@@ -11,11 +11,11 @@ export function Navbar() {
         {/* Brand Logo */}
         <Link href="/" className="flex items-center gap-3.5 group flex-shrink-0">
           <div className="w-10 h-10 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-xl shadow-gold scale-on-click transition-transform group-hover:scale-105">
-            41
+            D1
           </div>
           <div className="flex flex-col leading-none">
             <span className="text-[22px] font-display font-bold tracking-tight text-white">
-              all41
+              dayoneproject<span className="text-premium-gold">.xyz</span>
             </span>
             <span className="text-[10px] text-zinc-500 font-mono tracking-[0.18em] uppercase mt-0.5">
               Event Platform

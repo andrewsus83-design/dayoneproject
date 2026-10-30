@@ -17,7 +17,7 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: 'all41 | The Ultimate Event Platform',
+  title: 'dayoneproject.xyz | The Ultimate Event Platform',
   description: 'Multi-tenant event experience platform for corporate summits and luxury galas across Southeast Asia',
 };
 

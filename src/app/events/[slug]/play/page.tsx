@@ -70,7 +70,7 @@ function GuestPlayGameContent({ slug }: { slug: string }) {
           <span className="text-xs font-display font-bold text-white block">
             Interactive Quiz Pad • Q{activeQuestionNum}
           </span>
-          <span className="text-[10px] text-premium-neon font-mono">{slug}.all41.app</span>
+          <span className="text-[10px] text-premium-neon font-mono">app.dayoneproject.xyz/events/{slug}</span>
         </div>
         <div className="text-right">
           <span className="text-xs font-mono font-bold text-premium-gold">{myScore} pts</span>

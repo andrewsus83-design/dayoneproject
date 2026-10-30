@@ -36,7 +36,7 @@ const SECTIONS = [
       'Choose Corporate or Wedding. Pick a theme. Type your event name — your branded subdomain, RSVP landing page, and countdown timer are live instantly. No designers, no Webflow, no Canva.',
     bullets: [
       'Luma-style visual canvas with split preview',
-      'Custom subdomain (<slug>.all41.app) or BYOD',
+      'Own link (app.dayoneproject.xyz/events/<slug>) or BYOD',
       'Typeform-style RSVP with dietary + plus-one',
       'Digital angpao QRIS for weddings',
     ],
@@ -87,7 +87,7 @@ function PreEventVisual() {
           <div className="w-2.5 h-2.5 rounded-full bg-[#FEBC2E]" />
           <div className="w-2.5 h-2.5 rounded-full bg-[#28C840]" />
         </div>
-        <span className="text-[11px] font-mono text-zinc-500 ml-1">your-event.all41.app</span>
+        <span className="text-[11px] font-mono text-zinc-500 ml-1">app.dayoneproject.xyz/events/your-event</span>
       </div>
 
       {/* Event card mock */}

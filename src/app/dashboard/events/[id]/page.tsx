@@ -192,7 +192,7 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
 
   const handleDownloadTemplate = () => {
     const rows = [['Name', 'Phone / Email', 'Category', 'Table No.'], ['Jane Doe', 'jane@example.com', 'VIP', 'Table 05']];
-    downloadBlob('all41-guest-template.csv', new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' }));
+    downloadBlob('dayoneproject-guest-template.csv', new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' }));
   };
 
   const handleImportGuests = async (file: File | undefined) => {
@@ -288,7 +288,7 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
   const defaultQuestions = eventId === 'evt-popverse-converge-2026'
     ? POPVERSE_QUIZ_QUESTIONS.slice(0, 10)
     : [
-        { id: 'q-1', text: 'In what year was All41 founded?', options: ['2023', '2024', '2025', '2026'], answer: 1, points: 1000 },
+        { id: 'q-1', text: 'In what year was dayoneproject.xyz founded?', options: ['2023', '2024', '2025', '2026'], answer: 1, points: 1000 },
         { id: 'q-2', text: 'Which regional payment rail powers our QR check-in tokenization?', options: ['QRIS Realtime', 'Swift GPI', 'FedNow', 'SEPA'], answer: 0, points: 1200 },
         { id: 'q-3', text: 'What is the maximum allowed WebP image size for stage photowall?', options: ['500KB', '2MB', '10MB', '50MB'], answer: 1, points: 1000 },
       ];
@@ -298,7 +298,7 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
   const [raffleStyle, setRaffleStyle] = useState<'wheel' | 'slot' | 'claw'>('slot');
   const [prizeList, setPrizeList] = useState([
     { id: 'prz-1', name: 'Apple MacBook Pro 16" M4 Max', quantity: 1, sponsor: 'Fairmont / TechVenture' },
-    { id: 'prz-2', name: 'iPhone 16 Pro Max 512GB (Titanium)', quantity: 2, sponsor: 'All41 Innovation' },
+    { id: 'prz-2', name: 'iPhone 16 Pro Max 512GB (Titanium)', quantity: 2, sponsor: 'dayoneproject.xyz Innovation' },
     { id: 'prz-3', name: 'Fairmont Presidential Suite Staycation', quantity: 3, sponsor: 'Fairmont Jakarta' },
   ]);
 
@@ -586,10 +586,10 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                   <div className="p-6 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark space-y-4">
                     <span className="text-[10px] font-mono uppercase text-premium-gold font-bold">Public URL</span>
                     <div className="p-3.5 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark flex items-center justify-between text-xs font-mono">
-                      <span className="text-premium-neon truncate">{event.slug}.all41.app</span>
+                      <span className="text-premium-neon truncate">app.dayoneproject.xyz/events/{event.slug}</span>
                       <button
                         type="button"
-                        onClick={() => handleCopy(`https://${event.slug}.all41.app`, 'live-link')}
+                        onClick={() => handleCopy(`https://app.dayoneproject.xyz/events/${event.slug}`, 'live-link')}
                         className="text-zinc-400 hover:text-white"
                       >
                         {copiedLink ? <Check className="w-4 h-4 text-premium-success" /> : <Copy className="w-4 h-4" />}
@@ -991,10 +991,10 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                 <div className="space-y-2 text-xs">
                   <span className="font-bold text-zinc-300 block">1. Button Widget Embed</span>
                   <div className="p-3 rounded-xl bg-premium-surfaceDark border border-premium-borderDark font-mono text-[10px] text-zinc-400 break-all relative">
-                    &lt;a href=&quot;https://{event.slug}.all41.app&quot; class=&quot;all41-rsvp-btn&quot;&gt;RSVP VIP Pass&lt;/a&gt;
+                    &lt;a href=&quot;https://app.dayoneproject.xyz/events/{event.slug}&quot; class=&quot;dayoneproject-rsvp-btn&quot;&gt;RSVP VIP Pass&lt;/a&gt;
                     <button
                       type="button"
-                      onClick={() => handleCopy(`<a href="https://${event.slug}.all41.app" class="all41-rsvp-btn">RSVP VIP Pass</a>`, 'embed-btn')}
+                      onClick={() => handleCopy(`<a href="https://app.dayoneproject.xyz/events/${event.slug}" class="dayoneproject-rsvp-btn">RSVP VIP Pass</a>`, 'embed-btn')}
                       className="absolute top-2 right-2 text-zinc-400 hover:text-white"
                     >
                       {copiedEmbed === 'embed-btn' ? <Check className="w-4 h-4 text-premium-success" /> : <Copy className="w-4 h-4" />}
@@ -1006,10 +1006,10 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                 <div className="space-y-2 text-xs">
                   <span className="font-bold text-zinc-300 block">2. Iframe Landing Embed</span>
                   <div className="p-3 rounded-xl bg-premium-surfaceDark border border-premium-borderDark font-mono text-[10px] text-zinc-400 break-all relative">
-                    &lt;iframe src=&quot;https://{event.slug}.all41.app&quot; width=&quot;100%&quot; height=&quot;800&quot; frameborder=&quot;0&quot;&gt;&lt;/iframe&gt;
+                    &lt;iframe src=&quot;https://app.dayoneproject.xyz/events/{event.slug}&quot; width=&quot;100%&quot; height=&quot;800&quot; frameborder=&quot;0&quot;&gt;&lt;/iframe&gt;
                     <button
                       type="button"
-                      onClick={() => handleCopy(`<iframe src="https://${event.slug}.all41.app" width="100%" height="800" frameborder="0"></iframe>`, 'embed-iframe')}
+                      onClick={() => handleCopy(`<iframe src="https://app.dayoneproject.xyz/events/${event.slug}" width="100%" height="800" frameborder="0"></iframe>`, 'embed-iframe')}
                       className="absolute top-2 right-2 text-zinc-400 hover:text-white"
                     >
                       {copiedEmbed === 'embed-iframe' ? <Check className="w-4 h-4 text-premium-success" /> : <Copy className="w-4 h-4" />}
@@ -1369,7 +1369,7 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                     <label className="text-zinc-400 block mb-1">Subdomain Rail</label>
                     <input
                       type="text"
-                      defaultValue={`${event.slug}.all41.app`}
+                      defaultValue={`app.dayoneproject.xyz/events/${event.slug}`}
                       disabled
                       className="w-full bg-premium-surfaceDark border border-premium-borderDark text-premium-neon p-3 rounded-xl font-mono text-xs"
                     />
