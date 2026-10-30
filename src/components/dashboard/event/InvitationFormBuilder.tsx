@@ -357,36 +357,41 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
 
   const TABS = [
     { id: 'cover' as const, label: 'Cover', icon: Eye },
-    { id: 'questions' as const, label: `Questions (${questions.length}) · ${pageCount} page${pageCount === 1 ? '' : 's'}`, icon: List },
+    { id: 'questions' as const, label: 'Questions', count: questions.length, hint: `${questions.length} questions on ${pageCount} page${pageCount === 1 ? '' : 's'}`, icon: List },
     { id: 'closing' as const, label: 'Closing', icon: QrCode },
     { id: 'share' as const, label: 'Share', icon: Share2 },
-    { id: 'responses' as const, label: `Responses (${responses.length})`, icon: CheckSquare },
+    { id: 'responses' as const, label: 'Replies', count: responses.length, icon: CheckSquare },
     { id: 'pwa' as const, label: 'PWA', icon: Smartphone },
     { id: 'settings' as const, label: 'Settings', icon: Settings2 },
   ];
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_260px] gap-6">
       <EventFonts href={theme.fontsHref} />
 
       {/* Left: builder */}
-      <div className="xl:col-span-7 space-y-4 min-w-0">
-        <div className="flex items-center gap-1 flex-wrap">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setFormTab(t.id)}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold scale-on-click transition-all ${
-                formTab === t.id
-                  ? 'bg-premium-gold text-black shadow-gold'
-                  : 'bg-premium-surfaceDark text-zinc-400 border border-premium-borderDark hover:text-white'
-              }`}
-            >
-              <t.icon className="w-3.5 h-3.5" />
-              {t.label}
-            </button>
-          ))}
+      <div className="space-y-4 min-w-0">
+        <div className="flex items-center gap-0.5 p-1 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark overflow-x-auto">
+          {TABS.map((t) => {
+            const active = formTab === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setFormTab(t.id)}
+                title={'hint' in t ? t.hint : undefined}
+                className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 scale-on-click transition-all ${
+                  active ? 'bg-premium-gold text-black shadow-gold' : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <t.icon className="w-3.5 h-3.5" />
+                {t.label}
+                {'count' in t && (
+                  <span className={`px-1.5 rounded-md text-[10px] font-mono ${active ? 'bg-black/15' : 'bg-premium-black text-zinc-500'}`}>{t.count}</span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         <div className="flex items-center justify-between gap-3 text-[11px] font-mono px-1">
@@ -412,11 +417,11 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
 
             <div>
               <label className="text-[10px] font-mono uppercase text-zinc-500 tracking-widest mb-2 block">Color Theme</label>
-              <div className="flex gap-2 flex-wrap">
+              <div className="grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-4 gap-2">
                 <button
                   type="button"
                   onClick={() => setInv({ theme: 'event' })}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[10px] font-bold scale-on-click transition-all ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[10px] font-bold text-left min-w-0 scale-on-click transition-all ${
                     inv.theme === 'event' ? 'border-premium-gold text-white bg-premium-gold/10' : 'border-premium-borderDark text-zinc-300 hover:border-premium-gold/50'
                   }`}
                 >
@@ -432,7 +437,7 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
                     key={th.name}
                     type="button"
                     onClick={() => setInv({ theme: th.name })}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[10px] font-bold scale-on-click transition-all ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[10px] font-bold text-left min-w-0 scale-on-click transition-all ${
                       inv.theme === th.name ? 'border-premium-gold text-white bg-premium-gold/10' : 'border-premium-borderDark text-zinc-300 hover:border-premium-gold/50'
                     }`}
                   >
@@ -1296,7 +1301,7 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
       </div>
 
       {/* Right: live preview */}
-      <div className="xl:col-span-5 flex flex-col items-center gap-3 xl:sticky xl:top-20 self-start">
+      <div className="flex flex-col items-center gap-3 xl:sticky xl:top-20 self-start">
         <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Live Preview · what guests see</span>
         <div className="w-[236px] h-[472px] rounded-[2.5rem] border-[6px] border-zinc-800 overflow-hidden shadow-2xl bg-black">
           <div style={{ width: 360, height: 740, transform: 'scale(0.6222)', transformOrigin: 'top left' }}>
@@ -1316,18 +1321,23 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
             />
           </div>
         </div>
-        <div className="flex flex-wrap justify-center gap-1 max-w-[280px]">
+        <div className="w-full max-w-[280px] space-y-1">
           {([
-            ['cover', 'Cover'], ['page', 'Pages'], ['review', 'Review'], ['confirmed', 'Confirmed'], ['declined', 'Declined'], ['closed', 'Closed'], ['upcoming', 'Not open'],
-          ] as const).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setPreviewOverride(id)}
-              className={`px-2 py-1 rounded-lg text-[10px] font-bold border scale-on-click ${previewScreen === id ? 'border-premium-gold/60 text-premium-gold bg-premium-gold/10' : 'border-premium-borderDark text-zinc-500 hover:text-white'}`}
-            >
-              {label}
-            </button>
+            [['cover', 'Cover'], ['page', 'Pages'], ['review', 'Review']],
+            [['confirmed', 'Confirmed'], ['declined', 'Declined'], ['closed', 'Closed'], ['upcoming', 'Not open']],
+          ] as const).map((row, r) => (
+            <div key={r} className={`grid gap-1 ${row.length === 3 ? 'grid-cols-3' : 'grid-cols-4'}`}>
+              {row.map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setPreviewOverride(id)}
+                  className={`px-1 py-1.5 rounded-lg text-[10px] font-bold border text-center truncate scale-on-click ${previewScreen === id ? 'border-premium-gold/60 text-premium-gold bg-premium-gold/10' : 'border-premium-borderDark text-zinc-500 hover:text-white'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           ))}
         </div>
 

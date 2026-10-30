@@ -8,7 +8,7 @@ import {
 import { deleteAsset, resetEventSection, saveAsset, useAssetUrl, useEventConfig, type DesignConfig, type ThemeMode } from '@/lib/eventStore';
 import {
   ACCENT_FONTS, BODY_FONTS, CARD_STYLES, DARK_BACKGROUNDS, HEADING_FONTS, LIGHT_BACKGROUNDS, PALETTES, RADIUS_OPTIONS,
-  SPACING_OPTIONS, gradientText, modeForBackground, resolveTheme,
+  SPACING_OPTIONS, gradientText, modeForBackground, paletteColors, resolveTheme,
 } from '@/lib/eventTheme';
 import { compressImage } from '@/lib/image';
 import { EventFonts } from '@/components/events/EventFonts';
@@ -78,6 +78,23 @@ export function EventDesignStudio({ eventId }: { eventId: string }) {
     setError(r.ok ? null : r.error ?? 'Could not save.');
   };
   const backgrounds = design.mode === 'light' ? LIGHT_BACKGROUNDS : DARK_BACKGROUNDS;
+  const current = paletteColors(design);
+  const [hexDraft, setHexDraft] = useState<Partial<Record<'customPrimary' | 'customSecondary' | 'customAccent', string>>>({});
+
+  // Editing any color switches to Custom, starting from the palette shown now.
+  const pickColor = (key: 'customPrimary' | 'customSecondary' | 'customAccent', hex: string) =>
+    setDesign({
+      palette: 'custom',
+      customPrimary: current.primary,
+      customSecondary: current.secondary,
+      customAccent: current.accent,
+      [key]: hex.toUpperCase(),
+    });
+  const typeHex = (key: 'customPrimary' | 'customSecondary' | 'customAccent', raw: string) => {
+    const v = raw.startsWith('#') ? raw : `#${raw}`;
+    setHexDraft((d) => ({ ...d, [key]: v.toUpperCase() }));
+    if (/^#[0-9a-f]{6}$/i.test(v)) pickColor(key, v);
+  };
   const isPresetBg = [...DARK_BACKGROUNDS, ...LIGHT_BACKGROUNDS].some((b) => b.hex.toLowerCase() === design.background.toLowerCase());
 
   const chooseMode = (mode: ThemeMode) => {
@@ -201,23 +218,38 @@ export function EventDesignStudio({ eventId }: { eventId: string }) {
               );
             })}
           </div>
-          {design.palette === 'custom' && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+          <div className="pt-2 space-y-3">
+            <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Pick your own · tap a color or type a hex code</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {([
-                { key: 'customPrimary', label: '1st color', hint: 'Buttons & main highlights' },
-                { key: 'customSecondary', label: '2nd color', hint: 'Sub-titles & gradients' },
-                { key: 'customAccent', label: 'Accent', hint: 'Badges, numbers & small details' },
-              ] as const).map((c) => (
-                <label key={c.key} className="flex items-center gap-3 p-3 rounded-xl bg-premium-surfaceDark border border-premium-borderDark cursor-pointer">
-                  <input type="color" value={design[c.key]} onChange={(e) => setDesign({ [c.key]: e.target.value.toUpperCase() } as Partial<DesignConfig>)} className="w-9 h-9 rounded cursor-pointer bg-transparent border border-premium-borderDark" />
-                  <span>
-                    <span className="block text-xs font-bold text-white">{c.label}</span>
-                    <span className="block text-[10px] font-mono text-zinc-500">{design[c.key].toUpperCase()} · {c.hint}</span>
-                  </span>
-                </label>
-              ))}
+                { key: 'customPrimary', role: 'primary', label: '1st color', hint: 'Buttons & main highlights' },
+                { key: 'customSecondary', role: 'secondary', label: '2nd color', hint: 'Sub-titles & gradients' },
+                { key: 'customAccent', role: 'accent', label: 'Accent', hint: 'Badges, numbers & details' },
+              ] as const).map((c) => {
+                const hex = current[c.role].toUpperCase();
+                return (
+                  <div key={c.key} className="flex items-center gap-3 p-3 rounded-xl bg-premium-surfaceDark border border-premium-borderDark">
+                    <label className="relative w-11 h-11 rounded-xl border border-white/15 cursor-pointer shrink-0 overflow-hidden scale-on-click" style={{ background: hex }} title={`Pick the ${c.label}`}>
+                      <input type="color" value={hex.length === 7 ? hex : '#000000'} onChange={(e) => pickColor(c.key, e.target.value)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" aria-label={`Pick the ${c.label}`} />
+                    </label>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-bold text-white">{c.label}</div>
+                      <input
+                        value={hexDraft[c.key] ?? hex}
+                        onChange={(e) => typeHex(c.key, e.target.value)}
+                        onBlur={() => setHexDraft((d) => ({ ...d, [c.key]: undefined }))}
+                        spellCheck={false}
+                        maxLength={7}
+                        className="mt-1 w-24 bg-premium-black border border-premium-borderDark text-white px-2 py-1 rounded-lg font-mono text-[11px] outline-none focus:border-premium-gold uppercase"
+                        aria-label={`${c.label} hex code`}
+                      />
+                      <div className="text-[10px] text-zinc-500 mt-1 truncate">{c.hint}</div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          )}
+          </div>
         </div>
       )}
 
