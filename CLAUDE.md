@@ -57,9 +57,10 @@ ALWAYS use the official `@theme` tokens defined in `src/app/globals.css`:
 3. **Check-in Gated Interactivity:**
    - Day-of modules (Photo Wall uploads, Live Trivia Blitz, 3D Door Prize Raffle) strictly require a valid guest `qr_code_token` with `is_checked_in === true`.
 4. **Media Quotas & Pinterest Masonry Wall:**
-   - Client-side WebP compression `<= 2MB` for images, `<= 20MB (720p)` for video, max `10 uploads/guest`, optional admin caption toggle (`<= 300 chars`), Pinterest multi-column masonry layout (`PinterestMasonryPhotoWall.tsx`), Download & Social Share buttons, and 30-day Cloudflare R2 retention.
+   - Client-side WebP compression `<= 2MB` for images, `<= 20MB (720p)` for video, max `10 uploads/guest`, optional admin caption toggle (`<= 300 chars`), Pinterest multi-column masonry layout (`PinterestMasonryPhotoWall.tsx`), Download & Social Share buttons, and 30-day retention in Supabase Storage (bucket `a41_photos`, deleted by the nightly `a41-photo-cleanup` job).
 5. **Ballroom Stage LED Lock (`StageLedEditor.tsx` & `/events/[slug]/stage`):**
    - Only the 7 official system modules (`welcome`, `photowall`, `quiz`, `raffle`, `rundown`, `menu`, `sponsors`) are permitted on the stage display.
+   - Live Screens (`LiveScreenSwitcher.tsx`, outputs at `/live/<screenId>`) can also show organizer-made custom screens (slides, images or video with a frame/footer, stored in `a41_scenes`) next to those modules.
 6. **Invisible WhatsApp Rate Limiting & Email Builder:**
    - Resend powers the HTML Email Builder (`VIP Invitation`, `RSVP Pass`, `24h Reminder`, `Thank You`) with inline QR Pass PNGs and `.ics` calendar attachments.
    - Fonnte BYON requires mandatory Risk Disclosure consent. Anti-ban rate limiting (`5–15s` randomized pacing) is handled 100% automatically by the backend and disclosed in `/terms`—never expose rate-limit sliders to end users.
