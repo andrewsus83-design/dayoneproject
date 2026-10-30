@@ -8,9 +8,10 @@ import {
   deleteAsset, deleteFeedback, formatGuestNumber, numberDigits, saveAsset, useAssetUrl, useEventConfig, useFeedback, useGuests, useOrgEventsCache,
   type BroadcastKind, type BroadcastTemplate, type FeedbackConfig,
 } from '@/lib/eventStore';
-import { whatsappApi, WA_PER_MINUTE, type WaStats } from '@/lib/whatsappApi';
+import { whatsappApi, WA_PER_MINUTE, type EnqueueResult, type SendStats } from '@/lib/whatsappApi';
+import { emailApi, EMAIL_PER_MINUTE } from '@/lib/emailApi';
 import { BROADCAST_KINDS, BROADCAST_VARIABLES, defaultBroadcastTemplates } from '@/lib/broadcastTemplates';
-import { emailBody, renderBroadcast, waPhone, whatsappHref } from '@/lib/broadcast';
+import { emailBody, emailHtml, renderBroadcast, waPhone, whatsappHref } from '@/lib/broadcast';
 import { resolveTheme } from '@/lib/eventTheme';
 import { compressImage, downloadBlob, downloadDataUrl, toCsv } from '@/lib/image';
 import { SendButtons, useOrigin } from './SendButtons';
@@ -35,37 +36,69 @@ interface Recipient {
 }
 
 function minutesText(minutes: number) {
-  if (minutes < 60) return `${minutes} min`;
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'}`;
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  return m ? `${h} h ${m} min` : `${h} h`;
+  return m ? `${h} h ${m} min` : `${h} hour${h === 1 ? '' : 's'}`;
 }
 
-/** Sends one message per guest from the server, paced to keep the WhatsApp number safe. */
-function WhatsAppSendAll({ eventId, saved, count, onSend }: {
+const CHANNEL = {
+  whatsapp: {
+    title: 'Send to everyone on WhatsApp',
+    icon: MessageSquare,
+    unit: 'message',
+    perMinute: WA_PER_MINUTE,
+    has: 'a phone number',
+    how: 'Each guest gets their own message from our WhatsApp number, one at a time to keep the number safe.',
+    failed: 'Some numbers could not receive WhatsApp messages. Check them in your guest list.',
+    poll: 15_000,
+    stats: whatsappApi.stats,
+    cancel: whatsappApi.cancel,
+  },
+  email: {
+    title: 'Send to everyone by email',
+    icon: Mail,
+    unit: 'email',
+    perMinute: EMAIL_PER_MINUTE,
+    has: 'an email address',
+    how: 'Each guest gets their own email with their guest pass. Invitations, passes and reminders also carry a calendar file.',
+    failed: 'Some addresses could not receive the email. Check them in your guest list.',
+    poll: 5_000,
+    stats: emailApi.stats,
+    cancel: emailApi.cancel,
+  },
+} as const;
+
+/** Sends one message per guest from the server, paced automatically, with live progress. */
+function SendToEveryone({ channel, eventId, saved, count, onSend }: {
+  channel: keyof typeof CHANNEL;
   eventId: string;
   /** Only events saved to the organization can send from the server. */
   saved: boolean;
-  /** Guests in the current list who have a phone number. */
+  /** Guests in the current list who can be reached on this channel. */
   count: number;
-  onSend: () => Promise<{ queued: number; skipped: number; minutes: number }>;
+  onSend: () => Promise<EnqueueResult>;
 }) {
-  const [stats, setStats] = useState<WaStats | null>(null);
+  const ch = CHANNEL[channel];
+  const [stats, setStats] = useState<SendStats | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  /** The broadcast started from this page: progress counts from here. */
+  const [run, setRun] = useState<{ queued: number; base: number } | null>(null);
+  const plural = (n: number) => `${n} ${ch.unit}${n === 1 ? '' : 's'}`;
 
   const refresh = useCallback(async () => {
     if (!saved) return;
     try {
-      setStats(await whatsappApi.stats(eventId));
+      setStats(await ch.stats(eventId));
     } catch {
       // Progress is a nice-to-have; sending carries on without it.
     }
-  }, [eventId, saved]);
+  }, [ch, eventId, saved]);
 
   useEffect(() => {
-    // Loads once on open; setState happens after the request resolves.
+    // Loads on open and when the channel changes; setState happens after the request resolves.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
   }, [refresh]);
@@ -73,9 +106,9 @@ function WhatsAppSendAll({ eventId, saved, count, onSend }: {
   // Follow progress while messages are still going out.
   useEffect(() => {
     if (!stats?.waiting) return;
-    const t = setInterval(refresh, 15_000);
+    const t = setInterval(refresh, ch.poll);
     return () => clearInterval(t);
-  }, [stats?.waiting, refresh]);
+  }, [stats?.waiting, refresh, ch.poll]);
 
   if (!saved) {
     return (
@@ -86,11 +119,15 @@ function WhatsAppSendAll({ eventId, saved, count, onSend }: {
     );
   }
 
+  const estimate = Math.max(1, Math.ceil(count / ch.perMinute));
+  const left = stats?.limit !== undefined && stats.usedToday !== undefined ? Math.max(0, stats.limit - stats.usedToday) : null;
+  const overLimit = left !== null && count > left;
+  const paused = !!stats && stats.waiting > 0 && (stats.paused || !!stats.held);
+
   const send = async () => {
-    const minutes = Math.max(1, Math.ceil(count / WA_PER_MINUTE));
     const ok = confirm(
-      `Send this message to ${count} guest${count === 1 ? '' : 's'} on WhatsApp?\n\n` +
-        `Messages go out one by one, about ${WA_PER_MINUTE} a minute, so this takes about ${minutesText(minutes)}. ` +
+      `Send this ${ch.unit} to ${count} guest${count === 1 ? '' : 's'}?\n\n` +
+        `It takes about ${minutesText(estimate)} (about ${ch.perMinute} ${ch.unit}s a minute). ` +
         'You can close this page; sending carries on.',
     );
     if (!ok) return;
@@ -98,80 +135,105 @@ function WhatsAppSendAll({ eventId, saved, count, onSend }: {
     setError(null);
     setNotice(null);
     try {
+      const base = stats ? stats.sent + stats.failed : 0;
       const r = await onSend();
+      setRun({ queued: r.queued, base });
       setNotice(
-        `${r.queued} message${r.queued === 1 ? '' : 's'} queued` +
-          (r.skipped ? `, ${r.skipped} skipped (no usable number, or the same number twice)` : '') +
-          `. All sent in about ${minutesText(r.minutes)}.`,
+        `${plural(r.queued)} queued` +
+          (r.skipped ? `, ${r.skipped} skipped (no ${ch.has.replace(/^an? /, '')} in the guest list, or the same one twice)` : '') +
+          `. All sent in about ${minutesText(Math.max(1, r.minutes))}.`,
       );
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not send. Try again.');
+      await refresh();
     } finally {
       setBusy(false);
     }
   };
 
   const cancel = async () => {
-    if (!confirm('Stop the messages that have not gone out yet?')) return;
+    if (!stats || !confirm(`Cancel the ${plural(stats.waiting)} that ${stats.waiting === 1 ? 'has' : 'have'} not gone out yet?`)) return;
     setError(null);
     try {
-      const r = await whatsappApi.cancel(eventId);
-      setNotice(`${r.cancelled} waiting message${r.cancelled === 1 ? '' : 's'} stopped.`);
+      const r = await ch.cancel(eventId);
+      setNotice(`${plural(r.cancelled)} cancelled.`);
       await refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not stop the messages.');
+      setError(e instanceof Error ? e.message : 'Could not cancel.');
     }
   };
 
   const total = stats ? stats.waiting + stats.sent + stats.failed + stats.cancelled : 0;
-  const finishIn = stats?.waiting ? Math.max(1, Math.ceil((stats.ahead ?? stats.waiting) / WA_PER_MINUTE)) : 0;
+  const finishIn = stats?.waiting ? Math.max(1, Math.ceil((stats.ahead ?? stats.waiting) / ch.perMinute)) : 0;
+  const done = run && stats ? Math.min(run.queued, Math.max(0, stats.sent + stats.failed - run.base)) : 0;
+  const Icon = ch.icon;
 
   return (
     <div className="p-4 rounded-2xl bg-premium-charcoal border border-premium-success/30 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <div className="text-sm font-display font-bold text-white flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-premium-success" /> Send to everyone on WhatsApp
+            <Icon className="w-4 h-4 text-premium-success" /> {ch.title}
           </div>
           <p className="text-[11px] text-zinc-500 mt-0.5">
-            {count} guest{count === 1 ? '' : 's'} in this list {count === 1 ? 'has' : 'have'} a phone number. Each gets their own message from our WhatsApp number.
+            {count} guest{count === 1 ? '' : 's'} in this list {count === 1 ? 'has' : 'have'} {ch.has}. {ch.how}
           </p>
+          {count > 0 && (
+            <p className="text-[11px] text-zinc-400 mt-1">
+              Takes about <strong className="text-white">{minutesText(estimate)}</strong>, about {ch.perMinute} {ch.unit}s a minute.
+              {left !== null && <> Your organization can send <span className="font-mono text-white">{left.toLocaleString()}</span> more today.</>}
+            </p>
+          )}
         </div>
         <button
           type="button"
           onClick={send}
-          disabled={busy || count === 0}
+          disabled={busy || count === 0 || overLimit}
           className="px-4 py-2.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-xs shadow-gold scale-on-click disabled:opacity-40 flex items-center gap-1.5"
         >
           {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Send to {count}
         </button>
       </div>
 
+      {overLimit && (
+        <p className="text-[11px] font-bold text-premium-danger">
+          That is more than your organization can send today. Narrow the list (for example “Not sent yet”), or send the rest tomorrow.
+        </p>
+      )}
       {error && <p className="text-[11px] font-bold text-premium-danger">{error}</p>}
       {notice && !error && <p className="text-[11px] font-bold text-premium-success">{notice}</p>}
+
+      {run && run.queued > 0 && stats && (
+        <div className="space-y-1">
+          <div className="h-1.5 rounded-full bg-premium-black overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={run.queued} aria-valuenow={done}>
+            <div className="h-full bg-premium-success transition-all" style={{ width: `${(done / run.queued) * 100}%` }} />
+          </div>
+          <div className="text-[10px] font-mono text-zinc-500">{done} of {run.queued} done</div>
+        </div>
+      )}
 
       {stats && total > 0 && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2 border-t border-premium-borderDark text-[11px]">
           <span className="text-zinc-400">Waiting <strong className="text-white font-mono">{stats.waiting}</strong></span>
           <span className="text-zinc-400">Sent <strong className="text-premium-success font-mono">{stats.sent}</strong></span>
           <span className="text-zinc-400">Failed <strong className={`font-mono ${stats.failed ? 'text-premium-danger' : 'text-white'}`}>{stats.failed}</strong></span>
-          {stats.waiting > 0 && !stats.held && <span className="text-zinc-500">All sent in about {minutesText(finishIn)}</span>}
+          {stats.cancelled > 0 && <span className="text-zinc-400">Cancelled <strong className="text-white font-mono">{stats.cancelled}</strong></span>}
+          {stats.waiting > 0 && !paused && <span className="text-zinc-500">All sent in about {minutesText(finishIn)}</span>}
           {stats.waiting > 0 && (
             <button type="button" onClick={cancel} className="ml-auto px-2.5 py-1 rounded-lg border border-premium-borderDark text-zinc-400 hover:text-premium-danger hover:border-premium-danger/40 font-bold scale-on-click">
-              Stop waiting messages
+              Cancel
             </button>
           )}
         </div>
       )}
-      {stats?.held && stats.waiting > 0 && (
-        <p className="text-[11px] text-premium-danger">
-          Sending is paused until the dayoneproject.xyz team checks the WhatsApp number. Your waiting messages are kept and go out after that.
+      {paused && (
+        <p className="text-[11px] font-bold text-premium-danger flex items-start gap-1.5">
+          <Info className="w-3.5 h-3.5 shrink-0 mt-px" />
+          Sending is paused. Your dayoneproject.xyz admin has been told. Your waiting {ch.unit}s are kept and go out after that.
         </p>
       )}
-      {stats && stats.failed > 0 && stats.lastFailure && (
-        <p className="text-[11px] text-zinc-500">Some numbers could not receive WhatsApp messages. Check them in your guest list.</p>
-      )}
+      {stats && stats.failed > 0 && <p className="text-[11px] text-zinc-500">{ch.failed}</p>}
     </div>
   );
 }
@@ -340,16 +402,22 @@ export function BroadcastStudio({ eventId }: { eventId: string }) {
   });
 
   const savedEvents = useOrgEventsCache();
-  const sendable = shown.filter(({ guest: g }) => waPhone(g.phone, bc.countryCode));
-  /** Queues this template for every guest shown, then marks them as sent. */
-  const sendAllWhatsApp = async () => {
+  const sendable = shown.filter(({ guest: g }) => (bc.channel === 'email' ? !!g.email : !!waPhone(g.phone, bc.countryCode)));
+  /**
+   * Queues this template for every guest shown, then marks them as sent. Guests are sent by id: the server takes
+   * each number or address from the event's saved guest list.
+   */
+  const sendAll = async (): Promise<EnqueueResult> => {
     const label = BROADCAST_KINDS.find((k) => k.id === kind)?.label ?? kind;
-    const messages = sendable.map(({ guest: g, prize }) => ({
-      phone: waPhone(g.phone, bc.countryCode),
-      name: g.name,
-      text: renderBroadcast(kind, tpl, config, g, { origin, digits, prize }).whatsapp,
-    }));
-    const result = await whatsappApi.enqueue(eventId, label, messages);
+    const result = bc.channel === 'email'
+      ? await emailApi.enqueue(eventId, label, kind, sendable.map(({ guest: g, prize }) => {
+          const m = renderBroadcast(kind, tpl, config, g, { origin, digits, prize });
+          return { guestId: g.id, subject: m.subject, html: emailHtml(m, theme, { eventName: config.info.name, imageUrl }), text: emailBody(m) };
+        }))
+      : await whatsappApi.enqueue(eventId, label, sendable.map(({ guest: g, prize }) => ({
+          guestId: g.id,
+          text: renderBroadcast(kind, tpl, config, g, { origin, digits, prize }).whatsapp,
+        })));
     const ids = new Set([...(bc.sent[kind] ?? []), ...sendable.map(({ guest: g }) => g.id)]);
     update('broadcast', { sent: { ...bc.sent, [kind]: [...ids] } });
     return result;
@@ -635,9 +703,7 @@ export function BroadcastStudio({ eventId }: { eventId: string }) {
           </div>
         </div>
 
-        {bc.channel === 'whatsapp' && (
-          <WhatsAppSendAll eventId={eventId} saved={!!savedEvents?.[eventId]} count={sendable.length} onSend={sendAllWhatsApp} />
-        )}
+        <SendToEveryone key={bc.channel} channel={bc.channel} eventId={eventId} saved={!!savedEvents?.[eventId]} count={sendable.length} onSend={sendAll} />
 
         <div className="relative">
           <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -666,7 +732,7 @@ export function BroadcastStudio({ eventId }: { eventId: string }) {
           <Info className="w-4 h-4 text-premium-neon shrink-0 mt-px" />
           <span>
             Each button opens the message ready to send from your own WhatsApp or email app.
-            {bc.channel === 'whatsapp' && ' To reach everyone at once, use Send to everyone above.'}
+            {savedEvents?.[eventId] && ' To reach everyone at once, use Send to everyone above.'}
             Phone numbers starting with 0 get country code
             <input
               value={bc.countryCode}

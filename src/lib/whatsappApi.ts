@@ -2,18 +2,32 @@
 
 import { createClient } from '@/lib/supabase/client';
 
-/** Progress of one event's WhatsApp broadcasts (all batches together). */
-export interface WaStats {
+/** Progress of one event's broadcasts on one channel (all batches together). Same shape for WhatsApp and email. */
+export interface SendStats {
   waiting: number;
   sent: number;
   failed: number;
   cancelled: number;
   lastSentAt: string | null;
-  /** Why sending is paused (number offline, no quota…), when it is. */
+  /** Set when a waiting message of this event was held back because sending is paused. */
   held: string | null;
+  /** Sending is paused for everyone until the platform admin fixes it (they are told automatically). */
+  paused?: boolean;
   lastFailure: string | null;
-  /** Messages from every organization that go out before this event's last one. */
+  /** Messages from every organization that go out before this event's last one (organizations take turns). */
   ahead: number | null;
+  /** Messages the organization queued in the last 24 hours, and how many it may send in 24 hours. */
+  usedToday?: number;
+  limit?: number;
+}
+export type WaStats = SendStats;
+
+export interface EnqueueResult {
+  queued: number;
+  skipped: number;
+  minutes: number;
+  limit?: number;
+  remaining?: number;
 }
 
 export interface WaDevice {
@@ -64,9 +78,12 @@ async function call<T>(body: Record<string, unknown>): Promise<T> {
 }
 
 export const whatsappApi = {
-  /** Queues one message per guest; the server sends them in the background. */
-  enqueue: (eventId: string, label: string, messages: { phone: string; name: string; text: string }[]) =>
-    call<{ queued: number; skipped: number; minutes: number }>({ action: 'enqueue', eventId, label, messages }),
+  /**
+   * Queues one message per guest; the server sends them in the background. Guests are named by their id in the
+   * event's saved guest list; the server takes each number from that list.
+   */
+  enqueue: (eventId: string, label: string, messages: { guestId: string; text: string }[]) =>
+    call<EnqueueResult>({ action: 'enqueue', eventId, label, messages }),
   cancel: (eventId: string) => call<{ cancelled: number }>({ action: 'cancel', eventId }),
   stats: async (eventId: string): Promise<WaStats | null> => {
     const { data, error } = await createClient().rpc('a41_wa_stats', { p_event: eventId });
