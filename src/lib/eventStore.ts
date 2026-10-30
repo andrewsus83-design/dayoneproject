@@ -89,6 +89,8 @@ export type ThemeMode = 'dark' | 'light';
 export type CardStyleId = 'minimal' | 'bordered' | 'elevated' | 'glass';
 export type RadiusId = 'sharp' | 'medium' | 'round' | 'pill';
 export type SpacingId = 'tight' | 'normal' | 'spacious';
+/** Landing page content width: 'standard' is the original centered column. */
+export type PageWidthId = 'standard' | 'full' | '90' | '80';
 
 export interface DesignConfig {
   mode: ThemeMode;
@@ -108,6 +110,7 @@ export interface DesignConfig {
   spacingGaps: SpacingId | '';
   spacingCards: SpacingId | '';
   spacingLetters: SpacingId | '';
+  pageWidth: PageWidthId;
   logoUrl: string;
   logoSize: 's' | 'm' | 'l';
 }
@@ -434,6 +437,7 @@ export function buildDefaults(base: Event): EventConfig {
       spacingGaps: '',
       spacingCards: '',
       spacingLetters: '',
+      pageWidth: 'standard',
       logoUrl: '',
       logoSize: 'm',
     },

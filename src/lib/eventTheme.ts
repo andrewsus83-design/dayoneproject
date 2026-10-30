@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import type { DesignConfig, ThemeMode, CardStyleId, RadiusId, SpacingId } from './eventStore';
+import type { DesignConfig, ThemeMode, CardStyleId, RadiusId, SpacingId, PageWidthId } from './eventStore';
 
 export interface Swatch {
   id: string;
@@ -79,6 +79,14 @@ export const SPACING_OPTIONS: { id: SpacingId; label: string; desc: string; scal
   { id: 'tight', label: 'Tight', desc: 'Compact — less padding and gaps', scale: 0.7 },
   { id: 'normal', label: 'Normal', desc: 'Balanced default spacing', scale: 1 },
   { id: 'spacious', label: 'Spacious', desc: 'Airy — more room to breathe', scale: 1.4 },
+];
+
+/** CSS width of the landing page's content column. The percentages fill the screen on phones (never narrower than 40rem or the screen). */
+export const PAGE_WIDTH_OPTIONS: { id: PageWidthId; label: string; desc: string; css: string }[] = [
+  { id: 'standard', label: 'Standard', desc: 'Centered column (default)', css: 'min(100%, 56rem)' },
+  { id: 'full', label: 'Full', desc: 'Edge to edge', css: '100%' },
+  { id: '90', label: '90%', desc: '90% of the screen', css: 'max(90%, min(100%, 40rem))' },
+  { id: '80', label: '80%', desc: '80% of the screen', css: 'max(80%, min(100%, 40rem))' },
 ];
 
 export const PRISM_COLORS = ['#FFD700', '#FF8C00', '#CC0066', '#7B1D5A', '#1B3FA0', '#0099DD', '#00A36C', '#CC88FF', '#FFD700'];
@@ -186,6 +194,8 @@ export interface ResolvedTheme {
   radius: number;
   buttonRadius: number;
   space: ResolvedSpace;
+  /** CSS width of the landing page's content column. */
+  pageWidth: string;
   cardStyle: CSSProperties;
   vars: CSSProperties;
   fontsHref: string | null;
@@ -303,6 +313,7 @@ export function resolveTheme(design: DesignConfig): ResolvedTheme {
     radius: radiusPx,
     buttonRadius,
     space,
+    pageWidth: (PAGE_WIDTH_OPTIONS.find((w) => w.id === design.pageWidth) ?? PAGE_WIDTH_OPTIONS[0]).css,
     cardStyle,
     vars,
     fontsHref: fontsHref({ heading: design.headingFont, body: design.bodyFont, accent: design.accentFont }),

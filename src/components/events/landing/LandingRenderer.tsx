@@ -171,7 +171,8 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
       </nav>
 
       <div
-        className={`relative z-10 flex-1 flex flex-col px-6 w-full ${center ? 'items-center justify-center text-center mx-auto max-w-4xl py-16' : 'justify-end pb-16 max-w-3xl'}`}
+        className={`relative z-10 flex-1 flex flex-col px-6 w-full ${center ? 'items-center justify-center text-center mx-auto py-16' : 'justify-end pb-16 max-w-3xl'}`}
+        style={center ? { maxWidth: theme.pageWidth } : undefined}
       >
         <div className="flex flex-col" style={{ gap: theme.space.stack, alignItems: center ? 'center' : 'flex-start' }}>
           {center && b.showLogo && design.logoUrl && <Logo refId={design.logoUrl} size="l" />}
@@ -333,6 +334,8 @@ export function LandingRenderer(p: RendererProps) {
   };
   const directions = info.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${info.venue} ${info.address}`.trim())}`;
   const pad = `${theme.space.section / 2}px 24px`;
+  /** The content column, as wide as the Design Studio's page width. */
+  const column: CSSProperties = { width: theme.pageWidth, marginInline: 'auto' };
 
   const renderBlock = (b: LandingBlock) => {
     switch (b.type) {
@@ -348,7 +351,7 @@ export function LandingRenderer(p: RendererProps) {
           b.showLink && { icon: Globe, label: 'Link', val: `app.dayoneproject.xyz/events/${info.slug}` },
         ].filter(Boolean) as { icon: typeof Calendar; label: string; val: string }[];
         return (
-          <div className="max-w-4xl mx-auto" style={{ padding: pad }}>
+          <div style={{ ...column, padding: pad }}>
             <div className="grid grid-cols-2 @2xl:grid-cols-4" style={{ gap: theme.space.gap }}>
               {items.map(({ icon: Icon, label, val }) => (
                 <div key={label} className="flex flex-col gap-2 min-w-0" style={{ ...theme.cardStyle, padding: theme.space.card * 0.85 }}>
@@ -363,7 +366,7 @@ export function LandingRenderer(p: RendererProps) {
       }
       case 'text':
         return (
-          <div className="max-w-4xl mx-auto" style={{ padding: pad }}>
+          <div style={{ ...column, padding: pad }}>
             <SectionHead label={b.label} heading={b.heading} theme={theme} center={b.align === 'center'} />
             <div style={b.card ? { ...theme.cardStyle, padding: theme.space.card * 1.4 } : undefined}>
               <p className={`text-[15px] leading-[1.85] whitespace-pre-line ${b.align === 'center' ? 'text-center' : ''}`} style={{ color: theme.muted }}>{b.body}</p>
@@ -372,7 +375,7 @@ export function LandingRenderer(p: RendererProps) {
         );
       case 'features':
         return (
-          <div className="max-w-4xl mx-auto" style={{ padding: pad }}>
+          <div style={{ ...column, padding: pad }}>
             <SectionHead label={b.label} heading={b.heading} theme={theme} />
             {b.layout === 'list' ? (
               <div style={{ ...theme.cardStyle, padding: theme.space.card * 1.4 }}>
@@ -405,21 +408,21 @@ export function LandingRenderer(p: RendererProps) {
         );
       case 'gallery':
         return b.images.length ? (
-          <div className="max-w-4xl mx-auto" style={{ padding: pad }}>
+          <div style={{ ...column, padding: pad }}>
             <SectionHead label={b.label} heading={b.heading} theme={theme} />
             <div className="columns-2 @2xl:columns-3 gap-3">
               {b.images.map((img) => <GalleryImage key={img.id} refId={img.url} radius={Math.min(theme.radius, 20)} />)}
             </div>
           </div>
         ) : embedded ? (
-          <div className="max-w-4xl mx-auto" style={{ padding: pad }}>
+          <div style={{ ...column, padding: pad }}>
             <SectionHead label={b.label} heading={b.heading} theme={theme} />
             <div className="h-32 flex items-center justify-center text-xs" style={{ background: theme.surface, border: `1px dashed ${theme.border}`, borderRadius: theme.radius, color: theme.subtle }}>Add photos in the builder</div>
           </div>
         ) : null;
       case 'testimonials':
         return (
-          <div className="max-w-4xl mx-auto" style={{ padding: pad }}>
+          <div style={{ ...column, padding: pad }}>
             <SectionHead label={b.label} heading={b.heading} theme={theme} />
             <div className="grid grid-cols-1 @lg:grid-cols-2" style={{ gap: theme.space.gap }}>
               {b.items.map((t) => (
@@ -436,7 +439,7 @@ export function LandingRenderer(p: RendererProps) {
         );
       case 'quote':
         return (
-          <div className="max-w-4xl mx-auto" style={{ padding: pad }}>
+          <div style={{ ...column, padding: pad }}>
             <blockquote className="flex gap-4 items-start" style={{ ...theme.cardStyle, padding: theme.space.card * 1.4 }}>
               <Quote className="w-6 h-6 shrink-0" style={{ color: theme.primaryText }} />
               <div>
@@ -448,7 +451,7 @@ export function LandingRenderer(p: RendererProps) {
         );
       case 'facts':
         return (
-          <div className="max-w-4xl mx-auto" style={{ padding: pad }}>
+          <div style={{ ...column, padding: pad }}>
             <div style={{ ...theme.cardStyle, padding: theme.space.card * 1.4, border: `1px solid ${alpha(theme.primary, 0.25)}` }}>
               <SectionHead label={b.label} heading={b.heading} theme={theme} />
               <div className="grid grid-cols-1 @lg:grid-cols-3" style={{ gap: theme.space.gap }}>
@@ -464,7 +467,7 @@ export function LandingRenderer(p: RendererProps) {
         );
       case 'stats':
         return (
-          <div className="max-w-4xl mx-auto" style={{ padding: pad }}>
+          <div style={{ ...column, padding: pad }}>
             <div style={{ ...theme.cardStyle, padding: theme.space.card * 1.3 }}>
               {b.label && (
                 <span className="inline-block px-4 py-1.5 mb-4 text-xs font-bold uppercase tracking-widest" style={{ border: `1.5px solid ${theme.primary}`, borderRadius: 7, fontFamily: theme.accentFamily }}>
@@ -495,7 +498,7 @@ export function LandingRenderer(p: RendererProps) {
         );
       case 'venue':
         return (
-          <div className="max-w-4xl mx-auto" style={{ padding: pad }}>
+          <div style={{ ...column, padding: pad }}>
             <SectionHead label={b.label} heading={b.heading} theme={theme} />
             <div style={{ ...theme.cardStyle, padding: theme.space.card * 1.3 }} className="space-y-4">
               <p className="text-sm font-bold" style={heading}>{info.venue}</p>
@@ -520,13 +523,13 @@ export function LandingRenderer(p: RendererProps) {
         );
       case 'image':
         return (
-          <div className={b.fullWidth ? '' : 'max-w-4xl mx-auto'} style={{ padding: b.fullWidth ? `${theme.space.section / 2}px 0` : pad }}>
+          <div style={b.fullWidth ? { padding: `${theme.space.section / 2}px 0` } : { ...column, padding: pad }}>
             <ImageSection refId={b.url} caption={b.caption} theme={theme} />
           </div>
         );
       case 'cta':
         return (
-          <div className="max-w-4xl mx-auto text-center" style={{ padding: `${theme.space.section * 0.75}px 24px` }}>
+          <div className="text-center" style={{ ...column, padding: `${theme.space.section * 0.75}px 24px` }}>
             {b.label && <p className="text-[11px] font-bold uppercase tracking-[0.3em] mb-3" style={{ color: theme.primaryText, fontFamily: theme.accentFamily }}>{b.label}</p>}
             {b.heading && <h2 className="font-bold mb-4" style={{ ...heading, fontSize: 'clamp(26px, 5cqw, 44px)' }}>{b.heading}</h2>}
             {b.body && <p className="max-w-md mx-auto mb-8" style={{ color: theme.muted }}>{b.body}</p>}
@@ -578,7 +581,7 @@ export function LandingRenderer(p: RendererProps) {
         )}
         {landing.footerTagline && <p className="text-[11px] uppercase tracking-[0.22em] mb-6" style={{ color: theme.muted }}>{landing.footerTagline}</p>}
         {landing.footerText && <p className="text-xs mb-4" style={{ color: theme.subtle }}>{landing.footerText}</p>}
-        <div className="flex flex-col @md:flex-row items-center justify-between gap-4 max-w-4xl mx-auto pt-2">
+        <div className="flex flex-col @md:flex-row items-center justify-between gap-4 pt-2" style={column}>
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-sm shadow-gold">D1</div>
             <span className="text-xs" style={{ color: theme.subtle }}>Powered by dayoneproject.xyz</span>

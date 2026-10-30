@@ -8,7 +8,7 @@ import {
 import { deleteAsset, resetEventSection, saveAsset, useAssetUrl, useEventConfig, type DesignConfig, type ThemeMode } from '@/lib/eventStore';
 import {
   ACCENT_FONTS, BODY_FONTS, CARD_STYLES, DARK_BACKGROUNDS, HEADING_FONTS, LIGHT_BACKGROUNDS, PALETTES, RADIUS_OPTIONS,
-  SPACING_OPTIONS, gradientText, modeForBackground, paletteColors, resolveTheme,
+  PAGE_WIDTH_OPTIONS, SPACING_OPTIONS, gradientText, modeForBackground, paletteColors, resolveTheme,
 } from '@/lib/eventTheme';
 import { compressImage } from '@/lib/image';
 import { EventFonts } from '@/components/events/EventFonts';
@@ -285,6 +285,32 @@ export function EventDesignStudio({ eventId }: { eventId: string }) {
 
       {subTab === 'spacing' && (
         <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-6">
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-1">Landing page width</p>
+            <p className="text-[11px] text-zinc-500 mb-3">How wide the sections sit on a computer screen. Phones always use the full width.</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {PAGE_WIDTH_OPTIONS.map((w) => {
+                const active = (design.pageWidth || 'standard') === w.id;
+                return (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => setDesign({ pageWidth: w.id })}
+                    className={`p-4 rounded-2xl border text-left transition-all scale-on-click ${active ? 'border-premium-gold bg-premium-surfaceDark shadow-gold' : 'border-premium-borderDark bg-premium-black/60 hover:border-zinc-600'}`}
+                  >
+                    <div className="h-8 mb-3 rounded-md border border-premium-borderDark flex items-center justify-center">
+                      <span className="h-4 rounded bg-zinc-600" style={{ width: w.id === 'standard' ? '55%' : w.id === 'full' ? '100%' : `${w.id}%` }} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white">{w.label}</span>
+                      {active && <Check className="w-3.5 h-3.5 text-premium-gold" />}
+                    </div>
+                    <div className="text-[10px] text-zinc-500 mt-0.5">{w.desc}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div>
             <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-1">Spacing · everything</p>
             <p className="text-[11px] text-zinc-500 mb-3">Sets padding, margins, cards and letter spacing in one go. Fine-tune each one below.</p>
