@@ -8,7 +8,7 @@ import confetti from 'canvas-confetti';
 import { formatGuestNumber, guestPool, numberDigits, quizPointsAt, useEventConfigBySlug, useGuests, type Activity, type QuizItem } from '@/lib/eventStore';
 import { isServerEventId } from '@/lib/guestsApi';
 import { StageFrameShell } from '@/components/stage/StageFrameShell';
-import { LiveQuizHost } from '@/components/events/LiveQuizHost';
+import { LiveQuizHost, LobbyCard, useJoinQr } from '@/components/events/LiveQuizHost';
 
 export interface Player {
   id: string;
@@ -16,16 +16,72 @@ export interface Player {
   table: string;
 }
 
-function QuizRunner({ questions, players, onScore }: { questions: QuizItem[]; players: Player[]; onScore: (s: number) => void }) {
+/** A join code for the sample round, the same every time for the same event and activity. */
+function sampleJoinCode(seed: string) {
+  let h = 0;
+  for (const ch of seed) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return String(100000 + (h % 900000));
+}
+
+/**
+ * The sample events' trivia, shaped like the live game: a lobby with the join code where the checked-in sample
+ * guests join one by one, Start, then 3-2-1 before each question. Back to the lobby after the last one.
+ */
+function SampleTrivia({ slug, activity, players, onScore }: { slug: string; activity: Activity; players: Player[]; onScore: (s: number) => void }) {
+  const [playing, setPlaying] = useState(false);
+  const [joined, setJoined] = useState(0);
+  const joinCode = sampleJoinCode(`${slug}:${activity.id}`);
+  const qr = useJoinQr(slug, playing ? null : joinCode);
+
+  // Guests "scan in" at a natural pace while the lobby is open.
+  useEffect(() => {
+    if (playing || joined >= players.length) return;
+    const id = setTimeout(() => setJoined((n) => n + 1), joined === 0 ? 1200 : 400 + Math.random() * 900);
+    return () => clearTimeout(id);
+  }, [playing, joined, players.length]);
+
+  const inRound = players.slice(0, joined);
+  if (activity.questions.length === 0) return <p className="text-sm text-zinc-500">This activity has no questions yet — add some in the dashboard.</p>;
+  if (!playing) {
+    return (
+      <LobbyCard
+        slug={slug}
+        title={activity.name}
+        nameAlign={activity.nameAlign}
+        joinCode={joinCode}
+        qr={qr}
+        anonymous={activity.anonymous}
+        players={inRound.length}
+        names={inRound.map((p) => ({ id: p.id, name: p.label }))}
+        busy={false}
+        onStart={() => setPlaying(true)}
+        note={players.length === 0
+          ? 'Sample event: no sample guests are checked in, so no one can join. Check some in at the gate first.'
+          : 'Sample event: these guests join on their own for the demo. On your events, checked-in guests join from their phones.'}
+      />
+    );
+  }
+  return <QuizRunner questions={activity.questions} players={inRound} onScore={onScore} onRestart={() => { setJoined(0); setPlaying(false); }} />;
+}
+
+function QuizRunner({ questions, players, onScore, onRestart }: { questions: QuizItem[]; players: Player[]; onScore: (s: number) => void; onRestart: () => void }) {
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
   const [timer, setTimer] = useState(questions[0]?.seconds ?? 15);
   const [finished, setFinished] = useState(false);
+  const [countdown, setCountdown] = useState(3);
   const q = questions[index % Math.max(questions.length, 1)];
 
   useEffect(() => onScore(score), [score, onScore]);
+
+  // 3-2-1 before every question, like the live game.
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const id = setTimeout(() => setCountdown((n) => n - 1), 1000);
+    return () => clearTimeout(id);
+  }, [countdown]);
 
   const answer = (i: number) => {
     if (!q) return;
@@ -38,7 +94,7 @@ function QuizRunner({ questions, players, onScore }: { questions: QuizItem[]; pl
   };
 
   useEffect(() => {
-    if (finished || submitted || !q) return;
+    if (finished || submitted || !q || countdown > 0) return;
     const id = setInterval(() => {
       setTimer((t) => {
         if (t <= 1) {
@@ -51,7 +107,7 @@ function QuizRunner({ questions, players, onScore }: { questions: QuizItem[]; pl
     }, 1000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submitted, finished, index]);
+  }, [submitted, finished, index, countdown]);
 
   const next = () => {
     if (index + 1 < questions.length) {
@@ -59,6 +115,7 @@ function QuizRunner({ questions, players, onScore }: { questions: QuizItem[]; pl
       setSelected(null);
       setSubmitted(false);
       setTimer(questions[index + 1].seconds);
+      setCountdown(3);
     } else {
       setFinished(true);
       confetti({ particleCount: 150, spread: 90, origin: { y: 0.5 } });
@@ -88,9 +145,19 @@ function QuizRunner({ questions, players, onScore }: { questions: QuizItem[]; pl
             ))}
           </div>
         </div>
-        <button type="button" onClick={() => { setIndex(0); setSelected(null); setSubmitted(false); setScore(0); setTimer(questions[0].seconds); setFinished(false); }} className="w-full py-4 rounded-2xl font-bold text-sm text-black bg-premium-gold hover:bg-premium-goldHover shadow-gold scale-on-click flex items-center justify-center gap-2">
-          <RotateCcw className="w-4 h-4" /> Play Again
+        <button type="button" onClick={onRestart} className="w-full py-4 rounded-2xl font-bold text-sm text-black bg-premium-gold hover:bg-premium-goldHover shadow-gold scale-on-click flex items-center justify-center gap-2">
+          <RotateCcw className="w-4 h-4" /> New game
         </button>
+      </div>
+    );
+  }
+
+  if (countdown > 0) {
+    return (
+      <div className="w-full p-8 sm:p-10 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark shadow-2xl text-center py-16 space-y-4">
+        <span className="text-xs font-mono uppercase tracking-widest text-premium-neon font-bold">Question {index + 1} of {questions.length}</span>
+        <div key={countdown} className="text-[10rem] leading-none font-display font-bold text-premium-gold">{countdown}</div>
+        <p className="text-sm text-zinc-400">Get ready…</p>
       </div>
     );
   }
@@ -233,7 +300,7 @@ export function GamesScreen({ slug, initialId }: { slug: string; initialId?: str
           {live ? (
             <LiveQuizHost key={activity.id} eventId={eventId} slug={slug} activity={activity} />
           ) : activity.kind === 'quiz' ? (
-            <QuizRunner key={activity.id} questions={activity.questions} players={players} onScore={setScore} />
+            <SampleTrivia key={activity.id} slug={slug} activity={activity} players={players} onScore={setScore} />
           ) : (
             <HuntBoard activity={activity} />
           )}

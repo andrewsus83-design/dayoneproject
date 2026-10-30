@@ -22,7 +22,7 @@ function Panel({ children }: { children: React.ReactNode }) {
   return <div className={`${card} text-center space-y-5`}>{children}</div>;
 }
 
-function useJoinQr(slug: string, code: string | null | undefined) {
+export function useJoinQr(slug: string, code: string | null | undefined) {
   const [qr, setQr] = useState<{ code: string; url: string }>({ code: '', url: '' });
   useEffect(() => {
     if (!code) return;
@@ -183,7 +183,20 @@ export function LiveQuizHost({ eventId, slug, activity }: { eventId: string; slu
 
   return (
     <div className="w-full space-y-4">
-      {session.phase === 'lobby' && <Lobby slug={slug} activity={activity} session={session} qr={qr} busy={busy} onStart={() => run(() => controlQuiz(session.id, 'start'))} />}
+      {session.phase === 'lobby' && (
+        <LobbyCard
+          slug={slug}
+          title={activity.name}
+          nameAlign={activity.nameAlign}
+          joinCode={session.joinCode}
+          qr={qr}
+          anonymous={session.anonymous}
+          players={session.players}
+          names={session.lobbyPlayers ?? []}
+          busy={busy}
+          onStart={() => run(() => controlQuiz(session.id, 'start'))}
+        />
+      )}
       {session.phase === 'question' && <QuestionView session={session} now={now} busy={busy} onReveal={() => run(() => controlQuiz(session.id, 'reveal', session.position))} />}
       {session.phase === 'reveal' && <RevealView session={session} busy={busy} onNext={() => run(() => controlQuiz(session.id, 'next', session.position))} />}
       {session.phase === 'finished' && (
@@ -211,12 +224,24 @@ export function LiveQuizHost({ eventId, slug, activity }: { eventId: string; slu
   );
 }
 
-function Lobby({ slug, activity, session, qr, busy, onStart }: { slug: string; activity: Activity; session: QuizSession; qr: string; busy: boolean; onStart: () => void }) {
-  const names = session.lobbyPlayers ?? [];
-  const more = Math.max(0, session.players - names.length);
+/** The lobby on the big screen: join code and QR, who has joined, and Start. Live games and the sample round share it. */
+export function LobbyCard({ slug, title, nameAlign, joinCode, qr, anonymous, players, names, busy, onStart, note }: {
+  slug: string;
+  title: string;
+  nameAlign: NameAlign;
+  joinCode: string | null | undefined;
+  qr: string;
+  anonymous: boolean;
+  players: number;
+  names: { id: string; name: string }[];
+  busy: boolean;
+  onStart: () => void;
+  note?: string;
+}) {
+  const more = Math.max(0, players - names.length);
   return (
     <div className={`${card} space-y-8`}>
-      <h2 className={`text-4xl font-display font-bold text-white ${alignText[activity.nameAlign]}`}>{activity.name}</h2>
+      <h2 className={`text-4xl font-display font-bold text-white ${alignText[nameAlign]}`}>{title}</h2>
       <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-8 items-center">
         <div className="w-56 h-56 mx-auto bg-white rounded-[2rem] p-3 shadow-2xl flex items-center justify-center">
           {qr ? (
@@ -228,14 +253,14 @@ function Lobby({ slug, activity, session, qr, busy, onStart }: { slug: string; a
         </div>
         <div className="text-center md:text-left space-y-3">
           <p className="text-sm text-zinc-400">Scan the code, or open <span className="font-mono text-premium-neon">{getClientDomain(slug)}/play</span> and enter</p>
-          <div className="font-mono font-bold text-white text-6xl sm:text-7xl tracking-[0.15em]" aria-label="Join code">{formatJoinCode(session.joinCode)}</div>
-          <p className="text-xs text-zinc-500">Checked-in guests only{session.anonymous ? ' · players show as their guest number' : ''}.</p>
+          <div className="font-mono font-bold text-white text-6xl sm:text-7xl tracking-[0.15em]" aria-label="Join code">{formatJoinCode(joinCode)}</div>
+          <p className="text-xs text-zinc-500">Checked-in guests only{anonymous ? ' · players show as their guest number' : ''}.</p>
         </div>
       </div>
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-xs font-mono uppercase tracking-widest text-zinc-500">Players</span>
-          <span className="flex items-center gap-2 text-premium-success font-display font-bold text-2xl"><Users className="w-5 h-5" /> {session.players}</span>
+          <span className="flex items-center gap-2 text-premium-success font-display font-bold text-2xl"><Users className="w-5 h-5" /> {players}</span>
         </div>
         <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
           {names.length === 0 && <p className="text-sm text-zinc-500">Waiting for the first player…</p>}
@@ -245,9 +270,10 @@ function Lobby({ slug, activity, session, qr, busy, onStart }: { slug: string; a
           {more > 0 && <span className="px-3 py-1.5 rounded-xl text-sm font-mono text-zinc-500">+{more} more</span>}
         </div>
       </div>
-      <button type="button" disabled={busy || session.players === 0} onClick={onStart} className={`${goldButton} w-full text-lg`}>
-        <Play className="w-5 h-5" /> {busy ? 'Starting…' : session.players === 0 ? 'Waiting for players' : 'Start'}
+      <button type="button" disabled={busy || players === 0} onClick={onStart} className={`${goldButton} w-full text-lg`}>
+        <Play className="w-5 h-5" /> {busy ? 'Starting…' : players === 0 ? 'Waiting for players' : 'Start'}
       </button>
+      {note && <p className="text-xs text-zinc-500 text-center">{note}</p>}
     </div>
   );
 }
