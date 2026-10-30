@@ -4,11 +4,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import * as XLSX from 'xlsx';
 import {
-  ArrowDown, ArrowUp, Check, Copy, Download, ExternalLink, Gamepad2, MapPin, Palette, Plus, Search, Trash2, Trophy, Tv, Upload, Users, X,
+  AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowUp, Check, Copy, Download, ExternalLink, Gamepad2, MapPin, Palette, Plus, Search, Trash2, Trophy, Tv, Upload, Users, X,
 } from 'lucide-react';
 import {
   formatGuestNumber, guestPool, newActivity, newClue, newId, newQuizItem, numberDigits, QUIZ_STEP_SECONDS, quizPointLadder, useEventConfig, useGuests,
-  type Activity, type ClueItem, type QuizItem,
+  type Activity, type ClueItem, type NameAlign, type QuizItem,
 } from '@/lib/eventStore';
 import { AudiencePicker } from '@/components/raffle/AudiencePicker';
 import { SendButtons } from './SendButtons';
@@ -17,6 +17,11 @@ import { downloadBlob, downloadDataUrl, toCsv } from '@/lib/image';
 
 type Tab = 'content' | 'guests' | 'winners' | 'design' | 'screen';
 const input = 'w-full px-3 py-2 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-xs text-white outline-none focus:border-premium-gold/60';
+const NAME_ALIGNS: { id: NameAlign; label: string; icon: typeof AlignLeft }[] = [
+  { id: 'left', label: 'Left', icon: AlignLeft },
+  { id: 'center', label: 'Center', icon: AlignCenter },
+  { id: 'right', label: 'Right', icon: AlignRight },
+];
 
 function move<T>(list: T[], i: number, d: -1 | 1): T[] {
   const j = i + d;
@@ -316,10 +321,31 @@ export function GamesBuilder({ eventId }: { eventId: string }) {
           <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4">
             {tab === 'content' && (
               <>
-                <label className="block space-y-1.5">
-                  <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Activity name</span>
-                  <input value={activity.name} onChange={(e) => patch({ name: e.target.value })} className={input} />
-                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
+                  <label className="block space-y-1.5">
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Activity name</span>
+                    <input value={activity.name} onChange={(e) => patch({ name: e.target.value })} className={input} />
+                  </label>
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Name position on screen</span>
+                    <div className="flex gap-1 p-1 rounded-xl bg-premium-surfaceDark border border-premium-borderDark">
+                      {NAME_ALIGNS.map(({ id, label, icon: Icon }) => {
+                        const active = activity.nameAlign === id;
+                        return (
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => patch({ nameAlign: id })}
+                            aria-pressed={active}
+                            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold scale-on-click ${active ? 'bg-premium-gold text-black shadow-gold' : 'text-zinc-400 hover:text-white'}`}
+                          >
+                            <Icon className="w-3.5 h-3.5" /> {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
                 {activity.kind === 'quiz'
                   ? <QuizEditor questions={activity.questions} onChange={(questions) => patch({ questions })} />
                   : <HuntEditor clues={activity.clues} onChange={(clues) => patch({ clues })} />}

@@ -1,382 +1,401 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Briefcase, Building2, Check, Copy, KeyRound, Loader2, LogIn, Plus, RefreshCw, ScanLine, UserMinus, Users, X } from 'lucide-react';
 import { Header } from '@/components/dashboard/Header';
-import {
-  Settings,
-  Mail,
-  HardDrive,
-  Globe,
-  MessageSquare,
-  CreditCard,
-  CheckCircle2,
-  AlertTriangle,
-  ShieldAlert,
-  X,
-  ExternalLink,
-  Save,
-  Check,
-  Camera,
-} from 'lucide-react';
+import { teamApi, TEAM_ROLE_LABELS, type Team, type TeamMember } from '@/lib/teamApi';
+import { generatePassword } from '@/lib/adminApi';
+import { useSessionUser } from '@/lib/useSession';
+import { APP_HOST } from '@/lib/domain';
 
-export default function IntegrationsSettingsPage() {
-  // WhatsApp Fonnte Settings State
-  const [fonnteEnabled, setFonnteEnabled] = useState(false);
-  const [fonnteToken, setFonnteToken] = useState('');
-  const [isRiskModalOpen, setIsRiskModalOpen] = useState(false);
-  const [acceptedRiskTerms, setAcceptedRiskTerms] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+const input =
+  'w-full bg-premium-surfaceDark border border-premium-borderDark text-white px-4 py-3 rounded-xl text-sm outline-none focus:border-premium-gold placeholder:text-zinc-600';
+const label = 'text-[10px] font-mono uppercase tracking-widest text-zinc-500';
+const quietButton =
+  'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-[11px] font-bold text-zinc-300 hover:text-white hover:border-zinc-600 scale-on-click disabled:opacity-50';
 
-  // Custom Domain State
-  const [customDomain, setCustomDomain] = useState('summit.techunite-apac.com');
-  const [captionsEnabled, setCaptionsEnabled] = useState(true);
+const LOGIN_URL = `${APP_HOST}/login`;
 
-  const handleToggleFonnte = () => {
-    if (!fonnteEnabled && !acceptedRiskTerms) {
-      setIsRiskModalOpen(true);
-    } else {
-      setFonnteEnabled(!fonnteEnabled);
+const ROLE_STYLE: Record<TeamMember['role'], string> = {
+  owner: 'bg-premium-gold/15 text-premium-gold border-premium-gold/30',
+  organizer: 'bg-premium-neon/10 text-premium-neon border-premium-neon/25',
+  desk: 'bg-premium-success/10 text-premium-success border-premium-success/25',
+};
+
+function lastSeen(iso: string | null) {
+  return iso
+    ? `Last signed in ${new Date(iso).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+    : 'Has not signed in yet';
+}
+
+type NewPerson = { name: string; email: string; role: 'organizer' | 'desk'; code: string };
+const blankPerson = (): NewPerson => ({ name: '', email: '', role: 'organizer', code: generatePassword(10) });
+
+/** What to tell the new person (the access code is shown only once). */
+type Handover = { email: string; role: 'organizer' | 'desk'; code: string | null };
+
+export default function TeamSettingsPage() {
+  const { user } = useSessionUser();
+  const [team, setTeam] = useState<Team | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [orgName, setOrgName] = useState('');
+  const [savingName, setSavingName] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [person, setPerson] = useState<NewPerson>(blankPerson);
+  const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [handover, setHandover] = useState<Handover | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const next = await teamApi.get();
+      setTeam(next);
+      setOrgName(next.org.name);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load your team.');
+    }
+  }, []);
+
+  useEffect(() => {
+    // Loads once on open; setState happens after the request resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+  }, [load]);
+
+  const run = async (fn: () => Promise<void>) => {
+    setError(null);
+    try {
+      await fn();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong. Try again.');
     }
   };
 
-  const handleAcceptTerms = () => {
-    setAcceptedRiskTerms(true);
-    setFonnteEnabled(true);
-    setIsRiskModalOpen(false);
+  const saveName = () =>
+    run(async () => {
+      setSavingName(true);
+      try {
+        await teamApi.rename(orgName.trim());
+        await load();
+      } finally {
+        setSavingName(false);
+      }
+    });
+
+  const addPerson = (e: React.FormEvent) => {
+    e.preventDefault();
+    run(async () => {
+      setSaving(true);
+      try {
+        const email = person.email.trim().toLowerCase();
+        const desk = person.role === 'desk';
+        await teamApi.add({ email, name: person.name.trim(), role: person.role, code: desk ? person.code : undefined });
+        setHandover({ email, role: person.role, code: desk ? person.code : null });
+        setPerson(blankPerson());
+        setAdding(false);
+        await load();
+      } finally {
+        setSaving(false);
+      }
+    });
   };
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+  const remove = (m: TeamMember) => {
+    if (!confirm(`Remove ${m.name || m.email} from your team? They will no longer see your events.`)) return;
+    run(async () => {
+      setBusyId(m.id);
+      try {
+        await teamApi.remove(m.id);
+        await load();
+      } finally {
+        setBusyId(null);
+      }
+    });
   };
+
+  const newCode = (m: TeamMember) => {
+    if (!confirm(`Make a new access code for ${m.email}? The old code stops working.`)) return;
+    run(async () => {
+      setBusyId(m.id);
+      try {
+        const code = generatePassword(10);
+        await teamApi.resetCode(m.id, code);
+        setHandover({ email: m.email, role: 'desk', code });
+        await load();
+      } finally {
+        setBusyId(null);
+      }
+    });
+  };
+
+  const copy = (text: string) => {
+    navigator.clipboard?.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  const canManage = !!team?.canManage;
 
   return (
-    <div className="flex-1 flex flex-col font-sans select-none">
-      <Header
-        title="Platform Integrations & Infrastructure"
-        subtitle="Configure Cloudflare R2, Resend delivery, custom domains, WhatsApp BYON, and Xendit billing"
-        actionText="Back to Operations"
-        actionHref="/dashboard"
-      />
+    <div className="flex-1 flex flex-col font-sans">
+      <Header title="Settings" subtitle="Your organization and the people who run your events" />
 
-      <div className="p-6 sm:p-8 space-y-8 max-w-5xl">
-        {saveSuccess && (
-          <div className="p-4 rounded-2xl bg-premium-charcoal border border-premium-gold/40 text-premium-gold text-sm font-semibold flex items-center gap-3 shadow-gold">
-            <CheckCircle2 className="w-5 h-5 text-premium-gold" />
-            <span>Settings and integration tokens updated successfully!</span>
+      <div className="p-6 sm:p-8 space-y-6 max-w-4xl w-full">
+        {error && (
+          <div className="p-4 rounded-2xl bg-premium-danger/10 border border-premium-danger/40 text-premium-danger text-sm font-bold flex items-start justify-between gap-3">
+            <span>{error}</span>
+            <button type="button" onClick={() => setError(null)} className="scale-on-click" aria-label="Dismiss">
+              <X className="w-4 h-4" />
+            </button>
           </div>
         )}
 
-        <form onSubmit={handleSave} className="space-y-8">
-          {/* 1. Email Service (Resend) */}
-          <div className="p-8 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark space-y-6 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-premium-gold/15 text-premium-gold flex items-center justify-center shadow-gold">
-                  <Mail className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-display font-medium text-white">Resend Email Gateway</h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">High-deliverability dynamic QR passes & calendar invitations</p>
-                </div>
-              </div>
-              <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-premium-success/20 text-premium-success text-xs font-bold uppercase border border-premium-success/30">
-                <span className="w-2 h-2 rounded-full bg-premium-success shadow-[0_0_8px_#00E676]" />
-                Connected
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-              <div>
-                <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest block mb-2">Sender Email Address</label>
-                <input
-                  type="text"
-                  disabled
-                  value="dayoneproject.xyz <invitations@dayoneproject.xyz>"
-                  className="w-full px-5 py-3.5 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-xs font-mono text-zinc-300"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest block mb-2">Fair-Use Email Limit</label>
-                <div className="px-5 py-3.5 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-xs text-zinc-300 flex items-center justify-between">
-                  <span>Included in Flat Tier</span>
-                  <strong className="text-premium-success font-display">Max 3 emails / guest</strong>
-                </div>
-              </div>
-            </div>
+        {!team && !error && (
+          <div className="p-10 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark flex items-center justify-center gap-3 text-sm text-zinc-400">
+            <Loader2 className="w-4 h-4 animate-spin text-premium-gold" /> Loading your team…
           </div>
+        )}
 
-          {/* 2. Cloudflare R2 Storage */}
-          <div className="p-8 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark space-y-6 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-premium-gold/15 text-premium-gold flex items-center justify-center shadow-gold">
-                  <HardDrive className="w-6 h-6" />
+        {team && (
+          <>
+            {/* Organization */}
+            <section className="p-6 sm:p-8 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-premium-gold/15 text-premium-gold flex items-center justify-center">
+                  <Building2 className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-display font-medium text-white">Cloudflare R2 Object Storage</h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">Direct S3-compatible presigned client upload for Photo Wall WebP images</p>
+                  <h2 className="text-lg font-display font-bold text-white">Organization</h2>
+                  <p className="text-xs text-zinc-500">Everyone on your team sees and runs this organization&apos;s events.</p>
                 </div>
               </div>
-              <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-premium-success/20 text-premium-success text-xs font-bold uppercase border border-premium-success/30">
-                <span className="w-2 h-2 rounded-full bg-premium-success shadow-[0_0_8px_#00E676]" />
-                Active CDN
-              </span>
-            </div>
-
-            <div className="text-xs text-zinc-400 bg-premium-surfaceDark p-5 rounded-2xl border border-premium-borderDark flex items-center justify-between">
-              <span>Automatic Retention Policy:</span>
-              <strong className="text-white font-mono">30 Days Post-Event Retention (Auto-Purged)</strong>
-            </div>
-          </div>
-
-          {/* 3. Custom Domain & Subdomain */}
-          <div className="p-8 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark space-y-6 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-premium-neon/15 text-premium-neon flex items-center justify-center glow-neon">
-                  <Globe className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-display font-medium text-white">Client Subdomains & Custom White Label</h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">Every event gets its own secure link: app.dayoneproject.xyz/events/&lt;clientname&gt;</p>
-                </div>
-              </div>
-              <span className="text-xs text-premium-success font-bold uppercase bg-premium-success/20 px-3.5 py-1.5 rounded-full border border-premium-success/30">
-                Subdomain Active
-              </span>
-            </div>
-
-            <div className="space-y-4 pt-2">
-              <div className="p-5 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <span className="text-xs font-bold uppercase tracking-widest text-zinc-500 block">Default Event Link</span>
-                  <div className="text-sm font-mono font-bold text-premium-neon mt-1">
-                    https://app.dayoneproject.xyz/events/&lt;clientname&gt;
-                  </div>
-                </div>
-                <div className="text-xs text-zinc-400 max-w-sm font-light">
-                  Automatically routed via Edge Proxy to guest portal, photo wall, buzzer, and stage displays.
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest block mb-2">Optional Custom Domain (White Label CNAME)</label>
-                <div className="flex gap-3">
-                  <input
-                    type="text"
-                    value={customDomain}
-                    onChange={(e) => setCustomDomain(e.target.value)}
-                    placeholder="e.g. event.yourcompany.com"
-                    className="flex-1 px-5 py-3.5 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-sm font-mono text-white focus:border-premium-gold outline-none"
-                  />
+              {canManage ? (
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input value={orgName} onChange={(e) => setOrgName(e.target.value)} maxLength={120} placeholder="Organization name" className={input} />
                   <button
                     type="button"
-                    className="px-6 py-3.5 rounded-2xl bg-premium-surfaceDark border border-zinc-700 hover:border-premium-gold text-xs font-bold text-white transition-colors scale-on-click"
+                    onClick={saveName}
+                    disabled={savingName || !orgName.trim() || orgName.trim() === team.org.name}
+                    className="px-6 py-3 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-sm shadow-gold scale-on-click disabled:opacity-40 flex items-center justify-center gap-2"
                   >
-                    Verify DNS
+                    {savingName ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Save
                   </button>
                 </div>
-                <p className="text-xs text-zinc-500 mt-2 font-mono">
-                  Point a CNAME record from <code className="text-premium-neon">{customDomain}</code> to <code className="text-zinc-300">cname.vercel-dns.com</code>
-                </p>
-              </div>
-            </div>
-          </div>
+              ) : (
+                <div className="px-4 py-3 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-sm text-white font-bold">{team.org.name}</div>
+              )}
+            </section>
 
-          {/* 4. Photo Wall Captions & Media Upload Constraints */}
-          <div className="p-8 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark space-y-6 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-premium-gold/15 text-premium-gold flex items-center justify-center shadow-gold">
-                  <Camera className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-display font-medium text-white">Live Photo Wall & Guest Captions Policy</h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">Control guest captioning permissions and enforced media limits</p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setCaptionsEnabled(!captionsEnabled)}
-                className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all scale-on-click ${
-                  captionsEnabled
-                    ? 'bg-premium-gold text-black shadow-gold'
-                    : 'bg-premium-surfaceDark border border-premium-borderDark text-zinc-400 hover:text-white'
-                }`}
-              >
-                {captionsEnabled ? 'Captions: ON (300 Chars)' : 'Captions: OFF (Media Only)'}
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 text-xs">
-              <div className="p-5 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark">
-                <span className="text-[10px] font-mono uppercase text-zinc-500 font-bold block mb-1">Image Compression</span>
-                <strong className="text-white text-base font-display">Max 2MB (WebP)</strong>
-                <p className="text-[11px] text-zinc-400 mt-1 font-light">Auto-converted via browser canvas pipeline</p>
-              </div>
-
-              <div className="p-5 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark">
-                <span className="text-[10px] font-mono uppercase text-zinc-500 font-bold block mb-1">Video Stream</span>
-                <strong className="text-white text-base font-display">Max 20MB (720p HD)</strong>
-                <p className="text-[11px] text-zinc-400 mt-1 font-light">Short video clips for stage wall broadcast</p>
-              </div>
-
-              <div className="p-5 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark">
-                <span className="text-[10px] font-mono uppercase text-zinc-500 font-bold block mb-1">Display Layout</span>
-                <strong className="text-premium-gold text-base font-display">Pinterest Masonry</strong>
-                <p className="text-[11px] text-zinc-400 mt-1 font-light">Staggered columns with reaction hearts</p>
-              </div>
-            </div>
-          </div>
-
-          {/* 5. WhatsApp Integration (Fonnte BYON) with Risk Disclosure Modal */}
-          <div className="p-8 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark space-y-6 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-premium-neon/15 text-premium-neon flex items-center justify-center glow-neon">
-                  <MessageSquare className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-display font-medium text-white">WhatsApp Integration (Fonnte BYON)</h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">Bring Your Own Number gateway with automated delivery pacing</p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleToggleFonnte}
-                className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all scale-on-click ${
-                  fonnteEnabled
-                    ? 'bg-premium-neon text-black shadow-neon'
-                    : 'bg-premium-surfaceDark border border-premium-borderDark text-zinc-400 hover:text-white'
-                }`}
-              >
-                {fonnteEnabled ? 'Enabled' : 'Enable Fonnte'}
-              </button>
-            </div>
-
-            {fonnteEnabled ? (
-              <div className="space-y-4 pt-2">
-                <div>
-                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest block mb-2">Fonnte API Token</label>
-                  <input
-                    type="password"
-                    value={fonnteToken}
-                    onChange={(e) => setFonnteToken(e.target.value)}
-                    placeholder="Enter your Fonnte token..."
-                    className="w-full px-5 py-3.5 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-sm font-mono text-white focus:border-premium-gold outline-none"
-                  />
-                </div>
-
-                <div className="p-5 rounded-2xl bg-premium-surfaceDark border border-premium-gold/30 text-xs text-zinc-300 space-y-1">
-                  <div className="font-bold text-premium-gold flex items-center gap-2">
-                    <ShieldAlert className="w-4 h-4" />
-                    <span>System Rate-Limiting Protection Active</span>
+            {/* Handover after adding someone */}
+            {handover && (
+              <section className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-gold/50 shadow-gold space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <h3 className="text-base font-display font-bold text-white">
+                      {handover.code ? 'Give this access code to the register desk' : `${handover.email} can sign in now`}
+                    </h3>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
+                      {handover.code ? (
+                        <>
+                          They open <span className="font-mono text-premium-neon">{LOGIN_URL}</span>, choose <strong className="text-white">Register desk</strong>, and enter{' '}
+                          <span className="font-mono text-white">{handover.email}</span> with this code. It is shown only once.
+                        </>
+                      ) : (
+                        <>
+                          They open <span className="font-mono text-premium-neon">{LOGIN_URL}</span>, choose <strong className="text-white">Organizer</strong>, and enter their email.
+                          A 6-digit sign-in code is emailed to them each time.
+                        </>
+                      )}
+                    </p>
                   </div>
-                  <p className="text-xs text-zinc-400 leading-relaxed font-light">
-                    Messages are automatically spaced with jitter delays by our background worker queue to preserve number reputation in compliance with dayoneproject.xyz Terms & Conditions.
+                  <button type="button" onClick={() => setHandover(null)} className="text-zinc-500 hover:text-white scale-on-click" aria-label="Close">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                {handover.code && (
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 px-4 py-3 rounded-xl bg-premium-surfaceDark border border-premium-borderDark font-mono text-lg tracking-widest text-premium-gold text-center">
+                      {handover.code}
+                    </div>
+                    <button type="button" onClick={() => copy(handover.code!)} className={quietButton}>
+                      {copied ? <Check className="w-3.5 h-3.5 text-premium-success" /> : <Copy className="w-3.5 h-3.5" />} {copied ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* Team */}
+            <section className="p-6 sm:p-8 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-premium-neon/10 text-premium-neon flex items-center justify-center">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-display font-bold text-white">Team</h2>
+                    <p className="text-xs text-zinc-500">{team.members.length} {team.members.length === 1 ? 'person' : 'people'}</p>
+                  </div>
+                </div>
+                {canManage && !adding && (
+                  <button
+                    type="button"
+                    onClick={() => { setAdding(true); setHandover(null); }}
+                    className="px-5 py-2.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-sm shadow-gold scale-on-click flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" /> Add person
+                  </button>
+                )}
+              </div>
+
+              {!canManage && (
+                <p className="text-xs text-zinc-500 px-4 py-3 rounded-xl bg-premium-surfaceDark border border-premium-borderDark">
+                  Only the account owner can add or remove people.
+                </p>
+              )}
+
+              {adding && (
+                <form onSubmit={addPerson} className="p-5 rounded-2xl bg-premium-surfaceDark border border-premium-gold/40 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {([
+                      { role: 'organizer', icon: Briefcase, title: 'Admin organizer', desc: 'Creates and runs events. Signs in with a code sent to their email.' },
+                      { role: 'desk', icon: ScanLine, title: 'Register desk', desc: 'Checks guests in at the door. Signs in with email and an access code.' },
+                    ] as const).map(({ role, icon: Icon, title, desc }) => {
+                      const active = person.role === role;
+                      return (
+                        <button
+                          key={role}
+                          type="button"
+                          onClick={() => setPerson((p) => ({ ...p, role }))}
+                          className={`p-4 rounded-2xl border text-left scale-on-click transition-all ${active ? 'border-premium-gold bg-premium-charcoal shadow-gold' : 'border-premium-borderDark hover:border-zinc-600'}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Icon className={`w-4 h-4 ${active ? 'text-premium-gold' : 'text-zinc-500'}`} />
+                            <span className={`text-sm font-display font-bold ${active ? 'text-white' : 'text-zinc-300'}`}>{title}</span>
+                          </div>
+                          <p className="text-[11px] text-zinc-500 mt-1.5 leading-relaxed">{desc}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="block space-y-1.5">
+                      <span className={label}>Name</span>
+                      <input value={person.name} onChange={(e) => setPerson((p) => ({ ...p, name: e.target.value }))} placeholder="Full name" className={input} />
+                    </label>
+                    <label className="block space-y-1.5">
+                      <span className={label}>Email</span>
+                      <input
+                        type="email"
+                        required
+                        value={person.email}
+                        onChange={(e) => setPerson((p) => ({ ...p, email: e.target.value }))}
+                        placeholder={person.role === 'desk' ? 'desk1@yourcompany.com' : 'name@yourcompany.com'}
+                        className={input}
+                      />
+                    </label>
+                  </div>
+
+                  {person.role === 'desk' && (
+                    <label className="block space-y-1.5">
+                      <span className={label}>Access code</span>
+                      <div className="flex gap-2">
+                        <input
+                          required
+                          minLength={8}
+                          value={person.code}
+                          onChange={(e) => setPerson((p) => ({ ...p, code: e.target.value.trim() }))}
+                          className={`${input} font-mono tracking-widest`}
+                        />
+                        <button type="button" onClick={() => setPerson((p) => ({ ...p, code: generatePassword(10) }))} className={quietButton} title="Make a new code">
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-zinc-500">Use a separate email for each desk. You&apos;ll see this code once after saving.</p>
+                    </label>
+                  )}
+
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <button type="button" onClick={() => { setAdding(false); setPerson(blankPerson()); }} className={quietButton}>
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="px-5 py-2.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-sm shadow-gold scale-on-click disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Add to team
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              <div className="divide-y divide-premium-borderDark rounded-2xl border border-premium-borderDark overflow-hidden">
+                {team.members.map((m) => {
+                  const isMe = m.id === user?.id;
+                  return (
+                    <div key={m.id} className="flex flex-wrap items-center gap-3 p-4 bg-premium-surfaceDark/40">
+                      <div className="w-9 h-9 rounded-full bg-premium-charcoal border border-premium-borderDark flex items-center justify-center text-xs font-bold text-zinc-300 flex-shrink-0">
+                        {(m.name || m.email)[0]?.toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-[180px]">
+                        <div className="text-sm font-bold text-white flex items-center gap-2 flex-wrap">
+                          {m.name || m.email}
+                          {isMe && <span className="text-[10px] font-mono text-zinc-500">(you)</span>}
+                          {m.disabled && <span className="text-[10px] font-bold text-premium-danger">Switched off</span>}
+                        </div>
+                        <div className="text-[11px] text-zinc-500 truncate">
+                          {m.name ? <span className="font-mono">{m.email}</span> : null}
+                          {m.name ? ' · ' : ''}
+                          {lastSeen(m.lastSignInAt)}
+                        </div>
+                      </div>
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${ROLE_STYLE[m.role]}`}>
+                        {TEAM_ROLE_LABELS[m.role]}
+                      </span>
+                      {canManage && m.role !== 'owner' && !isMe && (
+                        <div className="flex items-center gap-2">
+                          {m.role === 'desk' && (
+                            <button type="button" onClick={() => newCode(m)} disabled={busyId === m.id} className={quietButton}>
+                              <KeyRound className="w-3.5 h-3.5" /> New code
+                            </button>
+                          )}
+                          <button type="button" onClick={() => remove(m)} disabled={busyId === m.id} className={`${quietButton} hover:text-premium-danger hover:border-premium-danger/40`}>
+                            {busyId === m.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserMinus className="w-3.5 h-3.5" />} Remove
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* How people sign in */}
+            <section className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div className="flex gap-3">
+                <LogIn className="w-4 h-4 text-premium-gold flex-shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="font-bold text-white">Admin organizers</div>
+                  <p className="text-zinc-400 leading-relaxed">
+                    Sign in at <span className="font-mono text-premium-neon">{LOGIN_URL}</span> → Organizer, with a code emailed to them. They can create and run events.
                   </p>
                 </div>
               </div>
-            ) : (
-              <div className="text-xs text-zinc-400 font-light">
-                Fonnte is currently disabled. By enabling it, you can connect your own phone number to dispatch WhatsApp passes.
-              </div>
-            )}
-          </div>
-
-          {/* 6. Payment Gateway (Xendit) */}
-          <div className="p-8 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark space-y-6 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-premium-gold/15 text-premium-gold flex items-center justify-center shadow-gold">
-                  <CreditCard className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-display font-medium text-white">Xendit Billing & Checkout</h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">Indonesian QRIS, Virtual Accounts (BCA, Mandiri, BRI, BNI), & Credit Cards</p>
+              <div className="flex gap-3">
+                <ScanLine className="w-4 h-4 text-premium-success flex-shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="font-bold text-white">Register desk</div>
+                  <p className="text-zinc-400 leading-relaxed">
+                    Sign in at <span className="font-mono text-premium-neon">{LOGIN_URL}</span> → Register desk, with their email and access code. They only see check-in.
+                  </p>
                 </div>
               </div>
-              <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-premium-gold/20 text-premium-gold text-xs font-bold uppercase border border-premium-gold/30">
-                Sandbox Mode Active
-              </span>
-            </div>
-
-            <div className="text-xs text-zinc-400 bg-premium-surfaceDark p-5 rounded-2xl border border-premium-borderDark flex items-center justify-between">
-              <span>Merchant Environment:</span>
-              <strong className="text-white font-mono">Deferred for Production Launch</strong>
-            </div>
-          </div>
-
-          {/* Submit Save Button */}
-          <div className="flex justify-end pt-4">
-            <button
-              type="submit"
-              className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl font-bold text-sm text-black bg-premium-gold hover:bg-premium-goldHover transition-all shadow-gold scale-on-click"
-            >
-              <Save className="w-4 h-4" />
-              <span>Save Configuration</span>
-            </button>
-          </div>
-        </form>
-
-        {/* Fonnte Risk Disclosure Modal */}
-        {isRiskModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
-            <div className="bg-premium-charcoal border border-premium-danger/30 rounded-[2.5rem] p-8 max-w-lg w-full relative shadow-danger space-y-6">
-              <button
-                type="button"
-                onClick={() => setIsRiskModalOpen(false)}
-                className="absolute top-6 right-6 text-zinc-500 hover:text-white scale-on-click"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-premium-danger/20 text-premium-danger flex items-center justify-center border border-premium-danger/30">
-                  <ShieldAlert className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-display font-medium text-white">
-                    WhatsApp BYON Risk Disclosure
-                  </h3>
-                  <p className="text-xs text-zinc-400">Important terms regarding third-party WhatsApp numbers</p>
-                </div>
-              </div>
-
-              <div className="space-y-3 text-xs text-zinc-300 leading-relaxed bg-premium-surfaceDark p-6 rounded-2xl border border-premium-borderDark font-light">
-                <p>
-                  <strong className="text-white font-bold">1. Dedicated Event Number:</strong> We strongly advise using a dedicated event phone number instead of your primary personal or core business number.
-                </p>
-                <p>
-                  <strong className="text-white font-bold">2. System Rate Limiting & Pacing:</strong> To safeguard your number from automated WhatsApp anti-spam bans, dayoneproject.xyz enforces background rate-limiting and sequential message delays automatically. You acknowledge that burst messages will be queued.
-                </p>
-                <p>
-                  <strong className="text-white font-bold">3. Terms Acceptance:</strong> By proceeding, you accept full responsibility for the number provided and agree that dayoneproject.xyz is not liable for carrier or platform number suspensions resulting from unsolicited recipient reporting.
-                </p>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsRiskModalOpen(false)}
-                  className="px-6 py-3.5 rounded-2xl bg-transparent border border-zinc-700 text-xs font-bold text-white scale-on-click"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleAcceptTerms}
-                  className="px-6 py-3.5 rounded-2xl font-bold text-xs text-black bg-premium-gold hover:bg-premium-goldHover shadow-gold scale-on-click"
-                >
-                  I Understand & Accept Terms
-                </button>
-              </div>
-            </div>
-          </div>
+            </section>
+          </>
         )}
       </div>
     </div>

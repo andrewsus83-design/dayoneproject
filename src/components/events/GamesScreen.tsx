@@ -194,43 +194,53 @@ export function GamesScreen({ slug, initialId }: { slug: string; initialId?: str
     return <div className="min-h-screen bg-premium-black flex items-center justify-center text-zinc-500 text-sm">Loading activity…</div>;
   }
 
+  // Left sits beside the back button; center and right get their own line under the controls.
+  const nameAlign = activity.nameAlign;
+  const justify = nameAlign === 'center' ? 'justify-center' : nameAlign === 'right' ? 'justify-end' : '';
+  const title = (
+    <div className="min-w-0">
+      <h1 className={`text-base font-display font-medium text-white flex items-center gap-2 truncate ${justify}`}>
+        {activity.name}
+        <span className="w-2 h-2 rounded-full bg-premium-neon shadow-[0_0_8px_#00F0FF] animate-pulse" />
+      </h1>
+      <p className={`text-xs text-zinc-400 font-mono truncate flex items-center gap-2 ${justify}`}>
+        {event.name}
+        <span className="inline-flex items-center gap-1 text-premium-success"><Users className="w-3 h-3" /> {players.length} player{players.length === 1 ? '' : 's'}</span>
+        {activity.anonymous && <span className="inline-flex items-center gap-1 text-premium-gold"><EyeOff className="w-3 h-3" /> Anonymous</span>}
+      </p>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-premium-black text-zinc-100 select-none relative overflow-hidden font-sans">
       <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-premium-neon/10 blur-[150px] pointer-events-none rounded-full" />
       <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-premium-gold/10 blur-[150px] pointer-events-none rounded-full" />
       <StageFrameShell frame={activity.frame} logoRef={config.design.logoUrl} className="min-h-screen">
-        <header className="px-8 pt-6 pb-4 flex flex-wrap items-center justify-between gap-4 z-20">
-          <div className="flex items-center gap-4 min-w-0">
-            <Link href={`/events/${slug}`} className="p-2.5 rounded-2xl bg-premium-charcoal text-zinc-400 hover:text-white border border-premium-borderDark scale-on-click" aria-label="Back to event">
-              <ArrowLeft className="w-4 h-4" />
-            </Link>
-            <div className="min-w-0">
-              <h1 className="text-base font-display font-medium text-white flex items-center gap-2 truncate">
-                {activity.name}
-                <span className="w-2 h-2 rounded-full bg-premium-neon shadow-[0_0_8px_#00F0FF] animate-pulse" />
-              </h1>
-              <p className="text-xs text-zinc-400 font-mono truncate flex items-center gap-2">
-                {event.name}
-                <span className="inline-flex items-center gap-1 text-premium-success"><Users className="w-3 h-3" /> {players.length} player{players.length === 1 ? '' : 's'}</span>
-                {activity.anonymous && <span className="inline-flex items-center gap-1 text-premium-gold"><EyeOff className="w-3 h-3" /> Anonymous</span>}
-              </p>
+        <header className="px-8 pt-6 pb-4 z-20 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4 min-w-0">
+              <Link href={`/events/${slug}`} className="p-2.5 rounded-2xl bg-premium-charcoal text-zinc-400 hover:text-white border border-premium-borderDark scale-on-click" aria-label="Back to event">
+                <ArrowLeft className="w-4 h-4" />
+              </Link>
+              {nameAlign === 'left' && title}
+            </div>
+            <div className="flex items-center gap-2 overflow-x-auto max-w-full">
+              {activities.length > 1 && activities.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => { setSelectedId(a.id); router.replace(`/events/${slug}/games/${a.id}`, { scroll: false }); }}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap scale-on-click ${a.id === activity.id ? 'bg-premium-gold text-black shadow-gold' : 'bg-premium-charcoal border border-premium-borderDark text-zinc-400 hover:text-white'}`}
+                >
+                  {a.name}
+                </button>
+              ))}
+              {activity.kind === 'quiz' && (
+                <span className="text-xs font-mono ml-2 whitespace-nowrap"><span className="text-zinc-500">Score </span><strong className="text-premium-neon font-display text-base">{score}</strong></span>
+              )}
             </div>
           </div>
-          <div className="flex items-center gap-2 overflow-x-auto max-w-full">
-            {activities.length > 1 && activities.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => { setSelectedId(a.id); router.replace(`/events/${slug}/games/${a.id}`, { scroll: false }); }}
-                className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap scale-on-click ${a.id === activity.id ? 'bg-premium-gold text-black shadow-gold' : 'bg-premium-charcoal border border-premium-borderDark text-zinc-400 hover:text-white'}`}
-              >
-                {a.name}
-              </button>
-            ))}
-            {activity.kind === 'quiz' && (
-              <span className="text-xs font-mono ml-2 whitespace-nowrap"><span className="text-zinc-500">Score </span><strong className="text-premium-neon font-display text-base">{score}</strong></span>
-            )}
-          </div>
+          {nameAlign !== 'left' && title}
         </header>
         <main className="flex-1 p-6 sm:p-8 max-w-4xl mx-auto w-full flex flex-col justify-center items-center z-10">
           {activity.kind === 'quiz' ? <QuizRunner key={activity.id} questions={activity.questions} players={players} onScore={setScore} /> : <HuntBoard activity={activity} />}

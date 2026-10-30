@@ -21,7 +21,7 @@ const quiet = 'w-full text-xs font-bold text-zinc-400 hover:text-white flex item
 const METHODS: { id: Method; label: string; icon: typeof Mail }[] = [
   { id: 'organizer', label: 'Organizer', icon: Briefcase },
   { id: 'desk', label: 'Register desk', icon: ScanLine },
-  { id: 'owner', label: 'Owner', icon: ShieldCheck },
+  { id: 'owner', label: 'Platform admin', icon: ShieldCheck },
 ];
 
 /** Only same-site paths are allowed after sign-in. */
@@ -170,7 +170,7 @@ function LoginForm() {
               <button type="submit" disabled={busy} className={primary}>
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />} Email me a code
               </button>
-              <p className="text-[11px] text-zinc-500 text-center">We send a one-time code to the email your admin registered.</p>
+              <p className="text-[11px] text-zinc-500 text-center">We send a one-time code to the email your account owner added.</p>
             </>
           )}
 
@@ -242,7 +242,7 @@ function LoginForm() {
           )}
         </form>
 
-        <p className="text-[11px] text-zinc-600 text-center">Accounts are created by your dayoneproject.xyz admin.</p>
+        <p className="text-[11px] text-zinc-600 text-center">No account yet? Ask your account owner to add you in Settings.</p>
       </div>
     </div>
   );

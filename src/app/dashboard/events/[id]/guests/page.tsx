@@ -104,7 +104,7 @@ function GuestListContent({ eventId }: { eventId: string }) {
   };
 
   const handleSendEmail = (guest: Guest) => {
-    setEmailSentAlert(`Invitation email successfully dispatched via Resend to ${guest.email || guest.name}!`);
+    setEmailSentAlert(`Invitation email sent to ${guest.email || guest.name}!`);
     setTimeout(() => setEmailSentAlert(null), 4000);
   };
 
@@ -458,7 +458,7 @@ function GuestListContent({ eventId }: { eventId: string }) {
                             type="button"
                             onClick={() => handleSendEmail(guest)}
                             className="p-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-zinc-400 hover:text-premium-neon hover:border-premium-neon/50 transition-colors scale-on-click"
-                            title="Send Resend Email Ticket"
+                            title="Email the QR pass"
                           >
                             <Mail className="w-4 h-4" />
                           </button>

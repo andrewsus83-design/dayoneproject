@@ -503,7 +503,7 @@ export function BroadcastStudio({ eventId }: { eventId: string }) {
           <Info className="w-4 h-4 text-premium-neon shrink-0 mt-px" />
           <span>
             Each button opens the message ready to send from your own WhatsApp or email app.
-            Automatic sending to everyone at once (WhatsApp through Fonnte, email through Resend) switches on once the server is connected.
+            Sending to everyone at once in one click is coming soon.
             Phone numbers starting with 0 get country code
             <input
               value={bc.countryCode}

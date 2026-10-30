@@ -23,9 +23,10 @@ import { Guest, PhotoWallUpload } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
 import {
   useEventConfig, useGuests, useHydrated, writeGuests, formatGuestNumber, numberDigits, resetEventSection, makePassToken, newId, DEFAULT_ACCESS,
-  type EventInfo,
+  useOrgEventsCache, type EventInfo,
 } from '@/lib/eventStore';
 import { isSlugTaken } from '@/lib/events';
+import { slugProblem, updateOrgEvent, venueTimestamp } from '@/lib/orgEvents';
 import { downloadBlob, toCsv } from '@/lib/image';
 import * as XLSX from 'xlsx';
 import {
@@ -129,8 +130,30 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
     setSlugError(null);
     setInfo({ slug });
   };
-  const handleSaveInfo = () => {
-    update('info', { ...info, slug: info.slug.replace(/-$/, '') });
+  const savedEvents = useOrgEventsCache();
+  const isSavedEvent = !!savedEvents?.[eventId];
+  const [infoError, setInfoError] = useState<string | null>(null);
+  const handleSaveInfo = async () => {
+    const slug = info.slug.replace(/-$/, '');
+    update('info', { ...info, slug });
+    setInfoError(null);
+    // Events saved to the organization also keep their name, link, date and venue in the backend.
+    if (isSavedEvent) {
+      const problem = slugProblem(slug);
+      if (problem) return setInfoError(problem);
+      try {
+        await updateOrgEvent(eventId, {
+          name: info.name.trim(),
+          slug,
+          venueName: info.venue.trim(),
+          venueAddress: info.address.trim(),
+          startsAt: venueTimestamp(info.startDate, info.startTime),
+          endsAt: venueTimestamp(info.endDate || info.startDate, info.endTime || info.startTime),
+        });
+      } catch (e) {
+        return setInfoError(e instanceof Error ? e.message : 'Could not save. Try again.');
+      }
+    }
     setInfoSaved(true);
     setTimeout(() => setInfoSaved(false), 2000);
   };
@@ -275,7 +298,7 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
   const handleModuleToggle = (tab: string, enabled: boolean) => {
     setModuleConfig((prev) => {
       const next = { ...prev, [tab]: enabled };
-      const arr = ['overview', 'setting', ...Object.entries(next).filter(([, v]) => v).map(([k]) => k)];
+      const arr = ['overview', 'design', 'comments', 'setting', ...Object.entries(next).filter(([, v]) => v).map(([k]) => k)];
       try {
         localStorage.setItem(`all41-mods-${eventId}`, JSON.stringify(arr));
         window.dispatchEvent(new CustomEvent('all41-modules-changed'));
@@ -563,10 +586,13 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                       />
                     </div>
 
+                    {infoError && (
+                      <p className="p-3 rounded-xl bg-premium-danger/10 border border-premium-danger/40 text-premium-danger text-xs font-bold">{infoError}</p>
+                    )}
                     <div className="flex items-center justify-between gap-3 pt-2">
                       <button
                         type="button"
-                        onClick={() => { if (confirm('Reset event information to the original values?')) { resetEventSection(eventId, 'info'); setSlugError(null); } }}
+                        onClick={() => { if (confirm('Reset event information to the original values?')) { resetEventSection(eventId, 'info'); setSlugError(null); setInfoError(null); } }}
                         className="px-4 py-2.5 rounded-xl border border-premium-borderDark text-zinc-400 hover:text-white font-bold text-xs scale-on-click flex items-center gap-1.5"
                       >
                         <RotateCcw className="w-3.5 h-3.5" /> Reset
@@ -967,7 +993,7 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
         )}
 
         {/* =========================================================================
-            MENU 4: BROADCAST (Email, WhatsApp Fonnte BYON, Embed Tools)
+            MENU 4: BROADCAST (Email, WhatsApp, Embed Tools)
            ========================================================================= */}
         {activeTab === 'broadcast' && (
           <div className="grid grid-cols-1 2xl:grid-cols-12 gap-8 animate-in fade-in duration-200">
@@ -1251,13 +1277,13 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
         )}
 
         {/* =========================================================================
-            MENU 10: SETTING (Domain BYOD, Email Resend, WhatsApp Fonnte, Terms, Privacy)
+            MENU 10: SETTING (Register desk access, modules, terms, privacy)
            ========================================================================= */}
         {activeTab === 'setting' && (
           <div className="space-y-6 animate-in fade-in duration-200">
             <div>
-              <h3 className="text-2xl font-display font-bold text-white">Event Integrations & Policies</h3>
-              <p className="text-xs text-zinc-400">Custom domain BYOD, WhatsApp Fonnte gateway, Resend email, and legal disclosures.</p>
+              <h3 className="text-2xl font-display font-bold text-white">Event Settings</h3>
+              <p className="text-xs text-zinc-400">Register desk access, which modules this event uses, and the terms guests agree to.</p>
             </div>
 
             {/* Register desk access */}
@@ -1268,7 +1294,8 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                     <KeyRound className="w-3.5 h-3.5" /> Register Desk Access
                   </span>
                   <p className="text-[11px] text-zinc-500 mt-1">
-                    The Register screen (door check-in) asks for this username and passcode before it opens.
+                    The Register screen (door check-in) asks for this username and passcode before it opens. Desk staff you add in{' '}
+                    <Link href="/dashboard/settings" className="text-premium-gold font-bold hover:underline">Settings</Link> sign in with their own access code instead.
                   </p>
                 </div>
                 <a
@@ -1329,7 +1356,7 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
             {/* Module Visibility */}
             <div className="p-6 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark space-y-4 shadow-xl">
               <div>
-                <span className="text-[10px] font-mono uppercase text-premium-gold font-bold">0. Module Visibility</span>
+                <span className="text-[10px] font-mono uppercase text-premium-gold font-bold">Module Visibility</span>
                 <p className="text-[11px] text-zinc-500 mt-1">Choose which modules appear in your event sidebar. Overview and Setting are always shown.</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1361,53 +1388,9 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Domain BYOD */}
-              <div className="p-6 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark space-y-3 shadow-xl">
-                <span className="text-[10px] font-mono uppercase text-premium-neon font-bold">1. Subdomain & Custom Domain BYOD</span>
-                <div className="space-y-2 text-xs">
-                  <div>
-                    <label className="text-zinc-400 block mb-1">Subdomain Rail</label>
-                    <input
-                      type="text"
-                      defaultValue={`app.dayoneproject.xyz/events/${event.slug}`}
-                      disabled
-                      className="w-full bg-premium-surfaceDark border border-premium-borderDark text-premium-neon p-3 rounded-xl font-mono text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-zinc-400 block mb-1">Bring Your Own Domain (BYOD)</label>
-                    <input
-                      type="text"
-                      value={config.policy.customDomain}
-                      onChange={(e) => update('policy', { customDomain: e.target.value.trim().toLowerCase() })}
-                      placeholder="rsvp.yourdomain.com"
-                      className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white p-3 rounded-xl font-mono text-xs outline-none focus:border-premium-gold"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* WhatsApp Fonnte */}
-              <div className="p-6 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark space-y-3 shadow-xl">
-                <span className="text-[10px] font-mono uppercase text-premium-success font-bold">2. WhatsApp (Fonnte BYON)</span>
-                <div className="space-y-2 text-xs">
-                  <div>
-                    <label className="text-zinc-400 block mb-1">Fonnte API Token</label>
-                    <input
-                      type="password"
-                      defaultValue="fonnte_sec_live_99214488a01b"
-                      className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white p-3 rounded-xl font-mono text-xs outline-none focus:border-premium-gold"
-                    />
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-[11px] text-zinc-400">
-                    Pacing Safety: <strong className="text-premium-success">5 - 15 Seconds delay per contact (Anti-Ban)</strong>
-                  </div>
-                </div>
-              </div>
-
               {/* Terms & Conditions */}
               <div className="p-6 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark space-y-3 shadow-xl">
-                <span className="text-[10px] font-mono uppercase text-premium-gold font-bold">3. Terms & Conditions</span>
+                <span className="text-[10px] font-mono uppercase text-premium-gold font-bold">Terms & Conditions</span>
                 <textarea
                   value={config.policy.terms}
                   onChange={(e) => update('policy', { terms: e.target.value })}
@@ -1418,7 +1401,7 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
 
               {/* Privacy Policy */}
               <div className="p-6 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark space-y-3 shadow-xl">
-                <span className="text-[10px] font-mono uppercase text-premium-gold font-bold">4. Privacy Policy</span>
+                <span className="text-[10px] font-mono uppercase text-premium-gold font-bold">Privacy Policy</span>
                 <textarea
                   value={config.policy.privacy}
                   onChange={(e) => update('policy', { privacy: e.target.value })}

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import { Event, Guest } from './types';
-import { getBaseEvent, resolveEventIdFromSlug, SLUG_INDEX_KEY } from './events';
+import { getBaseEvent, resolveEventIdFromSlug, SLUG_INDEX_KEY, ORG_EVENTS_KEY, type OrgEventRow } from './events';
 import { MOCK_GUESTS, POPVERSE_QUIZ_QUESTIONS } from './mockData';
 import { buildDefaultBlocks, legacyToBlocks, type LandingBlock } from './landingBlocks';
 import { defaultBroadcast } from './broadcastTemplates';
@@ -221,7 +221,11 @@ export interface Activity {
   /** What winners of this activity get, e.g. "Bluetooth speaker". */
   prize: string;
   winners: GameWinner[];
+  /** Where the activity name sits at the top of the big screen. */
+  nameAlign: NameAlign;
 }
+
+export type NameAlign = 'left' | 'center' | 'right';
 
 export interface GameWinner {
   id: string;
@@ -649,7 +653,7 @@ function defaultDoorPrizes(base: Event): DoorPrizesConfig {
   return { items, activeId: items[0].id };
 }
 
-const ACTIVITY_EXTRAS = { audience: 'all' as Audience, pickedGuestIds: [] as string[], anonymous: false, prize: '', winners: [] as GameWinner[] };
+const ACTIVITY_EXTRAS = { audience: 'all' as Audience, pickedGuestIds: [] as string[], anonymous: false, prize: '', winners: [] as GameWinner[], nameAlign: 'left' as NameAlign };
 const DRAW_EXTRAS = { audience: 'all' as Audience, pickedGuestIds: [] as string[], anonymous: false, numberSource: 'guests' as const };
 
 function normalizeGames(defaults: GamesConfig, stored: Partial<GamesConfig> | undefined): GamesConfig {
@@ -807,8 +811,20 @@ export function resetEventSection(eventId: string, section: EventSection): Write
   return writeJSON(eventKey(eventId), next);
 }
 
+/** Remembers the organization's backend events on this device so every screen can open them by id or link. */
+export function cacheOrgEvents(rows: OrgEventRow[], merge = false): WriteResult {
+  const next: Record<string, OrgEventRow> = merge ? { ...(readJSON<Record<string, OrgEventRow>>(ORG_EVENTS_KEY) ?? {}) } : {};
+  for (const row of rows) next[row.id] = row;
+  return writeJSON(ORG_EVENTS_KEY, next);
+}
+
+export function useOrgEventsCache(): Record<string, OrgEventRow> | null {
+  return useStoredJSON<Record<string, OrgEventRow>>(ORG_EVENTS_KEY);
+}
+
 export function useEventConfig(eventId: string) {
-  const base = useMemo(() => getBaseEvent(eventId), [eventId]);
+  const saved = useOrgEventsCache();
+  const base = useMemo(() => getBaseEvent(eventId, saved), [eventId, saved]);
   const stored = useStoredJSON<StoredConfig>(eventKey(eventId));
   const config = useMemo(() => mergeConfig(buildDefaults(base), stored), [base, stored]);
   const event = useMemo(() => applyConfigToEvent(base, config), [base, config]);

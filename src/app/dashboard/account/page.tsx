@@ -58,7 +58,7 @@ export default function AccountPage() {
       <div>
         <h1 className="text-3xl font-display font-bold text-white tracking-tight flex items-center gap-3"><UserCircle className="w-7 h-7 text-premium-gold" /> Account</h1>
         <p className="text-sm text-zinc-400 mt-1">
-          {user ? `${displayName(user)} · ${user.email}${role ? ` · ${owner ? 'Owner' : ROLE_LABELS[role]}` : ''}` : 'Loading…'}
+          {user ? `${displayName(user)} · ${user.email}${role ? ` · ${owner ? 'Platform admin' : ROLE_LABELS[role]}` : ''}` : 'Loading…'}
         </p>
       </div>
 
@@ -68,7 +68,7 @@ export default function AccountPage() {
           {owner
             ? 'With your email and the 6-digit code from your authenticator app.'
             : role === 'desk'
-              ? 'With your email and the access code from your admin. Ask your admin for a new code if you lose it.'
+              ? 'With your email and the access code from your account owner. Ask them for a new code if you lose it.'
               : 'With a one-time code sent to your email. There is no password to remember.'}
         </p>
       </div>

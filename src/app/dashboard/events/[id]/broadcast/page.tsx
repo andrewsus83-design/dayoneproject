@@ -191,7 +191,7 @@ function BroadcastContent({ eventId }: { eventId: string }) {
         </div>
         <div className="flex items-center gap-2 text-xs text-zinc-600">
           <div className="w-2 h-2 rounded-full bg-premium-success animate-pulse" />
-          Resend + Fonnte connected
+          Email + WhatsApp
         </div>
       </div>
 
@@ -287,7 +287,7 @@ function BroadcastContent({ eventId }: { eventId: string }) {
                 }`}
               >
                 {ch === 'email' ? <Mail className="w-3.5 h-3.5" /> : <MessageSquare className="w-3.5 h-3.5" />}
-                {ch === 'email' ? 'Email (Resend)' : 'WhatsApp (Fonnte)'}
+                {ch === 'email' ? 'Email' : 'WhatsApp'}
                 {sentSet.has(`${activeTemplate}-${ch}`) && (
                   <Check className="w-3 h-3 text-premium-success" />
                 )}
@@ -361,7 +361,7 @@ function BroadcastContent({ eventId }: { eventId: string }) {
                       </div>
                     </div>
                     <div className="mt-4 p-3 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-xs text-zinc-500 max-w-xs">
-                      ⚠️ Rate-limited: 5–15s randomised pacing to comply with Fonnte anti-spam rules. Estimated delivery: ~{Math.ceil(89 * 10 / 60)} min for 89 guests.
+                      Messages go out gradually to keep your WhatsApp number safe. Estimated delivery: ~{Math.ceil(89 * 10 / 60)} min for 89 guests.
                     </div>
                   </div>
                 )}
@@ -431,7 +431,7 @@ function BroadcastContent({ eventId }: { eventId: string }) {
 
               {activeChannel === 'whatsapp' && (
                 <p className="text-[10px] text-zinc-600 text-center leading-relaxed">
-                  Fonnte BYON required. Anti-ban rate limiting applied automatically. Risk disclosure accepted.
+                  Messages are spaced out automatically to keep your WhatsApp number safe.
                 </p>
               )}
             </div>
