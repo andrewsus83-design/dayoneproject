@@ -12,7 +12,7 @@ const ADMIN_NAV = [
   { label: 'Events', href: '/admin/events', icon: Calendar },
   { label: 'API Keys', href: '/admin/keys', icon: KeyRound },
   { label: 'Referral Payouts', href: '/admin/payouts', icon: Wallet },
-  { label: 'WhatsApp Queue & Pacing', href: '/admin/whatsapp', icon: MessageSquare },
+  { label: 'WhatsApp & Email', href: '/admin/whatsapp', icon: MessageSquare },
 ];
 
 export function AdminSidebar() {

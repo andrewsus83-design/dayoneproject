@@ -2,8 +2,9 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, CheckCircle2, Clock, KeyRound, Loader2, MessageSquare, RefreshCw, Send, Smartphone, XCircle } from 'lucide-react';
+import { AlertTriangle, Building2, CheckCircle2, Clock, KeyRound, Loader2, Mail, MessageSquare, RefreshCw, Save, Send, Smartphone, XCircle } from 'lucide-react';
 import { whatsappApi, WA_PER_MINUTE, type WaDevice, type WaOverview, type WaRecent } from '@/lib/whatsappApi';
+import { EMAIL_PER_MINUTE, sendAdminApi, type ChannelUsage, type OrgUsage, type SendOverview } from '@/lib/emailApi';
 
 const input = 'w-full bg-premium-surfaceDark border border-premium-borderDark text-white px-3 py-2.5 rounded-xl text-sm outline-none focus:border-premium-gold placeholder:text-zinc-600';
 
@@ -19,8 +20,82 @@ const STATUS: Record<WaRecent['status'], { label: string; className: string; ico
   cancelled: { label: 'Stopped', className: 'text-zinc-400 border-premium-borderDark bg-premium-surfaceDark', icon: XCircle },
 };
 
+function Usage({ u }: { u: ChannelUsage }) {
+  const share = u.limit > 0 ? u.used / u.limit : 1;
+  return (
+    <div className="min-w-[120px]">
+      <div className="font-mono text-white">
+        {u.used.toLocaleString()} <span className="text-zinc-500">/ {u.limit.toLocaleString()}</span>
+      </div>
+      <div className="mt-1 h-1 rounded-full bg-premium-black overflow-hidden">
+        <div className={`h-full ${share >= 0.9 ? 'bg-premium-danger' : 'bg-premium-gold'}`} style={{ width: `${Math.min(100, share * 100)}%` }} />
+      </div>
+      <div className="text-[10px] text-zinc-500 mt-1">
+        {u.sent} sent · {u.waiting} waiting{u.failed ? <span className="text-premium-danger"> · {u.failed} failed</span> : null}
+      </div>
+    </div>
+  );
+}
+
+/** One organization's use today, with its daily limits (platform admin can raise or lower them). */
+function OrgRow({ org, onSaved }: { org: OrgUsage; onSaved: () => void }) {
+  const [wa, setWa] = useState(String(org.whatsapp.limit));
+  const [email, setEmail] = useState(String(org.email.limit));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const changed = Number(wa) !== org.whatsapp.limit || Number(email) !== org.email.limit;
+  const limitInput = 'w-24 bg-premium-surfaceDark border border-premium-borderDark text-white px-2 py-1.5 rounded-lg text-xs font-mono outline-none focus:border-premium-gold';
+
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      await sendAdminApi.setLimits(org.id, { whatsapp: Number(wa), email: Number(email) });
+      onSaved();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <tr>
+      <td className="px-6 py-3">
+        <div className="text-white font-bold">{org.name}</div>
+        <div className="text-[10px] text-zinc-500">{org.owner ?? '—'}</div>
+      </td>
+      <td className="px-6 py-3"><Usage u={org.whatsapp} /></td>
+      <td className="px-6 py-3"><Usage u={org.email} /></td>
+      <td className="px-6 py-3">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <label className="flex items-center gap-1 text-[10px] text-zinc-500">
+            <MessageSquare className="w-3 h-3" />
+            <input value={wa} onChange={(e) => setWa(e.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" aria-label={`WhatsApp messages a day for ${org.name}`} className={limitInput} />
+          </label>
+          <label className="flex items-center gap-1 text-[10px] text-zinc-500">
+            <Mail className="w-3 h-3" />
+            <input value={email} onChange={(e) => setEmail(e.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" aria-label={`Emails a day for ${org.name}`} className={limitInput} />
+          </label>
+          <button
+            type="button"
+            onClick={save}
+            disabled={!changed || saving || wa === '' || email === ''}
+            className="px-3 py-1.5 rounded-lg bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-[11px] shadow-gold scale-on-click disabled:opacity-40 flex items-center gap-1"
+          >
+            {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save
+          </button>
+        </div>
+        {error && <div className="text-[10px] text-premium-danger text-right mt-1">{error}</div>}
+      </td>
+    </tr>
+  );
+}
+
 export default function AdminWhatsAppPage() {
   const [data, setData] = useState<{ configured: boolean; device: WaDevice | null; overview: WaOverview } | null>(null);
+  const [sending, setSending] = useState<SendOverview | null>(null);
+  const [sendingError, setSendingError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [phone, setPhone] = useState('');
@@ -28,17 +103,29 @@ export default function AdminWhatsAppPage() {
   const [testResult, setTestResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [nudging, setNudging] = useState(false);
 
+  /** Organizations' use and the email queue come straight from the database. */
+  const loadSending = useCallback(async () => {
+    try {
+      setSending(await sendAdminApi.overview());
+      setSendingError(null);
+    } catch (e) {
+      setSendingError(e instanceof Error ? e.message : 'Could not load usage.');
+    }
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
+    const usage = loadSending();
     try {
       setData(await whatsappApi.device());
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load WhatsApp status.');
     } finally {
+      await usage;
       setLoading(false);
     }
-  }, []);
+  }, [loadSending]);
 
   useEffect(() => {
     // Loads once on open; setState happens after the request resolves.
@@ -83,10 +170,11 @@ export default function AdminWhatsAppPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold text-white tracking-tight flex items-center gap-3">
-            <MessageSquare className="w-7 h-7 text-premium-gold" /> WhatsApp
+            <MessageSquare className="w-7 h-7 text-premium-gold" /> WhatsApp &amp; email
           </h1>
           <p className="text-sm text-zinc-400 mt-1">
-            Organizers’ broadcasts go out from this number one at a time, 5–15 seconds apart (about {WA_PER_MINUTE} a minute), to keep it safe from bans. Organizers never see these settings.
+            Organizers’ WhatsApp broadcasts go out from this number one at a time, 5–15 seconds apart (about {WA_PER_MINUTE} a minute), to keep it safe from bans; emails go out through Resend at about {EMAIL_PER_MINUTE} a minute.
+            Organizations take turns, and each has a daily limit. Organizers never see these settings.
           </p>
         </div>
         <button type="button" onClick={load} className="px-4 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-zinc-300 hover:text-white text-xs font-bold scale-on-click flex items-center gap-1.5">
@@ -234,6 +322,112 @@ export default function AdminWhatsAppPage() {
               </div>
             ) : (
               <p className="px-6 py-8 text-sm text-zinc-500">No WhatsApp messages yet. They appear here when an organizer uses “Send to everyone” in Broadcast.</p>
+            )}
+          </section>
+        </>
+      )}
+
+      {sendingError && <div className="p-3 rounded-xl bg-premium-danger/10 border border-premium-danger/40 text-premium-danger text-sm font-bold">{sendingError}</div>}
+
+      {sending && (
+        <>
+          {/* Organizations */}
+          <section className="rounded-[2rem] bg-premium-charcoal border border-premium-borderDark overflow-hidden">
+            <div className="px-6 py-4 border-b border-premium-borderDark flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-display font-bold text-white text-lg flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-premium-gold" /> Organizations, last 24 hours
+              </h2>
+              <span className="text-[11px] text-zinc-500">Daily limit per organization, counted in messages. Default {sending.defaultLimit.toLocaleString()} each.</span>
+            </div>
+            {sending.orgs.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-premium-black text-[10px] font-mono uppercase tracking-widest text-zinc-500">
+                    <tr>
+                      <th className="px-6 py-3">Organization</th>
+                      <th className="px-6 py-3">WhatsApp</th>
+                      <th className="px-6 py-3">Email</th>
+                      <th className="px-6 py-3 text-right">Daily limits</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-premium-borderDark">
+                    {sending.orgs.map((o) => (
+                      <OrgRow key={`${o.id}:${o.whatsapp.limit}:${o.email.limit}`} org={o} onSaved={loadSending} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="px-6 py-8 text-sm text-zinc-500">No organizations yet.</p>
+            )}
+          </section>
+
+          {/* Email */}
+          <section className="rounded-[2rem] bg-premium-charcoal border border-premium-borderDark overflow-hidden">
+            <div className="px-6 py-4 border-b border-premium-borderDark flex flex-wrap items-center justify-between gap-3">
+              <h2 className="font-display font-bold text-white text-lg flex items-center gap-2">
+                <Mail className="w-4 h-4 text-premium-gold" /> Email queue
+              </h2>
+              <span className="text-[11px] text-zinc-500">Last sent: {when(sending.email.lastSentAt)}</span>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  ['Waiting', sending.email.waiting, 'text-white'],
+                  ['Sent (24 h)', sending.email.sentToday, 'text-premium-success'],
+                  ['Failed (24 h)', sending.email.failedToday, sending.email.failedToday > 0 ? 'text-premium-danger' : 'text-white'],
+                ].map(([label, value, color]) => (
+                  <div key={label as string} className="p-3 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-center">
+                    <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{label}</div>
+                    <div className={`text-2xl font-display font-bold mt-1 ${color}`}>{value}</div>
+                  </div>
+                ))}
+              </div>
+              {sending.email.pausedUntil && (
+                <div className="p-3 rounded-xl bg-premium-danger/10 border border-premium-danger/40 text-xs text-premium-danger space-y-1">
+                  <div className="font-bold flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> Email sending paused until {when(sending.email.pausedUntil)}</div>
+                  <div>Resend said: {sending.email.note}. Check RESEND_API_KEY / RESEND_FROM in API keys; waiting emails are kept and go out after the pause.</div>
+                </div>
+              )}
+            </div>
+            {sending.email.recent.length > 0 ? (
+              <div className="overflow-x-auto border-t border-premium-borderDark">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-premium-black text-[10px] font-mono uppercase tracking-widest text-zinc-500">
+                    <tr>
+                      <th className="px-6 py-3">Event</th>
+                      <th className="px-6 py-3">Guest</th>
+                      <th className="px-6 py-3">Message</th>
+                      <th className="px-6 py-3">Queued</th>
+                      <th className="px-6 py-3 text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-premium-borderDark">
+                    {sending.email.recent.map((m) => {
+                      const s = STATUS[m.status];
+                      return (
+                        <tr key={m.id}>
+                          <td className="px-6 py-3 text-white font-bold">{m.event}</td>
+                          <td className="px-6 py-3">
+                            <div className="text-white">{m.to_name || '—'}</div>
+                            <div className="text-[10px] font-mono text-zinc-500">{m.email_hint}</div>
+                          </td>
+                          <td className="px-6 py-3 text-zinc-400">{m.label || '—'}</td>
+                          <td className="px-6 py-3 text-zinc-500 font-mono">{when(m.created_at)}</td>
+                          <td className="px-6 py-3 text-right">
+                            <span title={m.error ?? undefined} className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[11px] font-bold ${s.className}`}>
+                              <s.icon className={`w-3 h-3 ${m.status === 'sending' ? 'animate-spin' : ''}`} /> {s.label}
+                            </span>
+                            {m.status === 'failed' && m.error && <div className="text-[10px] text-zinc-500 mt-1">{m.error}</div>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="px-6 py-8 text-sm text-zinc-500 border-t border-premium-borderDark">No emails yet. They appear here when an organizer uses “Send to everyone by email” in Broadcast.</p>
             )}
           </section>
         </>
