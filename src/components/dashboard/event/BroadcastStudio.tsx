@@ -490,12 +490,12 @@ export function BroadcastStudio({ eventId }: { eventId: string }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-xl font-display font-bold text-white">Broadcast</h3>
-          <p className="text-xs text-zinc-400 mt-0.5">Write each message once, then send it to every guest by WhatsApp or email. Changes save automatically.</p>
+          <p className="text-xs text-zinc-400 mt-0.5">Write each message once, then send it to every guest by email or WhatsApp. Changes save automatically.</p>
         </div>
         <div className="flex items-center gap-1 bg-premium-surfaceDark p-1 rounded-xl border border-premium-borderDark">
           {([
-            { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
             { id: 'email', label: 'Email', icon: Mail },
+            { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
           ] as const).map((c) => (
             <button
               key={c.id}

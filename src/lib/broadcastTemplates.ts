@@ -65,7 +65,8 @@ export function defaultBroadcastTemplates(base: Event): Record<BroadcastKind, Br
 
 export function defaultBroadcast(base: Event): BroadcastConfig {
   return {
-    channel: 'whatsapp',
+    // Email goes out from the server today; WhatsApp sending from the server waits for the platform's number.
+    channel: 'email',
     countryCode: '62',
     templates: defaultBroadcastTemplates(base),
     sent: {},
