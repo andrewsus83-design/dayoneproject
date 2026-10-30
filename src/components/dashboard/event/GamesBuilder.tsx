@@ -4,8 +4,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import * as XLSX from 'xlsx';
 import {
-  AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowUp, Check, Copy, Download, ExternalLink, Gamepad2, MapPin, Palette, Plus, Search, Trash2, Trophy, Tv, Upload, Users, X,
+  AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowUp, Check, Copy, Download, ExternalLink, Gamepad2, MapPin, Palette, Plus, Search, Smartphone, Trash2, Trophy, Tv, Upload, Users, X,
 } from 'lucide-react';
+import { isServerEventId } from '@/lib/guestsApi';
+import { getClientDomain } from '@/lib/domain';
 import {
   formatGuestNumber, guestPool, newActivity, newClue, newId, newQuizItem, numberDigits, QUIZ_STEP_SECONDS, quizPointLadder, updateGameWinners, useEventConfig, useGuests,
   type Activity, type ClueItem, type NameAlign, type QuizItem,
@@ -22,6 +24,31 @@ const NAME_ALIGNS: { id: NameAlign; label: string; icon: typeof AlignLeft }[] = 
   { id: 'center', label: 'Center', icon: AlignCenter },
   { id: 'right', label: 'Right', icon: AlignRight },
 ];
+
+// The live game's limits (a41_quiz_sync_activity checks the same).
+const SECONDS = { min: 10, max: 60 };
+const POINTS = { min: 100, max: 10000 };
+const clamp = (n: number, { min, max }: { min: number; max: number }) => Math.min(max, Math.max(min, Number.isFinite(n) ? Math.round(n) : min));
+
+/** How trivia runs on a saved event: guests join on their phones with the code on the big screen. */
+function LiveTriviaNote({ slug, anonymous }: { slug: string; anonymous: boolean }) {
+  return (
+    <div className="p-4 rounded-2xl border border-premium-neon/30 bg-premium-neon/5 space-y-2">
+      <div className="flex items-center gap-2 text-xs font-bold text-premium-neon"><Smartphone className="w-4 h-4" /> Live on guests&apos; phones</div>
+      <ol className="list-decimal pl-4 space-y-1 text-[11px] text-zinc-400">
+        <li>Open the Big Screen link, signed in as an organizer, and press <strong className="text-white">Open lobby</strong>.</li>
+        <li>
+          Guests scan the QR on the screen or enter its 6-digit code at <span className="font-mono text-premium-neon">{getClientDomain(slug)}/play</span>. Only checked-in guests can join.
+        </li>
+        <li>Press <strong className="text-white">Start</strong>: everyone sees 3, 2, 1, then taps an answer on their phone. Faster right answers score more.</li>
+      </ol>
+      <p className="text-[11px] text-zinc-500">
+        Players show as {anonymous ? <>their guest number (<span className="font-mono text-premium-gold">No. 007</span>)</> : 'their first name and initial'} on phones and the leaderboard (Players tab → Anonymous).
+        The questions are copied to the game when you open the lobby; changing them after a game was played starts a fresh game, and past results stay.
+      </p>
+    </div>
+  );
+}
 
 function move<T>(list: T[], i: number, d: -1 | 1): T[] {
   const j = i + d;
@@ -48,7 +75,7 @@ function QuizEditor({ questions, onChange }: { questions: QuizItem[]; onChange: 
         if (!text || !a || !b) continue;
         const options = [a, b, c, d].filter(Boolean);
         const letter = (ans || 'A').toUpperCase().charCodeAt(0) - 65;
-        parsed.push({ id: newId('qz'), text, options, answer: Math.min(Math.max(letter, 0), options.length - 1), points: parseInt(pts || '1000', 10) || 1000, seconds: 15 });
+        parsed.push({ id: newId('qz'), text, options, answer: Math.min(Math.max(letter, 0), options.length - 1), points: clamp(parseInt(pts || '1000', 10) || 1000, POINTS), seconds: 15 });
       }
       onChange([...questions, ...parsed]);
       setImportMsg(`Imported ${parsed.length} question${parsed.length === 1 ? '' : 's'}.`);
@@ -103,8 +130,8 @@ function QuizEditor({ questions, onChange }: { questions: QuizItem[]; onChange: 
                   ))}
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <label className="text-[10px] text-zinc-500 font-mono uppercase">Points<input type="number" min={0} value={q.points} onChange={(e) => patch(q.id, { points: Math.max(0, parseInt(e.target.value || '0', 10)) })} className={`${input} mt-1`} /></label>
-                  <label className="text-[10px] text-zinc-500 font-mono uppercase">Seconds<input type="number" min={5} value={q.seconds} onChange={(e) => patch(q.id, { seconds: Math.max(5, parseInt(e.target.value || '15', 10)) })} className={`${input} mt-1`} /></label>
+                  <label className="text-[10px] text-zinc-500 font-mono uppercase">Points ({POINTS.min}–{POINTS.max.toLocaleString()})<input type="number" min={POINTS.min} max={POINTS.max} step={100} value={q.points} onChange={(e) => patch(q.id, { points: Math.max(0, parseInt(e.target.value || '0', 10) || 0) })} onBlur={() => patch(q.id, { points: clamp(q.points, POINTS) })} className={`${input} mt-1`} /></label>
+                  <label className="text-[10px] text-zinc-500 font-mono uppercase">Seconds ({SECONDS.min}–{SECONDS.max})<input type="number" min={SECONDS.min} max={SECONDS.max} value={q.seconds} onChange={(e) => patch(q.id, { seconds: Math.max(0, parseInt(e.target.value || '0', 10) || 0) })} onBlur={() => patch(q.id, { seconds: clamp(q.seconds, SECONDS) })} className={`${input} mt-1`} /></label>
                 </div>
                 <p className="text-[10px] text-zinc-500">
                   Faster answers score more. Every {QUIZ_STEP_SECONDS} seconds:{' '}
@@ -268,6 +295,8 @@ export function GamesBuilder({ eventId }: { eventId: string }) {
 
   const allUrl = `/events/${config.info.slug}/games`;
   const screenUrl = activity ? `${allUrl}/${activity.id}` : '';
+  // Saved events run trivia on the server, played on guests' phones; the samples keep the on-screen demo.
+  const liveTrivia = activity?.kind === 'quiz' && isServerEventId(eventId);
 
   return (
     <div className="space-y-5">
@@ -346,6 +375,7 @@ export function GamesBuilder({ eventId }: { eventId: string }) {
                     </div>
                   </div>
                 </div>
+                {liveTrivia && <LiveTriviaNote slug={config.info.slug} anonymous={activity.anonymous} />}
                 {activity.kind === 'quiz'
                   ? <QuizEditor questions={activity.questions} onChange={(questions) => patch({ questions })} />
                   : <HuntEditor clues={activity.clues} onChange={(clues) => patch({ clues })} />}
@@ -363,10 +393,17 @@ export function GamesBuilder({ eventId }: { eventId: string }) {
                 onChange={(p) => patch(p)}
               />
             )}
+            {tab === 'guests' && liveTrivia && (
+              <p className="text-[11px] text-zinc-500">
+                Anonymous also applies on guests&apos; phones and the live leaderboard: players show as{' '}
+                <span className="font-mono text-premium-gold">No. 007</span> instead of their name. It is set when you open the lobby.
+              </p>
+            )}
             {tab === 'design' && <FrameDesigner value={activity.frame} onChange={(p) => patch({ frame: { ...activity.frame, ...p } })} logoRef={config.design.logoUrl} />}
             {tab === 'screen' && (
               <div className="space-y-4">
                 <p className="text-xs text-zinc-400">Games have their own link, separate from door prizes. Each activity also has its own link.</p>
+                {liveTrivia && <LiveTriviaNote slug={config.info.slug} anonymous={activity.anonymous} />}
                 {[
                   { label: `This activity: ${activity.name}`, url: screenUrl },
                   { label: 'All games (switch between them on screen)', url: allUrl },
