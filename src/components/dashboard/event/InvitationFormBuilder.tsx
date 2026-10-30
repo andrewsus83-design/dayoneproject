@@ -15,6 +15,7 @@ import {
 } from '@/lib/eventStore';
 import { DARK_BACKGROUNDS, LIGHT_BACKGROUNDS, PALETTES, resolveTheme } from '@/lib/eventTheme';
 import { compressImage, downloadBlob, downloadDataUrl, toCsv } from '@/lib/image';
+import { isServerEventId, passCode } from '@/lib/guestsApi';
 import { InvitationFormView, type PreviewScreen } from '@/components/events/InvitationFormView';
 import { EventFonts } from '@/components/events/EventFonts';
 
@@ -94,6 +95,8 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 export function InvitationFormBuilder({ eventId }: { eventId: string }) {
   const { config, event, update, savedAt } = useEventConfig(eventId);
+  // Saved events: replies come from the server's guest list (read-only here); samples keep them on this device.
+  const serverReplies = isServerEventId(eventId);
   const responses = useResponses(eventId);
   const guests = useGuests(eventId);
   const inv = config.invitation;
@@ -1058,7 +1061,9 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="font-display font-bold text-white text-base flex items-center gap-2"><CheckSquare className="w-4 h-4 text-premium-gold" /> Responses</h3>
-                <p className="text-[11px] text-zinc-400 mt-0.5">Every reply sent through the live form lands here.</p>
+                <p className="text-[11px] text-zinc-400 mt-0.5">
+                  Every reply sent through the live form lands here{serverReplies ? ' (and on the guest list, with its QR pass). Remove a reply by removing the guest.' : '.'}
+                </p>
               </div>
               <button type="button" onClick={exportCsv} disabled={responses.length === 0} className="px-3.5 py-2 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-white font-bold text-xs scale-on-click flex items-center gap-1.5 disabled:opacity-40">
                 <Download className="w-3.5 h-3.5" /> Export CSV
@@ -1096,14 +1101,16 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
                           {r.number && <span className="font-mono text-premium-gold mr-2">#{formatGuestNumber(r.number, numberDigits(guests, info.capacity))}</span>}
                           {r.name}
                         </span>
-                        <span className="text-[10px] text-zinc-500 font-mono">{new Date(r.submittedAt).toLocaleString()} · {r.token}</span>
+                        <span className="text-[10px] text-zinc-500 font-mono">{new Date(r.submittedAt).toLocaleString()} · {passCode(r.token)}</span>
                       </button>
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${r.attending ? 'bg-premium-success/15 text-premium-success border-premium-success/30' : 'bg-premium-danger/15 text-premium-danger border-premium-danger/30'}`}>
                         {r.attending ? `Yes · ${r.party}` : 'No'}
                       </span>
-                      <button type="button" onClick={() => { if (confirm(`Delete the reply from ${r.name}?`)) report(deleteResponse(eventId, r.id)); }} className="text-zinc-600 hover:text-premium-danger scale-on-click" aria-label="Delete reply">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {!serverReplies && (
+                        <button type="button" onClick={() => { if (confirm(`Delete the reply from ${r.name}?`)) report(deleteResponse(eventId, r.id)); }} className="text-zinc-600 hover:text-premium-danger scale-on-click" aria-label="Delete reply">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                     {expandedResponse === r.id && (
                       <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1119,7 +1126,7 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
                 ))}
               </div>
             )}
-            {responses.length === 0 && (
+            {responses.length === 0 && !serverReplies && (
               <button
                 type="button"
                 onClick={() => {

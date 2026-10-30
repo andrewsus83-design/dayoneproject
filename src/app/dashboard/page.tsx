@@ -6,7 +6,8 @@ import { Header } from '@/components/dashboard/Header';
 import { Event } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
 import { BASE_EVENTS, eventFromRow, type OrgEventRow } from '@/lib/events';
-import { useGuests } from '@/lib/eventStore';
+import { useSampleGuests } from '@/lib/eventStore';
+import { guestCounts, type GuestCounts } from '@/lib/guestsApi';
 import { listOrgEvents } from '@/lib/orgEvents';
 import { isPlatformAdmin } from '@/lib/auth';
 import { useSessionUser } from '@/lib/useSession';
@@ -35,11 +36,15 @@ const STATUS_BADGE: Record<Listed['status'], { label: string; className: string;
   sample: { label: 'Sample', className: 'border-zinc-600 text-zinc-400', dot: 'bg-zinc-500' },
 };
 
-function EventCard({ event: evt, status }: Listed) {
-  const guests = useGuests(evt.id);
+function EventCard({ event: evt, status, counts }: Listed & { counts?: GuestCounts | null }) {
+  // Saved events: counts from the server (one request for all cards). Samples: this device's demo list.
+  const sampleGuests = useSampleGuests(evt.id);
+  const sample = status === 'sample';
+  const total = sample ? sampleGuests.length : counts?.guests ?? 0;
   const isWedding = evt.event_type === 'wedding';
-  const checkedIn = guests.filter((g) => g.is_checked_in).length;
-  const checkInPct = guests.length ? Math.round((checkedIn / guests.length) * 100) : 0;
+  const checkedIn = sample ? sampleGuests.filter((g) => g.is_checked_in).length : counts?.checked_in ?? 0;
+  const checkInPct = total ? Math.round((checkedIn / total) * 100) : 0;
+  const loading = !sample && counts === undefined;
   const badge = STATUS_BADGE[status];
 
   return (
@@ -94,7 +99,7 @@ function EventCard({ event: evt, status }: Listed) {
 
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: 'Guests', value: `${guests.length}`, unit: 'on the list', color: 'text-white' },
+            { label: 'Guests', value: loading ? '…' : `${total}`, unit: !sample && counts?.capacity ? `of ${counts.capacity} allowed` : 'on the list', color: 'text-white' },
             { label: 'Checked In', value: checkedIn > 0 ? `${checkedIn}` : '—', unit: checkedIn > 0 ? `${checkInPct}%` : 'not yet', color: checkedIn > 0 ? 'text-premium-success' : 'text-zinc-500' },
           ].map(({ label, value, unit, color }) => (
             <div key={label} className="p-3.5 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-center">
@@ -161,6 +166,18 @@ export default function DashboardPage() {
   const [rows, setRows] = useState<OrgEventRow[] | null>(null);
   const [upcoming, setUpcoming] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  // Guest and check-in counts of every saved event; null when they could not be loaded.
+  const [counts, setCounts] = useState<Record<string, GuestCounts> | null | undefined>(undefined);
+
+  useEffect(() => {
+    let alive = true;
+    guestCounts()
+      .then((c) => alive && setCounts(c))
+      .catch(() => alive && setCounts(null));
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -244,7 +261,7 @@ export default function DashboardPage() {
             )}
 
             {filtered.map((l) => (
-              <EventCard key={l.event.id} {...l} />
+              <EventCard key={l.event.id} {...l} counts={counts === undefined ? undefined : counts?.[l.event.id] ?? null} />
             ))}
 
             <Link
