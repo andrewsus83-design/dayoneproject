@@ -32,7 +32,7 @@ type NewPerson = { name: string; email: string; role: 'organizer' | 'desk'; code
 const blankPerson = (): NewPerson => ({ name: '', email: '', role: 'organizer', code: generatePassword(10) });
 
 /** What to tell the new person (the access code is shown only once). */
-type Handover = { email: string; role: 'organizer' | 'desk'; code: string | null };
+type Handover = { email: string; role: 'organizer' | 'desk'; code: string | null; welcomeSent?: boolean };
 
 export default function TeamSettingsPage() {
   const { user } = useSessionUser();
@@ -91,8 +91,8 @@ export default function TeamSettingsPage() {
       try {
         const email = person.email.trim().toLowerCase();
         const desk = person.role === 'desk';
-        await teamApi.add({ email, name: person.name.trim(), role: person.role, code: desk ? person.code : undefined });
-        setHandover({ email, role: person.role, code: desk ? person.code : null });
+        const res = await teamApi.add({ email, name: person.name.trim(), role: person.role, code: desk ? person.code : undefined });
+        setHandover({ email, role: person.role, code: desk ? person.code : null, welcomeSent: res.welcomeSent });
         setPerson(blankPerson());
         setAdding(false);
         await load();
@@ -204,7 +204,10 @@ export default function TeamSettingsPage() {
                         </>
                       ) : (
                         <>
-                          They open <span className="font-mono text-premium-neon">{LOGIN_URL}</span>, choose <strong className="text-white">Organizer</strong>, and enter their email.
+                          {handover.welcomeSent
+                            ? 'We emailed them a welcome message with the sign-in link. '
+                            : "We couldn't email them a welcome message, so let them know: "}
+                          they open <span className="font-mono text-premium-neon">{LOGIN_URL}</span>, choose <strong className="text-white">Organizer</strong>, and enter their email.
                           A 6-digit sign-in code is emailed to them each time.
                         </>
                       )}

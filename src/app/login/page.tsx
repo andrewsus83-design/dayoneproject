@@ -51,7 +51,8 @@ function LoginForm() {
   const asParam = search.get('as');
   const [method, setMethod] = useState<Method>(asParam === 'desk' || asParam === 'owner' ? asParam : 'organizer');
   const [step, setStep] = useState<Step>('start');
-  const [email, setEmail] = useState('');
+  // The welcome email links here with the address filled in.
+  const [email, setEmail] = useState(() => (search.get('email') ?? '').trim().slice(0, 254));
   const [code, setCode] = useState('');
   const [setupCode, setSetupCode] = useState('');
   const [enroll, setEnroll] = useState<{ secret: string; uri: string } | null>(null);

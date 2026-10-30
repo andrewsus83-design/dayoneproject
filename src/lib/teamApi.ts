@@ -42,7 +42,9 @@ export const teamApi = {
   get: () => call<Team>({ action: 'list' }),
   rename: (name: string) => call<{ ok: true }>({ action: 'rename', name }),
   /** code is the access code for a register desk; admin organizers sign in with an emailed code instead. */
-  add: (input: { email: string; name: string; role: 'organizer' | 'desk'; code?: string }) => call<{ ok: true }>({ action: 'add', ...input }),
+  /** welcomeSent: an admin organizer was emailed a welcome message with the sign-in link. */
+  add: (input: { email: string; name: string; role: 'organizer' | 'desk'; code?: string }) =>
+    call<{ ok: true; welcomeSent?: boolean }>({ action: 'add', ...input }),
   remove: (id: string) => call<{ ok: true }>({ action: 'remove', id }),
   resetCode: (id: string, code: string) => call<{ ok: true }>({ action: 'reset-code', id, code }),
 };

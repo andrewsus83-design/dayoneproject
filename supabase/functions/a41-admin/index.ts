@@ -20,6 +20,44 @@ function corsHeaders(origin: string | null) {
   };
 }
 
+const APP_URL = 'https://app.dayoneproject.xyz';
+const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
+/** Tells a new organizer or admin how to sign in. Never blocks the create: false when the email could not go out. */
+// deno-lint-ignore no-explicit-any
+async function sendWelcome(admin: any, to: string, name: string): Promise<boolean> {
+  try {
+    const secret = async (key: string) => (await admin.rpc('a41_svc_secret', { p_name: key })).data as string | null;
+    const resendKey = await secret('a41_RESEND_API_KEY');
+    if (!resendKey) return false;
+    const from = (await secret('a41_RESEND_FROM')) || 'dayoneproject.xyz <login@dayoneproject.xyz>';
+    const link = `${APP_URL}/login?as=organizer&email=${encodeURIComponent(to)}`;
+    const first = name.trim().split(/\s+/)[0] ?? '';
+    const html = `<!doctype html><html><body style="margin:0;background:#09090B;font-family:Manrope,Arial,sans-serif;color:#FAFAFA">
+<div style="max-width:440px;margin:0 auto;padding:40px 24px;text-align:center">
+<div style="width:48px;height:48px;border-radius:999px;background:#C5A059;color:#09090B;font-weight:700;font-size:20px;line-height:48px;margin:0 auto">D1</div>
+<h1 style="font-size:22px;margin:24px 0 8px">${first ? `Welcome, ${esc(first)}` : 'Welcome'}</h1>
+<p style="color:#A1A1AA;font-size:14px;line-height:1.6;margin:0 0 24px">You now have an organizer account on dayoneproject.xyz. You can create events and add your own team.</p>
+<a href="${link}" style="display:inline-block;background:#C5A059;color:#09090B;font-weight:700;font-size:14px;text-decoration:none;padding:14px 28px;border-radius:12px">Sign in</a>
+<p style="color:#71717A;font-size:12px;line-height:1.6;margin:24px 0 0">Open app.dayoneproject.xyz/login, choose Organizer and enter this email address. We email you a 6-digit code each time; there is no password.</p>
+</div></body></html>`;
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        subject: 'Your dayoneproject.xyz organizer account is ready',
+        html,
+        text: `You now have an organizer account on dayoneproject.xyz.\n\nSign in: ${link}\n\nChoose Organizer and enter this email address. We email you a 6-digit code each time; there is no password.`,
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 type AnyUser = {
   id: string;
   email?: string;
@@ -98,7 +136,8 @@ Deno.serve(async (req) => {
             user_metadata: name ? { ...(existing.user_metadata ?? {}), name } : existing.user_metadata,
           });
           if (error) return json({ error: error.message }, 400);
-          return json({ user: view(data.user as AnyUser), existing: true });
+          const welcomeSent = existing.app_metadata?.a41_role ? false : await sendWelcome(admin, email, name);
+          return json({ user: view(data.user as AnyUser), existing: true, welcomeSent });
         }
 
         if (role === 'desk' && password.length < 8) return json({ error: 'The access code needs at least 8 characters.' }, 400);
@@ -112,7 +151,9 @@ Deno.serve(async (req) => {
           app_metadata: { a41_role: role },
         });
         if (error) return json({ error: error.message }, 400);
-        return json({ user: view(data.user as AnyUser), existing: false });
+        // Organizers and admins get a welcome email with the sign-in link; desk staff get their code from you.
+        const welcomeSent = role === 'desk' ? false : await sendWelcome(admin, email, name);
+        return json({ user: view(data.user as AnyUser), existing: false, welcomeSent });
       }
 
       case 'update': {

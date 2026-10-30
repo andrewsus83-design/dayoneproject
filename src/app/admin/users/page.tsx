@@ -17,7 +17,7 @@ export default function AdminUsersPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', email: '', role: 'organizer' as AppRole, password: generatePassword(10) });
   const [creating, setCreating] = useState(false);
-  const [created, setCreated] = useState<{ email: string; role: AppRole; code: string | null; existing: boolean } | null>(null);
+  const [created, setCreated] = useState<{ email: string; role: AppRole; code: string | null; existing: boolean; welcomeSent: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
   const [resetFor, setResetFor] = useState<{ id: string; password: string } | null>(null);
 
@@ -43,7 +43,7 @@ export default function AdminUsersPage() {
     try {
       const desk = form.role === 'desk';
       const res = await adminApi.createUser({ ...form, email: form.email.trim().toLowerCase(), password: desk ? form.password : '' });
-      setCreated({ email: res.user.email, role: form.role, code: desk && !res.existing ? form.password : null, existing: res.existing });
+      setCreated({ email: res.user.email, role: form.role, code: desk && !res.existing ? form.password : null, existing: res.existing, welcomeSent: !!res.welcomeSent });
       setForm({ name: '', email: '', role: 'organizer', password: generatePassword(10) });
       await load();
     } catch (err) {
@@ -143,7 +143,13 @@ export default function AdminUsersPage() {
               </>
             ) : (
               <>
-                <p className="text-zinc-300">{created.existing ? `${created.email} already had a Day One Project account and now has access.` : `${created.email} is ready.`} They sign in at app.dayoneproject.xyz/login with a code sent to their email.</p>
+                <p className="text-zinc-300">
+                  {created.existing ? `${created.email} already had a Day One Project account and now has access.` : `${created.email} is ready.`}{' '}
+                  {created.welcomeSent
+                    ? 'We emailed them a welcome message with the sign-in link.'
+                    : "We couldn't email them a welcome message, so send them the invite below."}{' '}
+                  They sign in at app.dayoneproject.xyz/login with a code sent to their email.
+                </p>
                 <button type="button" onClick={() => copy(`Sign in at https://app.dayoneproject.xyz/login with your email (${created.email}). We'll email you a one-time code.`)} className="text-xs font-bold text-premium-gold flex items-center gap-1.5">
                   {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />} {copied ? 'Copied' : 'Copy invite message'}
                 </button>
