@@ -1,14 +1,17 @@
 // dayoneproject.xyz WhatsApp sending through Fonnte. Deployed to Supabase project dayoneproject (pmuryumfyekjwqntcypo)
 // as `a41-whatsapp` with verify_jwt off: every action checks its own caller.
 //
-// - enqueue / cancel (admin organizers): queue an event's broadcast, or stop what has not gone out yet.
+// - enqueue / cancel (the event's managers): queue an event's broadcast, or stop what has not gone out yet.
+//   Both run as the signed-in organizer through a41_wa_enqueue / a41_wa_cancel, which only message the event's own
+//   guests (numbers come from a41_guests) and keep each organization inside its daily limit.
 // - run (the one-minute timer, or anyone): sends waiting messages one at a time, 5–15 s apart, from the
-//   platform's Fonnte number. Only one run sends at a time, so extra calls do nothing.
+//   platform's Fonnte number, taking turns between organizations. Only one run sends at a time.
 // - device / test (platform admin): the number's status and quota, and one test message.
 // The Fonnte device token lives in Supabase Vault as a41_FONNTE_TOKEN (Admin > API keys > FONNTE_TOKEN).
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 
 const ALLOWED_ORIGINS = ['https://app.dayoneproject.xyz', 'http://localhost:3042', 'http://localhost:3000'];
+const PREVIEW_ORIGIN = /^https:\/\/all41-u356-[a-z0-9-]+\.vercel\.app$/;
 const FONNTE = 'https://api.fonnte.com';
 const MIN_GAP_MS = 5_000;
 const MAX_GAP_MS = 15_000;
@@ -19,8 +22,18 @@ const MAX_MESSAGES = 3000;
 /** Fonnte reasons that concern one message only; any other refusal means the number or account needs attention. */
 const MESSAGE_PROBLEMS = ['target invalid', 'input invalid'];
 
+/** What organizers see for each refusal from a41_wa_enqueue / a41_wa_cancel. */
+const RPC_ERRORS: Record<string, [number, string]> = {
+  not_signed_in: [401, 'Sign in again to continue.'],
+  event_not_found: [404, 'Save this event to your organization first.'],
+  forbidden: [403, 'Only the organizers who manage this event can send its messages.'],
+  rate_limited: [429, 'Too many broadcasts in the last hour. Try again later.'],
+  too_many_messages: [400, `Send to at most ${MAX_MESSAGES} guests at a time.`],
+  invalid_messages: [400, 'Nothing to send.'],
+};
+
 function corsHeaders(origin: string | null) {
-  const allowed = origin && (ALLOWED_ORIGINS.includes(origin) || /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin));
+  const allowed = origin && (ALLOWED_ORIGINS.includes(origin) || PREVIEW_ORIGIN.test(origin));
   return {
     'Access-Control-Allow-Origin': allowed ? origin! : ALLOWED_ORIGINS[0],
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -62,8 +75,32 @@ async function fonnteSend(token: string, phone: string, message: string): Promis
 }
 
 type Claimed = { id: number; to_phone: string; body: string };
+type Secret = (name: string) => Promise<string | null>;
 
-async function run(admin: SupabaseClient, secret: (name: string) => Promise<string | null>) {
+/** Emails the platform admins that sending has paused (at most once every 6 hours). Never throws. */
+async function tellAdmins(admin: SupabaseClient, secret: Secret, reason: string) {
+  try {
+    const { data: first } = await admin.rpc('a41_svc_hit', { p_key: 'notice:wa-paused', p_max: 1, p_window_seconds: 21_600 });
+    if (first !== true) return;
+    const key = (await secret('a41_RESEND_API_KEY'))?.trim();
+    const { data: admins } = await admin.from('a41_platform_admins').select('email');
+    const to = (admins ?? []).map((a: { email: string }) => a.email).filter(Boolean);
+    if (!key || !to.length) return;
+    const from = (await secret('a41_RESEND_FROM'))?.trim() || 'dayoneproject.xyz <events@dayoneproject.xyz>';
+    const text = `WhatsApp sending is paused for ${PAUSE_SECONDS / 60} minutes because the sending number refused a message:\n\n` +
+      `${reason}\n\nWaiting messages are kept and go out once the number works again. Check Admin > WhatsApp: ` +
+      'https://app.dayoneproject.xyz/admin/whatsapp';
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to, subject: 'WhatsApp sending is paused', text }),
+    });
+  } catch {
+    // The admin page shows the pause either way.
+  }
+}
+
+async function run(admin: SupabaseClient, secret: Secret) {
   const out = { busy: false, sent: 0, failed: 0, retrying: 0, halted: '' };
   const { data: begin } = await admin.rpc('a41_svc_wa_begin', { p_seconds: LEASE_SECONDS });
   if (!begin?.ok) return { ...out, busy: true };
@@ -110,6 +147,7 @@ async function run(admin: SupabaseClient, secret: (name: string) => Promise<stri
     return out;
   } finally {
     await admin.rpc('a41_svc_wa_end', { p_pause_seconds: pause, p_note: pause ? out.halted : null });
+    if (pause) await tellAdmins(admin, secret, out.halted);
   }
 }
 
@@ -135,66 +173,50 @@ Deno.serve(async (req) => {
     if (!me) return json({ error: 'Sign in again to continue.' }, 401);
     const { data: who } = await asCaller.rpc('a41_whoami');
     const isPlatformAdmin = who?.isAdmin === true;
-    const role = me.app_metadata?.a41_role;
+    const refused = (message: string) => {
+      const [status, text] = RPC_ERRORS[message] ?? [400, 'Could not send. Try again.'];
+      return json({ error: text }, status);
+    };
 
     switch (body.action) {
-      case 'enqueue':
       case 'cancel': {
-        if (role !== 'organizer' && role !== 'admin' && !isPlatformAdmin) return json({ error: 'Your account cannot send messages.' }, 403);
-        // The caller's own access rules decide whether they may see (and so message) this event.
-        const { data: ev } = await asCaller.from('a41_events').select('id, org_id').eq('id', String(body.eventId ?? '')).maybeSingle();
-        if (!ev) return json({ error: 'Save this event to your organization first.' }, 404);
+        const { data, error } = await asCaller.rpc('a41_wa_cancel', { p_event: String(body.eventId ?? '') });
+        if (error) return refused(error.message);
+        return json(data);
+      }
 
-        if (body.action === 'cancel') {
-          const { data: cancelled } = await admin
-            .from('a41_wa_messages')
-            .update({ status: 'cancelled', lease_until: null })
-            .eq('event_id', ev.id)
-            .eq('status', 'queued')
-            .select('id');
-          return json({ cancelled: cancelled?.length ?? 0 });
-        }
-
+      case 'enqueue': {
         if (!(await secret('a41_FONNTE_TOKEN'))?.trim()) {
           return json({ error: 'WhatsApp sending is not switched on yet. Ask your dayoneproject.xyz admin.' }, 503);
         }
-        const { data: allowed } = await admin.rpc('a41_svc_hit', { p_key: `wa-enqueue:${me.id}`, p_max: 30, p_window_seconds: 3600 });
-        if (allowed !== true) return json({ error: 'Too many broadcasts in the last hour. Try again later.' }, 429);
-
-        const input = Array.isArray(body.messages) ? body.messages : [];
-        if (input.length > MAX_MESSAGES) return json({ error: `Send to at most ${MAX_MESSAGES} guests at a time.` }, 400);
-        const batchId = crypto.randomUUID();
-        const label = String(body.label ?? '').trim().slice(0, 80);
-        const seen = new Set<string>();
-        const rows: Record<string, unknown>[] = [];
-        let skipped = 0;
-        for (const m of input) {
-          const phone = normalizePhone(m?.phone);
-          const text = String(m?.text ?? '').trim().slice(0, 4000);
-          if (!phone || !text || seen.has(phone)) {
-            skipped++;
-            continue;
+        const input: unknown[] = Array.isArray(body.messages) ? body.messages : [];
+        if (input.length > MAX_MESSAGES) return refused('too_many_messages');
+        // New clients send {guestId, text}; older ones {phone, name, text}, which the database only accepts when the
+        // number belongs to one of the event's guests. The number itself always comes from the guest list.
+        const messages = input.map((m) => {
+          const item = (m ?? {}) as Record<string, unknown>;
+          const text = String(item.text ?? '').slice(0, 4000);
+          return item.guestId ? { guestId: String(item.guestId), text } : { phone: String(item.phone ?? ''), text };
+        });
+        const { data, error } = await asCaller.rpc('a41_wa_enqueue', {
+          p_event: String(body.eventId ?? ''),
+          p_label: String(body.label ?? '').trim().slice(0, 80),
+          p_messages: messages,
+        });
+        if (error) return refused(error.message);
+        if (data?.ok !== true) {
+          if (data?.reason === 'daily_limit') {
+            return json({
+              error: data.remaining > 0
+                ? `Your organization can send ${data.remaining} more WhatsApp message${data.remaining === 1 ? '' : 's'} today (${data.limit} a day). Send to fewer guests, or try again tomorrow.`
+                : `Your organization has sent its ${data.limit} WhatsApp messages for today. Try again tomorrow.`,
+              limit: data.limit,
+              remaining: data.remaining,
+            }, 429);
           }
-          seen.add(phone);
-          rows.push({
-            org_id: ev.org_id,
-            event_id: ev.id,
-            batch_id: batchId,
-            label,
-            to_name: String(m?.name ?? '').trim().slice(0, 160),
-            to_phone: phone,
-            body: text,
-            created_by: me.id,
-          });
+          return json({ error: 'None of these guests has a WhatsApp number in this event’s guest list.' }, 400);
         }
-        if (!rows.length) return json({ error: 'None of these guests has a WhatsApp number we can use.' }, 400);
-        for (let i = 0; i < rows.length; i += 500) {
-          const { error } = await admin.from('a41_wa_messages').insert(rows.slice(i, i + 500));
-          if (error) return json({ error: error.message }, 400);
-        }
-        const { count } = await admin.from('a41_wa_messages').select('id', { count: 'exact', head: true }).in('status', ['queued', 'sending']);
-        // About one message every 10 s on average.
-        return json({ queued: rows.length, skipped, minutes: Math.max(1, Math.ceil(((count ?? rows.length) * 10) / 60)) });
+        return json({ queued: data.queued, skipped: data.skipped, minutes: data.minutes, limit: data.limit, remaining: data.remaining });
       }
 
       case 'device': {
