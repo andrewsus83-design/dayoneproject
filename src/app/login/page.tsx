@@ -4,7 +4,7 @@ import React, { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Briefcase, KeyRound, Loader2, Mail, ScanLine, ShieldCheck, Smartphone } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { appRole, canUseDashboard } from '@/lib/auth';
+import { appRole, canUseDashboard, isPlatformAdmin } from '@/lib/auth';
 import { authApi } from '@/lib/authApi';
 import { AuthenticatorQr } from '@/components/auth/AuthenticatorQr';
 
@@ -79,6 +79,12 @@ function LoginForm() {
     if (!appRole(data.user)) {
       await supabase.auth.signOut();
       throw new Error('This account does not have access yet. Ask your admin to add you.');
+    }
+    // The Platform admin sign-in opens the admin dashboard; the Organizer sign-in opens the events dashboard.
+    if (method === 'owner' && isPlatformAdmin(data.user)) {
+      router.replace(next?.startsWith('/admin') ? next : '/admin');
+      router.refresh();
+      return;
     }
     const home = canUseDashboard(data.user) ? '/dashboard' : '/desk';
     const allowed = next && (canUseDashboard(data.user) || next.startsWith('/desk')) ? next : home;
