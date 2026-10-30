@@ -261,7 +261,7 @@ function GuestMobilePassContent({ slug }: { slug: string }) {
           className="p-3 bg-premium-charcoal rounded-2xl border border-premium-borderDark hover:border-premium-gold text-center flex flex-col items-center justify-center transition-colors scale-on-click"
         >
           <Gamepad2 className="w-5 h-5 text-premium-gold mb-1" />
-          <span className="text-[11px] font-bold text-white">Quiz Pad</span>
+          <span className="text-[11px] font-bold text-white">Trivia</span>
         </Link>
 
         <Link
