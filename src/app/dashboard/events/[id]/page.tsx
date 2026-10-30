@@ -24,7 +24,7 @@ import {
 import { PhotoWallUpload } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
 import {
-  useEventConfig, useHydrated, resetEventSection, DEFAULT_ACCESS,
+  useEventConfig, useGuests, useHydrated, resetEventSection,
   useOrgEventsCache, type EventInfo,
 } from '@/lib/eventStore';
 import { BASE_EVENTS, isSlugTaken } from '@/lib/events';
@@ -58,7 +58,6 @@ import {
   Tv,
   QrCode,
   Shield,
-  Eye,
   HelpCircle,
   ArrowRight,
   TrendingUp,
@@ -67,7 +66,6 @@ import {
   Smartphone,
   RotateCcw,
   KeyRound,
-  EyeOff,
 } from 'lucide-react';
 
 interface EventHubProps {
@@ -97,6 +95,8 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
 
   // Every edit is persisted to the browser-backed event store, so nothing snaps back to defaults.
   const { config, event, update, savedAt } = useEventConfig(eventId);
+  // Server guest list for saved events (sample events keep their local list); Insights counts from it.
+  const guestsList = useGuests(eventId);
   const hydrated = useHydrated();
   const isWedding = event.event_type === 'wedding';
   const info = config.info;
@@ -108,7 +108,6 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
   const [overviewSubTab, setOverviewSubTab] = useState<'info' | 'landing' | 'invitation'>('info');
   const [infoSaved, setInfoSaved] = useState(false);
   const [slugError, setSlugError] = useState<string | null>(null);
-  const [showPasscode, setShowPasscode] = useState(false);
 
   const setInfo = (patch: Partial<EventInfo>) => update('info', patch);
   const handleSlugChange = (raw: string) => {
