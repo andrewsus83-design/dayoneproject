@@ -167,7 +167,7 @@ function GuestMobilePassContent({ slug }: { slug: string }) {
           </Link>
 
           <Link
-            href={`/events/${slug}/raffle`}
+            href={`/events/${slug}/doorprize`}
             className="p-3 bg-premium-charcoal rounded-2xl border border-premium-borderDark hover:border-premium-danger text-center flex flex-col items-center justify-center transition-colors scale-on-click"
           >
             <Gift className="w-5 h-5 text-premium-danger mb-1" />

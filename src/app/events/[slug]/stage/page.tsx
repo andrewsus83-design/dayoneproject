@@ -1,6 +1,8 @@
 'use client';
 
-import { useEventConfigBySlug } from '@/lib/eventStore';
+import { useEventConfigBySlug, useGuests } from '@/lib/eventStore';
+import { type SlotResult } from '@/components/raffle/SlotMachine';
+import { DrawMachine, DRAW_STYLES } from '@/components/raffle/DrawMachine';
 import React, { useState, useEffect, use, Suspense } from 'react';
 import {
   MOCK_EVENT,
@@ -42,8 +44,14 @@ import QRCode from 'qrcode';
 import confetti from 'canvas-confetti';
 
 function StageBigScreenContent({ slug }: { slug: string }) {
-  const { event } = useEventConfigBySlug(slug);
+  const { eventId, event, config } = useEventConfigBySlug(slug);
   const clientDomain = getClientDomain(slug);
+  const stageGuests = useGuests(eventId);
+  const stageEligible = stageGuests.filter((g) => g.is_checked_in);
+  const [stageDrawId, setStageDrawId] = useState<string | null>(null);
+  const stageDraw = config.doorprizes.items.find((d) => d.id === (stageDrawId ?? config.doorprizes.activeId)) ?? config.doorprizes.items[0];
+  const [slotTrigger, setSlotTrigger] = useState(0);
+  const [slotResult, setSlotResult] = useState<SlotResult | null>(null);
   const captionsEnabled = event.settings?.enablePhotoWallCaptions ?? true;
 
   const [stageConfig, setStageConfig] = useState<StageConfig>(DEFAULT_STAGE_CONFIG);
@@ -131,7 +139,7 @@ function StageBigScreenContent({ slug }: { slug: string }) {
           setIsAutoRotating(false);
           if (data.rafflePrize) setActiveRafflePrize(data.rafflePrize);
           if (data.raffleStyle) setActiveRaffleStyle(data.raffleStyle);
-          handleStageSpin();
+          handleStageSpin(data.doorPrizeId);
         }
       };
     }
@@ -203,20 +211,14 @@ function StageBigScreenContent({ slug }: { slug: string }) {
     }
   };
 
-  const handleStageSpin = () => {
+  const handleStageSpin = (doorPrizeId?: string) => {
     if (isRaffleSpinning) return;
-    setIsRaffleSpinning(true);
-    setRaffleWinner(null);
-
-    const randomAngle = wheelRotation + 1800 + Math.floor(Math.random() * 360);
-    setWheelRotation(randomAngle);
-
-    setTimeout(() => {
-      setIsRaffleSpinning(false);
-      setRaffleWinner(MOCK_GUESTS[1]); // Clarissa Tan
-      confetti({ particleCount: 160, spread: 90, origin: { y: 0.6 } });
-    }, 4500);
+    setSlotResult(null);
+    if (doorPrizeId) setStageDrawId(doorPrizeId);
+    // Wait a beat so the machine is mounted when the stage just switched to the raffle module.
+    window.setTimeout(() => setSlotTrigger((t) => t + 1), 150);
   };
+
 
   return (
     <div className="min-h-screen bg-premium-black text-zinc-100 flex flex-col justify-between overflow-x-hidden relative select-none font-sans">
@@ -436,107 +438,37 @@ function StageBigScreenContent({ slug }: { slug: string }) {
         </main>
       )}
 
-      {/* MODULE 4: Door Prize Raffle Arena (Synced with Operator Mode: Slot / Wheel / Claw) */}
-      {stageMode === 'raffle' && (
-        <main className="flex-1 p-10 flex flex-col justify-center items-center max-w-4xl mx-auto w-full z-10 animate-fadeIn text-center space-y-6">
+      {/* MODULE 4: Door Prize Raffle Arena — the door prize marked "on stage" in the dashboard */}
+      {stageMode === 'raffle' && stageDraw && (
+        <main className="flex-1 p-10 flex flex-col justify-center items-center max-w-5xl mx-auto w-full z-10 animate-fadeIn text-center space-y-6">
           <div>
             <span className="text-xs font-mono uppercase text-premium-gold font-bold tracking-widest">
-              ★ GRAND AUDITED RAFFLE DRAW • {activeRaffleStyle.toUpperCase()} MODE ★
+              ★ {stageDraw.name.toUpperCase()} • {(DRAW_STYLES.find((d) => d.id === stageDraw.style)?.label ?? '').toUpperCase()} ★
             </span>
-            <h2 className="text-4xl font-display font-bold text-white mt-1">
-              {activeRafflePrize}
-            </h2>
+            <h2 className="text-4xl font-display font-bold text-white mt-1">{stageDraw.prize}</h2>
           </div>
 
-          {/* 1. Slot Machine 777 Mode */}
-          {activeRaffleStyle === 'slot' && (
-            <div className="flex gap-5 p-8 rounded-[2.5rem] bg-premium-charcoal border-2 border-premium-gold shadow-gold my-4">
-              {[0, 1, 2].map((reel) => (
-                <div
-                  key={reel}
-                  className="w-28 sm:w-36 h-40 rounded-3xl bg-premium-black border border-premium-borderDark flex flex-col items-center justify-center shadow-inner"
-                >
-                  <span className="text-[10px] font-mono uppercase text-zinc-500 mb-1">
-                    {reel === 0 ? 'Table' : reel === 1 ? 'Category' : 'Winner'}
-                  </span>
-                  <span className="text-2xl sm:text-3xl font-display font-bold text-premium-gold px-2 truncate max-w-full">
-                    {isRaffleSpinning
-                      ? '777'
-                      : raffleWinner
-                      ? reel === 0
-                        ? raffleWinner.table_number || 'VIP'
-                        : reel === 1
-                        ? raffleWinner.category
-                        : raffleWinner.name.split(' ')[0]
-                      : '★'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="my-2 w-full flex justify-center">
+            <DrawMachine
+              key={stageDraw.id}
+              eventId={eventId}
+              draw={stageDraw}
+              size="lg"
+              trigger={slotTrigger}
+              showButton={false}
+              onSpinStart={() => setIsRaffleSpinning(true)}
+              onResult={(r) => { setIsRaffleSpinning(false); setSlotResult(r); }}
+            />
+          </div>
 
-          {/* 2. 3D Wheel Spinner Mode */}
-          {activeRaffleStyle === 'wheel' && (
-            <div className="relative w-80 h-80 my-4 flex items-center justify-center">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-30 w-0 h-0 border-l-[14px] border-l-transparent border-r-[14px] border-r-transparent border-t-[28px] border-t-premium-danger drop-shadow-[0_4px_10px_rgba(255,51,102,0.8)]" />
-
-              <div
-                className="w-full h-full rounded-full border-8 border-premium-gold shadow-gold relative overflow-hidden transition-all duration-[4500ms] cubic-bezier(0.15, 0.9, 0.2, 1)"
-                style={{ transform: `rotate(${wheelRotation}deg)` }}
-              >
-                {MOCK_GUESTS.map((g, idx) => {
-                  const angle = (360 / MOCK_GUESTS.length) * idx;
-                  const colors = ['#00F0FF', '#C5A059', '#FF3366', '#00E676', '#18181B', '#E5C378'];
-                  return (
-                    <div
-                      key={g.id}
-                      className="absolute inset-0 origin-center flex justify-center items-start pt-6 font-mono text-xs font-bold text-black"
-                      style={{
-                        transform: `rotate(${angle}deg)`,
-                        backgroundColor: colors[idx % colors.length],
-                        clipPath: 'polygon(50% 50%, 0 0, 100% 0)',
-                      }}
-                    >
-                      <span className="rotate-90 origin-bottom mt-2 truncate max-w-[90px]">
-                        {g.name.split(' ')[0]}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="absolute w-20 h-20 rounded-full bg-premium-black border-4 border-premium-gold shadow-2xl flex items-center justify-center font-display font-bold text-lg text-premium-gold z-20">
-                41
-              </div>
-            </div>
-          )}
-
-          {/* 3. Arcade Claw Machine Mode */}
-          {activeRaffleStyle === 'claw' && (
-            <div className="w-96 h-72 rounded-[2.5rem] border-2 border-premium-gold bg-premium-charcoal shadow-gold relative flex flex-col items-center justify-between p-6 my-4">
-              <div className="w-20 h-8 rounded-b-2xl bg-premium-neon text-black font-mono text-[10px] font-bold flex items-center justify-center shadow-neon">
-                CLAW ARMED
-              </div>
-              <div className="text-center space-y-2">
-                <Gift className={`w-20 h-20 text-premium-gold mx-auto ${isRaffleSpinning ? 'animate-bounce' : ''}`} />
-                <div className="text-xs font-mono text-zinc-300">
-                  {isRaffleSpinning ? 'Grabbing Golden Capsule from Checked-In Pool...' : '418 Verified Capsules Ready'}
-                </div>
-              </div>
-              <div className="w-full h-3 bg-premium-surfaceDark rounded-full border border-premium-borderDark" />
-            </div>
-          )}
-
-          {/* Winner Spotlight Banner */}
-          {raffleWinner && (
-            <div className="p-6 rounded-3xl bg-premium-charcoal border-2 border-premium-success shadow-2xl animate-bounce text-center space-y-1">
+          {slotResult && (
+            <div className="px-10 py-6 rounded-3xl bg-premium-charcoal border-2 border-premium-gold shadow-gold text-center space-y-1">
               <span className="text-xs font-mono uppercase text-premium-success tracking-widest font-bold">
-                🎉 OFFICIAL AUDITED WINNER 🎉
+                🎉 {slotResult.mode === 'number' ? 'LUCKY NUMBER' : 'LUCKY GUEST'} 🎉
               </span>
-              <h3 className="text-4xl font-display font-bold text-white">{raffleWinner.name}</h3>
-              <p className="text-sm font-mono text-premium-gold">
-                Table {raffleWinner.table_number || 'VIP'} • Verified Pass ID: {raffleWinner.qr_code_token}
-              </p>
+              <h3 className={`font-bold text-premium-gold ${slotResult.mode === 'number' ? 'text-7xl font-mono tracking-[0.2em]' : 'text-5xl font-display'}`}>
+                {slotResult.label}
+              </h3>
             </div>
           )}
 
@@ -544,14 +476,12 @@ function StageBigScreenContent({ slug }: { slug: string }) {
             <button
               type="button"
               disabled={isRaffleSpinning}
-              onClick={handleStageSpin}
+              onClick={() => handleStageSpin()}
               className={`px-10 py-4 rounded-2xl font-display font-bold text-sm uppercase tracking-wider text-black shadow-gold transition-all scale-on-click ${
-                isRaffleSpinning
-                  ? 'bg-zinc-700 text-zinc-400 cursor-not-allowed'
-                  : 'bg-premium-gold hover:bg-premium-goldHover'
+                isRaffleSpinning ? 'bg-zinc-700 text-zinc-400 cursor-not-allowed' : 'bg-premium-gold hover:bg-premium-goldHover'
               }`}
             >
-              {isRaffleSpinning ? 'SPINNING LIVE ON STAGE...' : 'TRIGGER AUDITED STAGE SPIN'}
+              {isRaffleSpinning ? 'DRAWING LIVE ON STAGE...' : 'TRIGGER STAGE DRAW'}
             </button>
           </div>
         </main>

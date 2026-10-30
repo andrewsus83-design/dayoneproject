@@ -21,7 +21,7 @@ import {
 import { Guest, PhotoWallUpload } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
 import {
-  useEventConfig, useGuests, useHydrated, writeGuests, resetEventSection, makePassToken, newId, DEFAULT_ACCESS,
+  useEventConfig, useGuests, useHydrated, writeGuests, formatGuestNumber, numberDigits, resetEventSection, makePassToken, newId, DEFAULT_ACCESS,
   type EventInfo,
 } from '@/lib/eventStore';
 import { isSlugTaken } from '@/lib/events';
@@ -183,8 +183,8 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
 
   const handleExportGuests = () => {
     const rows = [
-      ['Name', 'Email', 'Phone', 'Category', 'Table', 'QR Token', 'Checked in'],
-      ...guestsList.map((g) => [g.name, g.email ?? '', g.phone ?? '', g.category, g.table_number ?? '', g.qr_code_token, g.is_checked_in ? 'Yes' : 'No']),
+      ['No.', 'Name', 'Email', 'Phone', 'Category', 'Table', 'QR Token', 'Checked in'],
+      ...guestsList.map((g) => [formatGuestNumber(g.guest_number, numberDigits(guestsList, info.capacity)), g.name, g.email ?? '', g.phone ?? '', g.category, g.table_number ?? '', g.qr_code_token, g.is_checked_in ? 'Yes' : 'No']),
     ];
     downloadBlob(`${info.slug}-guests.csv`, new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' }));
   };
@@ -230,7 +230,7 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
   };
 
   const filteredGuests = guestsList.filter((g) =>
-    `${g.name} ${g.email ?? ''} ${g.phone ?? ''} ${g.category} ${g.table_number ?? ''}`.toLowerCase().includes(searchGuest.toLowerCase()),
+    `${g.guest_number ?? ''} ${g.name} ${g.email ?? ''} ${g.phone ?? ''} ${g.category} ${g.table_number ?? ''}`.toLowerCase().includes(searchGuest.toLowerCase()),
   );
   const [registrations, setRegistrations] = useState(
     MOCK_REGISTRATIONS[eventId] ?? MOCK_REGISTRATIONS['evt-techunite-2026']
@@ -356,8 +356,8 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
             { label: 'Invitation', href: `/events/${event.slug}/invitation`, icon: Mail },
             { label: 'Guest', href: `/events/${event.slug}/pass`, icon: Smartphone },
             { label: 'Register', href: `/events/${event.slug}/gate`, icon: Lock, primary: true },
-            { label: 'Trivia', href: `/events/${event.slug}/games`, icon: Gamepad2 },
-            { label: 'Raffle', href: `/events/${event.slug}/raffle`, icon: Gift },
+            { label: 'Games', href: `/events/${event.slug}/games`, icon: Gamepad2 },
+            { label: 'Door Prize', href: `/events/${event.slug}/doorprize`, icon: Gift },
             { label: 'LED', href: `/events/${event.slug}/stage`, icon: Tv },
           ] as const).map((v) => {
             const Icon = v.icon;
@@ -809,7 +809,8 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-premium-borderDark bg-premium-surfaceDark text-zinc-400 font-mono uppercase text-[10px] tracking-wider">
-                    <th className="p-4 pl-6">Attendee</th>
+                    <th className="p-4 pl-6 w-16">#</th>
+                    <th className="p-4">Attendee</th>
                     <th className="p-4">Contact</th>
                     <th className="p-4">Category</th>
                     <th className="p-4">Table / Seat</th>
@@ -821,12 +822,13 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                 <tbody className="divide-y divide-premium-borderDark/60">
                   {filteredGuests.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="p-6 text-center text-zinc-500">No guests match “{searchGuest}”.</td>
+                      <td colSpan={8} className="p-6 text-center text-zinc-500">No guests match “{searchGuest}”.</td>
                     </tr>
                   )}
                   {filteredGuests.map((g) => (
                     <tr key={g.id} className="hover:bg-premium-surfaceDark/40 transition-colors">
-                      <td className="p-4 pl-6 font-bold text-white">{g.name}</td>
+                      <td className="p-4 pl-6 font-mono text-premium-gold font-bold">{formatGuestNumber(g.guest_number, numberDigits(guestsList, info.capacity))}</td>
+                      <td className="p-4 font-bold text-white">{g.name}</td>
                       <td className="p-4 text-zinc-400 font-mono text-[11px]">{g.phone || g.email}</td>
                       <td className="p-4">
                         <span className="px-2.5 py-1 rounded-full bg-premium-gold/15 text-premium-gold border border-premium-gold/30 font-bold uppercase text-[10px]">
@@ -1126,11 +1128,11 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h3 className="text-2xl font-display font-bold text-white">Games Builder</h3>
-                <p className="text-xs text-zinc-400">Build quiz questions, upload CSV, and create scavenger hunt QR chains.</p>
+                <p className="text-xs text-zinc-400">Run multiple activities — trivia rounds and scavenger hunts — each with its own questions, frame and footer.</p>
               </div>
             </div>
 
-            <GamesBuilder subTab={gamesSubTab} setSubTab={setGamesSubTab} />
+            <GamesBuilder eventId={eventId} />
 
           </div>
         )}
@@ -1143,10 +1145,10 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h3 className="text-2xl font-display font-bold text-white">Door Prize & Raffle Engine</h3>
-                <p className="text-xs text-zinc-400">Wheel of fortune, slot machine, lucky draw spotlight — pick your style and spin.</p>
+                <p className="text-xs text-zinc-400">Run as many door prizes as you like — each with its own machine (Slot, Wheel, Name Picker or 3D Claw), frame, footer and winners.</p>
               </div>
             </div>
-            <RaffleEngine raffleStyle={raffleStyle} setRaffleStyle={setRaffleStyle} />
+            <RaffleEngine eventId={eventId} />
           </div>
         )}
 
@@ -1271,7 +1273,7 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                 },
                 {
                   title: '3D Door Prize Raffle Machine',
-                  url: `/events/${event.slug}/raffle`,
+                  url: `/events/${event.slug}/doorprize`,
                   desc: 'Interactive 3D slot machine, spinning wheel, and arcade claw raffle draw.',
                   badge: 'Raffle Stage',
                   color: 'text-premium-gold',

@@ -43,6 +43,9 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { StageLedEditor } from '@/components/dashboard/StageLedEditor';
+import { SlotSettings } from '@/components/raffle/SlotSettings';
+import { DRAW_STYLES } from '@/components/raffle/DrawMachine';
+import { useEventConfig } from '@/lib/eventStore';
 
 type BigScreenTarget = 'stage' | 'photowall' | 'games' | 'raffle';
 type ViewLayoutMode = 'switcher_studio' | 'split_live' | 'bigscreen_focus';
@@ -76,6 +79,9 @@ const QUIZ_QUESTIONS = [
 ];
 
 function OperatorCommandCenterContent({ eventId }: { eventId: string }) {
+  const { config: eventConfig, update: updateEvent } = useEventConfig(eventId);
+  const doorPrizes = eventConfig.doorprizes;
+  const updateDoorPrizes = (patch: Partial<typeof doorPrizes>) => updateEvent('doorprizes', patch);
   const event = eventId === 'evt-002' ? MOCK_WEDDING_EVENT : MOCK_EVENT;
 
   // 1. Top Surface Switcher: Operator Deck vs Split View vs Active Big Screen Focus
@@ -248,7 +254,7 @@ function OperatorCommandCenterContent({ eventId }: { eventId: string }) {
       case 'games':
         return `/events/${event.slug}/games`;
       case 'raffle':
-        return `/events/${event.slug}/raffle`;
+        return `/events/${event.slug}/doorprize`;
     }
   };
 
@@ -312,7 +318,7 @@ function OperatorCommandCenterContent({ eventId }: { eventId: string }) {
     try {
       if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
         const channel = new BroadcastChannel('all41_stage_bus');
-        channel.postMessage({ type: 'TRIGGER_RAFFLE_SPIN', rafflePrize, raffleStyle });
+        channel.postMessage({ type: 'TRIGGER_RAFFLE_SPIN', rafflePrize, raffleStyle, doorPrizeId: doorPrizes.activeId });
         channel.close();
       }
     } catch {
@@ -1427,39 +1433,33 @@ function OperatorCommandCenterContent({ eventId }: { eventId: string }) {
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-zinc-300 block mb-2">Grand Prize Title (Previewed Before Live)</label>
-                    <input
-                      type="text"
-                      value={rafflePrize}
-                      onChange={(e) => {
-                        setRafflePrize(e.target.value);
-                        setPreviewModule('raffle');
-                      }}
-                      className="w-full px-4 py-3.5 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-sm font-bold text-white focus:outline-none focus:border-premium-gold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-zinc-300 block mb-2">Select 3D Visualizer Mode</label>
-                    <div className="grid grid-cols-3 gap-3">
-                      {(['slot', 'wheel', 'claw'] as const).map((style) => (
+                    <label className="text-xs font-bold text-zinc-300 block mb-2">Door prize on the big screen</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {doorPrizes.items.map((d) => (
                         <button
-                          key={style}
+                          key={d.id}
                           type="button"
                           onClick={() => {
-                            setRaffleStyle(style);
+                            updateDoorPrizes({ activeId: d.id });
+                            setRafflePrize(d.prize);
+                            setRaffleStyle(d.style === 'picker' ? 'claw' : d.style);
                             setPreviewModule('raffle');
                           }}
-                          className={`p-4 rounded-2xl border text-xs font-bold uppercase transition-all scale-on-click ${
-                            raffleStyle === style
+                          className={`p-4 rounded-2xl border text-left transition-all scale-on-click ${
+                            doorPrizes.activeId === d.id
                               ? 'bg-premium-gold text-black border-premium-gold shadow-gold'
-                              : 'bg-premium-surfaceDark border-premium-borderDark text-zinc-400 hover:text-white'
+                              : 'bg-premium-surfaceDark border-premium-borderDark text-zinc-300 hover:text-white'
                           }`}
                         >
-                          {style === 'slot' ? '🎰 Slot 777' : style === 'wheel' ? '🎡 Wheel of Spin' : '🕹️ Arcade Claw'}
+                          <span className="block text-xs font-bold">{d.name}</span>
+                          <span className={`block text-[10px] mt-0.5 ${doorPrizes.activeId === d.id ? 'text-black/70' : 'text-zinc-500'}`}>
+                            {d.prize} · {DRAW_STYLES.find((x) => x.id === d.style)?.label} · {d.winners.length}/{d.quantity}
+                          </span>
                         </button>
                       ))}
                     </div>
+                    <SlotSettings eventId={eventId} drawId={doorPrizes.activeId} className="mt-3" />
+                    <p className="text-[10px] text-zinc-500 mt-2">Add door prizes, machines and frames in the Door Prize tab.</p>
                   </div>
 
                   <button

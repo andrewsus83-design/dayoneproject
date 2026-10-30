@@ -2,7 +2,8 @@
 
 import React, { use, Suspense, useMemo } from 'react';
 import {
-  addResponse, readGuests, useAssetUrl, useEventConfigBySlug, useResponses, writeGuests, formatEventDate,
+  addResponse, readGuests, useAssetUrl, useEventConfigBySlug, useGuests, useResponses, writeGuests, formatEventDate,
+  nextGuestNumber, numberDigits,
   type FormResponse,
 } from '@/lib/eventStore';
 import { resolveInvitationTheme } from '@/lib/eventTheme';
@@ -18,9 +19,11 @@ function todayIso() {
 function InvitationContent({ slug }: { slug: string }) {
   const { eventId, hydrated, config, event } = useEventConfigBySlug(slug);
   const responses = useResponses(eventId);
+  const guests = useGuests(eventId);
   const inv = config.invitation;
   const photo = useAssetUrl(inv.photoUrl);
-  const hero = useAssetUrl(config.landing.heroUrl);
+  const heroBlock = config.landing.blocks.find((b) => b.type === 'hero');
+  const hero = useAssetUrl(heroBlock && heroBlock.type === 'hero' ? heroBlock.imageUrl : '');
   const coverUrl = photo || hero || event.cover_image_url || '';
   const theme = useMemo(() => resolveInvitationTheme(config.design, inv.theme), [config.design, inv.theme]);
   const isWedding = event.event_type === 'wedding';
@@ -37,8 +40,15 @@ function InvitationContent({ slug }: { slug: string }) {
     return null;
   }, [hydrated, inv.accepting, inv.replyBy, inv.guestLimit, responses]);
 
+  const notOpenUntil = useMemo(() => {
+    if (!hydrated || inv.opensMode !== 'scheduled' || !inv.opensAt) return null;
+    return new Date(inv.opensAt).getTime() > Date.now() ? inv.opensAt : null;
+  }, [hydrated, inv.opensMode, inv.opensAt]);
+
   const handleSubmit = (r: FormResponse) => {
-    const saved = addResponse(eventId, r);
+    const current = readGuests(eventId);
+    const number = r.attending ? nextGuestNumber(current) : undefined;
+    const saved = addResponse(eventId, { ...r, number });
     if (!saved.ok || !r.attending) return saved;
     const now = new Date().toISOString();
     const guest: Guest = {
@@ -54,6 +64,7 @@ function InvitationContent({ slug }: { slug: string }) {
       rsvp_notes: null,
       custom_fields: r.answers,
       qr_code_token: r.token,
+      guest_number: number,
       is_checked_in: false,
       checked_in_at: null,
       checked_in_by: null,
@@ -63,8 +74,8 @@ function InvitationContent({ slug }: { slug: string }) {
       created_at: now,
       updated_at: now,
     };
-    writeGuests(eventId, [...readGuests(eventId), guest]);
-    return saved;
+    writeGuests(eventId, [...current, guest]);
+    return { ...saved, number };
   };
 
   if (!hydrated) {
@@ -80,8 +91,12 @@ function InvitationContent({ slug }: { slug: string }) {
         theme={theme}
         coverUrl={coverUrl}
         isWedding={isWedding}
+        logoRef={config.design.logoUrl}
+        logoSize={config.design.logoSize}
         closedReason={closedReason}
+        notOpenUntil={notOpenUntil}
         onSubmit={handleSubmit}
+        numberPad={numberDigits(guests, config.info.capacity)}
         backHref={`/events/${slug}`}
       />
     </>

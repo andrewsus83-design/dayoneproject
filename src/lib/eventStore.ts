@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import { Event, Guest } from './types';
 import { getBaseEvent, resolveEventIdFromSlug, SLUG_INDEX_KEY } from './events';
-import { MOCK_GUESTS } from './mockData';
+import { MOCK_GUESTS, POPVERSE_QUIZ_QUESTIONS } from './mockData';
+import { buildDefaultBlocks, legacyToBlocks, type LandingBlock } from './landingBlocks';
 
 /* ───────────────────────── Types ───────────────────────── */
 
@@ -9,6 +10,7 @@ export type QuestionType = 'text' | 'long_text' | 'yes_no' | 'multiple' | 'numbe
 export type QuestionRole = 'name' | 'attending' | 'party' | 'email' | 'phone';
 
 export interface FormQuestion {
+  kind?: 'question';
   id: string;
   type: QuestionType;
   label: string;
@@ -16,6 +18,39 @@ export interface FormQuestion {
   options?: string[];
   placeholder?: string;
   role?: QuestionRole;
+}
+
+export interface FormPageBreak {
+  kind: 'page_break';
+  id: string;
+  title: string;
+  description: string;
+}
+
+export interface FormImage {
+  kind: 'image';
+  id: string;
+  url: string;
+  caption: string;
+}
+
+export interface FormFile {
+  kind: 'file';
+  id: string;
+  url: string;
+  name: string;
+  size: number;
+  label: string;
+}
+
+export type FormItem = FormQuestion | FormPageBreak | FormImage | FormFile;
+
+export function isQuestion(item: FormItem): item is FormQuestion {
+  return !item.kind || item.kind === 'question';
+}
+
+export function getQuestions(items: FormItem[]): FormQuestion[] {
+  return items.filter(isQuestion);
 }
 
 export interface EventInfo {
@@ -42,35 +77,32 @@ export interface Testimony {
 }
 
 export interface LandingConfig {
-  heroUrl: string;
-  heroOverlay: boolean;
-  badge: string;
-  subtitle: string;
-  ctaLabel: string;
-  ctaSub: string;
-  galleryOn: boolean;
-  gallery: { id: string; url: string }[];
-  testimoniesOn: boolean;
-  testimonies: Testimony[];
-  notesOn: boolean;
-  notesText: string;
-  dressCode: string;
+  blocks: LandingBlock[];
+  footerTitle: string;
+  footerTagline: string;
+  footerText: string;
 }
 
 export type ThemeMode = 'dark' | 'light';
 export type CardStyleId = 'minimal' | 'bordered' | 'elevated' | 'glass';
 export type RadiusId = 'sharp' | 'medium' | 'round' | 'pill';
+export type SpacingId = 'tight' | 'normal' | 'spacious';
 
 export interface DesignConfig {
   mode: ThemeMode;
   background: string;
   palette: string;
   customPrimary: string;
+  customSecondary: string;
   customAccent: string;
   headingFont: string;
   bodyFont: string;
+  accentFont: string;
   cardStyle: CardStyleId;
   radius: RadiusId;
+  spacing: SpacingId;
+  logoUrl: string;
+  logoSize: 's' | 'm' | 'l';
 }
 
 export interface ClosingCopy {
@@ -87,10 +119,18 @@ export interface InvitationConfig {
   startLabel: string;
   startNote: string;
   photoUrl: string;
-  questions: FormQuestion[];
+  photoZoom: number;
+  photoX: number;
+  photoY: number;
+  photoHeight: number;
+  items: FormItem[];
   confirmed: ClosingCopy;
   declined: ClosingCopy;
   closed: ClosingCopy;
+  upcoming: ClosingCopy;
+  opensMode: 'now' | 'scheduled';
+  opensAt: string;
+  ticketLabel: string;
   showTicket: boolean;
   showCalendar: boolean;
   showDirections: boolean;
@@ -106,6 +146,8 @@ export interface InvitationConfig {
   maxPerReply: string;
   askReview: boolean;
   sendLabel: string;
+  guestNumbers: boolean;
+  numberLabel: string;
 }
 
 export interface AccessConfig {
@@ -119,6 +161,96 @@ export interface PolicyConfig {
   privacy: string;
 }
 
+export type SlotMode = 'number' | 'name';
+
+export interface RaffleConfig {
+  slotMode: SlotMode;
+  // 0 = automatic: the larger of the guest list size and the event capacity.
+  totalNumbers: number;
+  drawnNumbers: number[];
+  drawnGuestIds: string[];
+}
+
+export type FramePreset = 'none' | 'gold' | 'neon' | 'prism' | 'confetti' | 'image';
+
+export interface StageFrame {
+  preset: FramePreset;
+  imageUrl: string;
+  imageBlend: 'normal' | 'screen';
+  footerOn: boolean;
+  footerText: string;
+  footerLogo: boolean;
+  footerStyle: 'dark' | 'gold' | 'glass';
+}
+
+export interface QuizItem {
+  id: string;
+  text: string;
+  options: string[];
+  answer: number;
+  points: number;
+  seconds: number;
+}
+
+export interface ClueItem {
+  id: string;
+  location: string;
+  hint: string;
+  riddle: string;
+  token: string;
+}
+
+export interface Activity {
+  id: string;
+  name: string;
+  kind: 'quiz' | 'scavenger';
+  questions: QuizItem[];
+  clues: ClueItem[];
+  frame: StageFrame;
+  audience: Audience;
+  pickedGuestIds: string[];
+  anonymous: boolean;
+}
+
+export type DrawStyle = 'slot' | 'wheel' | 'picker' | 'claw';
+export type Audience = 'all' | 'picked';
+
+export interface DrawWinner {
+  id: string;
+  label: string;
+  guestId?: string;
+  number?: number;
+  at: string;
+}
+
+export interface DoorPrize {
+  id: string;
+  name: string;
+  prize: string;
+  quantity: number;
+  sponsor: string;
+  style: DrawStyle;
+  slotMode: SlotMode;
+  totalNumbers: number;
+  confetti: boolean;
+  frame: StageFrame;
+  winners: DrawWinner[];
+  audience: Audience;
+  pickedGuestIds: string[];
+  anonymous: boolean;
+  numberSource: 'guests' | 'range';
+}
+
+export interface GamesConfig {
+  activities: Activity[];
+  activeId: string;
+}
+
+export interface DoorPrizesConfig {
+  items: DoorPrize[];
+  activeId: string;
+}
+
 export interface EventConfig {
   info: EventInfo;
   landing: LandingConfig;
@@ -126,6 +258,9 @@ export interface EventConfig {
   invitation: InvitationConfig;
   access: AccessConfig;
   policy: PolicyConfig;
+  raffle: RaffleConfig;
+  games: GamesConfig;
+  doorprizes: DoorPrizesConfig;
 }
 
 export type EventSection = keyof EventConfig;
@@ -141,6 +276,7 @@ export interface FormResponse {
   attending: boolean;
   party: number;
   token: string;
+  number?: number;
 }
 
 /* ───────────────────────── Storage keys ───────────────────────── */
@@ -180,6 +316,7 @@ export const DEFAULT_ACCESS: AccessConfig = { username: 'admin', passcode: '4141
 
 export function buildDefaults(base: Event): EventConfig {
   const isWedding = base.event_type === 'wedding';
+  const isPopverse = base.id === 'evt-popverse-converge-2026';
   return {
     info: {
       name: base.name,
@@ -196,40 +333,26 @@ export function buildDefaults(base: Event): EventConfig {
       endTime: base.end_date.slice(11, 16),
     },
     landing: {
-      heroUrl: '',
-      heroOverlay: true,
-      badge: isWedding ? 'Wedding Celebration' : 'Corporate Summit',
-      subtitle: '',
-      ctaLabel: isWedding ? 'RSVP to Attend' : 'Register Now',
-      ctaSub: 'Instant confirmation · Digital QR pass sent by email & WhatsApp',
-      galleryOn: false,
-      gallery: [],
-      testimoniesOn: false,
-      testimonies: [
-        {
-          id: 't1',
-          name: 'Sarah Kim',
-          role: isWedding ? 'Bridesmaid' : 'CEO, TechCorp',
-          text: 'Absolutely outstanding — every detail was perfect.',
-          rating: 5,
-        },
-      ],
-      notesOn: false,
-      notesText: isWedding
-        ? '"And now these three remain: faith, hope and love. But the greatest of these is love." — 1 Corinthians 13:13'
-        : '"The best way to predict the future is to create it." — Peter Drucker',
-      dressCode: isWedding ? 'Black Tie — Tropical Formal' : 'Business Attire',
+      blocks: buildDefaultBlocks(base),
+      footerTitle: isPopverse ? 'POPVERSE' : '',
+      footerTagline: isPopverse ? 'Different Tunes. One Beat.' : '',
+      footerText: isPopverse ? '© 2026 Converge ICT Solutions Inc. · SPACE at One Ayala, Makati CBD' : '',
     },
     design: {
       mode: 'dark',
-      background: '#09090B',
-      palette: 'gold',
+      background: isPopverse ? '#0A0608' : '#09090B',
+      palette: isPopverse ? 'prism' : 'gold',
       customPrimary: base.theme_config.primaryColor || '#C5A059',
+      customSecondary: '#E8D3A3',
       customAccent: base.theme_config.accentColor || '#00F0FF',
-      headingFont: 'outfit',
-      bodyFont: 'manrope',
-      cardStyle: 'elevated',
+      headingFont: isPopverse ? 'montserrat' : 'outfit',
+      bodyFont: isPopverse ? 'montserrat' : 'manrope',
+      accentFont: 'none',
+      cardStyle: isPopverse ? 'glass' : 'elevated',
       radius: 'medium',
+      spacing: 'normal',
+      logoUrl: '',
+      logoSize: 'm',
     },
     invitation: {
       theme: 'event',
@@ -241,7 +364,12 @@ export function buildDefaults(base: Event): EventConfig {
       startLabel: isWedding ? 'RSVP now' : 'Register now',
       startNote: 'Takes about 1 minute',
       photoUrl: '',
-      questions: isWedding ? ESSENTIALS_WEDDING : ESSENTIALS_CORPORATE,
+      photoZoom: 1,
+      photoX: 50,
+      photoY: 50,
+      photoHeight: 240,
+      items: withPageBreaks(isWedding ? ESSENTIALS_WEDDING : ESSENTIALS_CORPORATE),
+      ticketLabel: "You're invited",
       confirmed: {
         heading: 'See you there, {name}!',
         message: 'Your seat is saved for {party}. Please show this QR code at the entrance.',
@@ -257,6 +385,13 @@ export function buildDefaults(base: Event): EventConfig {
         message: '{event} is no longer accepting replies. Please contact the host if you need help.',
         smallPrint: '',
       },
+      upcoming: {
+        heading: 'Registration opens soon',
+        message: 'Replies for {event} open on {opens}. Come back then to reserve your seat.',
+        smallPrint: '',
+      },
+      opensMode: 'now',
+      opensAt: '',
       showTicket: true,
       showCalendar: true,
       showDirections: true,
@@ -272,6 +407,8 @@ export function buildDefaults(base: Event): EventConfig {
       maxPerReply: '6',
       askReview: true,
       sendLabel: isWedding ? 'Send RSVP' : 'Register Now',
+      guestNumbers: true,
+      numberLabel: 'Guest No.',
     },
     access: { ...DEFAULT_ACCESS },
     policy: {
@@ -281,18 +418,182 @@ export function buildDefaults(base: Event): EventConfig {
       privacy:
         'Data collected is solely utilized for attendee verification, ticket pass dispatch, and table seating coordination.',
     },
+    raffle: { slotMode: 'number', totalNumbers: 0, drawnNumbers: [], drawnGuestIds: [] },
+    games: defaultGames(base),
+    doorprizes: defaultDoorPrizes(base),
   };
+}
+
+export function drawExclusions(config: EventConfig) {
+  const numbers: number[] = [];
+  const guestIds: string[] = [];
+  for (const d of config.doorprizes.items) {
+    for (const w of d.winners) {
+      if (typeof w.number === 'number') numbers.push(w.number);
+      if (w.guestId) guestIds.push(w.guestId);
+    }
+  }
+  return { numbers, guestIds };
+}
+
+export function recordDrawWinner(eventId: string, drawId: string, winner: { label: string; number?: number; guestId?: string }): WriteResult {
+  const current = readJSON<StoredConfig>(eventKey(eventId)) ?? {};
+  const base = getBaseEvent(eventId);
+  const items = (current.doorprizes?.items as DoorPrize[] | undefined) ?? buildDefaults(base).doorprizes.items;
+  const next = items.map((d) =>
+    d.id === drawId
+      ? { ...d, winners: [{ id: newId('w'), at: new Date().toISOString(), ...winner }, ...d.winners] }
+      : d,
+  );
+  return updateEventConfig(eventId, 'doorprizes', { items: next });
+}
+
+export function resolveDrawTotal(draw: DoorPrize, config: EventConfig, guestCount: number): number {
+  return draw.totalNumbers > 0 ? draw.totalNumbers : Math.max(guestCount, config.info.capacity, 1);
+}
+
+export function resolveRaffleTotal(config: EventConfig, guestCount: number): number {
+  return config.raffle.totalNumbers > 0 ? config.raffle.totalNumbers : Math.max(guestCount, config.info.capacity, 1);
+}
+
+let breakSeq = 0;
+// One question per page by default — the original Typeform-style flow.
+export function withPageBreaks(questions: FormQuestion[], perPage = 1): FormItem[] {
+  const out: FormItem[] = [];
+  questions.forEach((q, i) => {
+    if (i > 0 && perPage > 0 && i % perPage === 0) {
+      out.push({ kind: 'page_break', id: `pb-${i}-${(breakSeq++).toString(36)}`, title: '', description: '' });
+    }
+    out.push({ ...q, kind: 'question' });
+  });
+  return out;
+}
+
+function normalizeLanding(defaults: LandingConfig, stored: Partial<LandingConfig> | undefined): LandingConfig {
+  if (!stored) return defaults;
+  const legacy = stored as Partial<LandingConfig> & Record<string, unknown>;
+  const blocks = Array.isArray(legacy.blocks) ? legacy.blocks : legacyToBlocks(defaults.blocks, legacy);
+  return { ...defaults, ...stored, blocks };
+}
+
+function normalizeInvitation(defaults: InvitationConfig, stored: Partial<InvitationConfig> | undefined): InvitationConfig {
+  if (!stored) return defaults;
+  const legacy = stored as Partial<InvitationConfig> & { questions?: FormQuestion[] };
+  const items = Array.isArray(legacy.items) ? legacy.items : Array.isArray(legacy.questions) ? withPageBreaks(legacy.questions) : defaults.items;
+  const { questions: _legacyQuestions, ...rest } = legacy;
+  void _legacyQuestions;
+  return { ...defaults, ...rest, items };
+}
+
+export function defaultFrame(base?: Event): StageFrame {
+  const popverse = base?.id === 'evt-popverse-converge-2026';
+  return {
+    preset: popverse ? 'image' : 'gold',
+    imageUrl: popverse ? POPVERSE_STAGE_FRAME : '',
+    imageBlend: 'screen',
+    footerOn: true,
+    footerText: base ? base.name : '',
+    footerLogo: true,
+    footerStyle: 'dark',
+  };
+}
+
+export const POPVERSE_STAGE_FRAME =
+  'https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793300675118_e65da6c9_1793300675879_1fc2362a.png';
+
+const DEFAULT_QUIZ: QuizItem[] = [
+  { id: 'q-1', text: 'In what year was All41 founded?', options: ['2023', '2024', '2025', '2026'], answer: 1, points: 1000, seconds: 15 },
+  { id: 'q-2', text: 'Which payment rail powers QR check-in in Indonesia?', options: ['QRIS', 'Swift GPI', 'FedNow', 'SEPA'], answer: 0, points: 1000, seconds: 15 },
+  { id: 'q-3', text: 'Which protocol is best suited for live audience quiz sync?', options: ['WebSockets', 'HTTP Polling', 'SMTP', 'FTP'], answer: 0, points: 1000, seconds: 15 },
+];
+
+export function newQuizItem(): QuizItem {
+  return { id: newId('qz'), text: 'New question', options: ['Option A', 'Option B', 'Option C', 'Option D'], answer: 0, points: 1000, seconds: 15 };
+}
+
+export function newClue(): ClueItem {
+  return { id: newId('cl'), location: '', hint: '', riddle: '', token: Math.random().toString(36).slice(2, 8).toUpperCase() };
+}
+
+export function newActivity(kind: Activity['kind'], base?: Event, index = 1): Activity {
+  return {
+    id: newId('act'),
+    name: kind === 'quiz' ? `Trivia Round ${index}` : `Scavenger Hunt ${index}`,
+    kind,
+    questions: kind === 'quiz' ? DEFAULT_QUIZ.map((q) => ({ ...q, id: newId('qz') })) : [],
+    clues: kind === 'scavenger' ? [newClue(), newClue(), newClue()] : [],
+    frame: defaultFrame(base),
+    ...ACTIVITY_EXTRAS,
+  };
+}
+
+function defaultGames(base: Event): GamesConfig {
+  const popverse = base.id === 'evt-popverse-converge-2026';
+  const first: Activity = {
+    id: 'act-main',
+    name: popverse ? 'POPVERSE Pop Quiz' : 'Main Trivia',
+    kind: 'quiz',
+    questions: popverse
+      ? POPVERSE_QUIZ_QUESTIONS.map((q) => ({ ...q, seconds: 15 }))
+      : DEFAULT_QUIZ,
+    clues: [],
+    frame: defaultFrame(base),
+    ...ACTIVITY_EXTRAS,
+  };
+  return { activities: [first], activeId: first.id };
+}
+
+export function newDoorPrize(base?: Event, index = 1): DoorPrize {
+  return {
+    id: newId('dp'),
+    name: `Door Prize ${index}`,
+    prize: 'Mystery Prize',
+    quantity: 1,
+    sponsor: '',
+    style: 'slot',
+    slotMode: 'number',
+    totalNumbers: 0,
+    confetti: true,
+    frame: defaultFrame(base),
+    winners: [],
+    ...DRAW_EXTRAS,
+  };
+}
+
+function defaultDoorPrizes(base: Event): DoorPrizesConfig {
+  const items: DoorPrize[] = [
+    { ...newDoorPrize(base), id: 'dp-grand', name: 'Grand Prize', prize: 'Apple MacBook Pro M4 Max (16-inch)', quantity: 1, sponsor: 'All41 Innovation' },
+    { ...newDoorPrize(base), id: 'dp-second', name: 'Second Prize', prize: 'iPhone 16 Pro Max', quantity: 2, style: 'claw' },
+    { ...newDoorPrize(base), id: 'dp-lucky', name: 'Lucky Draw', prize: 'Staycation Voucher', quantity: 3, style: 'picker' },
+  ];
+  return { items, activeId: items[0].id };
+}
+
+const ACTIVITY_EXTRAS = { audience: 'all' as Audience, pickedGuestIds: [] as string[], anonymous: false };
+const DRAW_EXTRAS = { audience: 'all' as Audience, pickedGuestIds: [] as string[], anonymous: false, numberSource: 'guests' as const };
+
+function normalizeGames(defaults: GamesConfig, stored: Partial<GamesConfig> | undefined): GamesConfig {
+  const merged = { ...defaults, ...stored };
+  return { ...merged, activities: merged.activities.map((a) => ({ ...ACTIVITY_EXTRAS, ...a })) };
+}
+
+function normalizeDoorPrizes(defaults: DoorPrizesConfig, stored: Partial<DoorPrizesConfig> | undefined): DoorPrizesConfig {
+  const merged = { ...defaults, ...stored };
+  return { ...merged, items: merged.items.map((d) => ({ ...DRAW_EXTRAS, ...d })) };
 }
 
 function mergeConfig(defaults: EventConfig, stored: StoredConfig | null): EventConfig {
   if (!stored) return defaults;
   return {
     info: { ...defaults.info, ...stored.info },
-    landing: { ...defaults.landing, ...stored.landing },
+    landing: normalizeLanding(defaults.landing, stored.landing),
     design: { ...defaults.design, ...stored.design },
-    invitation: { ...defaults.invitation, ...stored.invitation },
+    invitation: normalizeInvitation(defaults.invitation, stored.invitation),
     access: { ...defaults.access, ...stored.access },
     policy: { ...defaults.policy, ...stored.policy },
+    raffle: { ...defaults.raffle, ...stored.raffle },
+    games: normalizeGames(defaults.games, stored.games),
+    doorprizes: normalizeDoorPrizes(defaults.doorprizes, stored.doorprizes),
   };
 }
 
@@ -491,16 +792,51 @@ export function deleteResponse(eventId: string, id: string): WriteResult {
   return writeJSON(responsesKey(eventId), current.filter((r) => r.id !== id));
 }
 
+// Every guest keeps a permanent number; missing ones continue after the highest number in list order.
+export function numberGuests(guests: Guest[]): Guest[] {
+  let max = guests.reduce((m, g) => Math.max(m, g.guest_number ?? 0), 0);
+  if (guests.every((g) => g.guest_number)) return guests;
+  return guests.map((g) => (g.guest_number ? g : { ...g, guest_number: ++max }));
+}
+
+const numberedCache = new WeakMap<Guest[], Guest[]>();
+function numbered(list: Guest[]): Guest[] {
+  let out = numberedCache.get(list);
+  if (!out) {
+    out = numberGuests(list);
+    numberedCache.set(list, out);
+  }
+  return out;
+}
+
 export function useGuests(eventId: string): Guest[] {
-  return useStoredJSON<Guest[]>(guestsKey(eventId)) ?? MOCK_GUESTS;
+  return numbered(useStoredJSON<Guest[]>(guestsKey(eventId)) ?? MOCK_GUESTS);
 }
 
 export function readGuests(eventId: string): Guest[] {
-  return readJSON<Guest[]>(guestsKey(eventId)) ?? MOCK_GUESTS;
+  return numbered(readJSON<Guest[]>(guestsKey(eventId)) ?? MOCK_GUESTS);
 }
 
 export function writeGuests(eventId: string, guests: Guest[]): WriteResult {
-  return writeJSON(guestsKey(eventId), guests);
+  return writeJSON(guestsKey(eventId), numberGuests(guests));
+}
+
+export function nextGuestNumber(guests: Guest[]): number {
+  return numbered(guests).reduce((m, g) => Math.max(m, g.guest_number ?? 0), 0) + 1;
+}
+
+export function numberDigits(guests: Guest[], capacity = 0): number {
+  const max = numbered(guests).reduce((m, g) => Math.max(m, g.guest_number ?? 0), 0);
+  return Math.max(3, String(Math.max(max, capacity, 1)).length);
+}
+
+export function formatGuestNumber(n: number | undefined, digits = 3): string {
+  return n ? String(n).padStart(digits, '0') : '';
+}
+
+export function guestPool(guests: Guest[], audience: Audience, picked: string[], checkedInOnly = true): Guest[] {
+  const pickedSet = new Set(picked);
+  return numbered(guests).filter((g) => (audience === 'all' || pickedSet.has(g.id)) && (!checkedInOnly || g.is_checked_in));
 }
 
 /* ───────────────────────── Helpers ───────────────────────── */
@@ -546,6 +882,12 @@ export function formatEventDate(date: string, style: 'long' | 'short' = 'long'):
   });
 }
 
+export function formatOpensAt(value: string): string {
+  if (!value) return '';
+  const [date, time] = value.split('T');
+  return `${formatEventDate(date)}${time ? ` at ${formatEventTime(time)}` : ''}`;
+}
+
 export function formatEventTime(time: string): string {
   if (!time) return '';
   const [h, m] = time.split(':').map(Number);
@@ -557,7 +899,7 @@ export function formatEventTime(time: string): string {
 
 export function fillVariables(
   text: string,
-  vars: { name?: string; fullname?: string; party?: number; event: string; date: string; time: string; venue: string; code?: string },
+  vars: { name?: string; fullname?: string; party?: number; event: string; date: string; time: string; venue: string; code?: string; opens?: string; number?: string },
 ): string {
   const party = vars.party ?? 1;
   return text
@@ -569,5 +911,7 @@ export function fillVariables(
     .replaceAll('{date}', vars.date)
     .replaceAll('{time}', vars.time)
     .replaceAll('{venue}', vars.venue)
-    .replaceAll('{code}', vars.code || 'ALL41-XXXXXXXX');
+    .replaceAll('{code}', vars.code || 'ALL41-XXXXXXXX')
+    .replaceAll('{opens}', vars.opens || 'soon')
+    .replaceAll('{number}', vars.number || '001');
 }

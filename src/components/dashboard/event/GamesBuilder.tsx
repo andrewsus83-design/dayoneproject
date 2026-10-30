@@ -1,561 +1,299 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import QRCode from 'qrcode';
+import * as XLSX from 'xlsx';
 import {
-  QrCode, MapPin, Plus, Trash2, Upload, FileText, CheckCircle2,
-  Edit3, Copy, Download, Eye, AlertCircle, Hash, AlignLeft,
-  ChevronRight, Trophy, Zap, GripVertical, X, Check, Sparkles,
+  ArrowDown, ArrowUp, Check, Copy, Download, ExternalLink, Gamepad2, MapPin, Palette, Plus, Search, Trash2, Tv, Upload, Users,
 } from 'lucide-react';
+import {
+  guestPool, newActivity, newClue, newId, newQuizItem, numberDigits, useEventConfig, useGuests, type Activity, type ClueItem, type QuizItem,
+} from '@/lib/eventStore';
+import { AudiencePicker } from '@/components/raffle/AudiencePicker';
+import { FrameDesigner } from '@/components/stage/FrameDesigner';
+import { downloadBlob, downloadDataUrl, toCsv } from '@/lib/image';
 
-/* ─── Scavenger Hunt ─────────────────────────────────────── */
+type Tab = 'content' | 'guests' | 'design' | 'screen';
+const input = 'w-full px-3 py-2 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-xs text-white outline-none focus:border-premium-gold/60';
 
-interface HuntClue {
-  id: string;
-  order: number;
-  location: string;
-  hint: string;
-  riddle: string;
-  token: string;
-  generated: boolean;
+function move<T>(list: T[], i: number, d: -1 | 1): T[] {
+  const j = i + d;
+  if (j < 0 || j >= list.length) return list;
+  const next = [...list];
+  [next[i], next[j]] = [next[j], next[i]];
+  return next;
 }
 
-function generateToken() {
-  return Math.random().toString(36).substring(2, 8).toUpperCase();
-}
+function QuizEditor({ questions, onChange }: { questions: QuizItem[]; onChange: (q: QuizItem[]) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [openId, setOpenId] = useState<string | null>(questions[0]?.id ?? null);
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+  const patch = (id: string, p: Partial<QuizItem>) => onChange(questions.map((q) => (q.id === id ? { ...q, ...p } : q)));
 
-function ScavengerBuilder() {
-  const [clues, setClues] = useState<HuntClue[]>([
-    { id: 'c1', order: 1, location: 'Main Registration Desk', hint: 'Check where badges are given', riddle: 'Find the place where your journey starts — show this QR to begin!', token: generateToken(), generated: true },
-    { id: 'c2', order: 2, location: 'Keynote Hall Entrance', hint: 'Look above the main stage doors', riddle: 'Speakers gather here to share their light. Scan me to claim your next clue!', token: generateToken(), generated: true },
-    { id: 'c3', order: 3, location: 'Networking Lounge', hint: 'Near the coffee bar', riddle: 'Connections bloom where conversations flow. Scan to earn your prize!', token: generateToken(), generated: false },
-  ]);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-
-  const addClue = () => {
-    const newClue: HuntClue = {
-      id: `c${Date.now()}`,
-      order: clues.length + 1,
-      location: '',
-      hint: '',
-      riddle: '',
-      token: generateToken(),
-      generated: false,
-    };
-    setClues((prev) => [...prev, newClue]);
-    setEditId(newClue.id);
-  };
-
-  const removeClue = (id: string) => setClues((prev) => prev.filter((c) => c.id !== id).map((c, i) => ({ ...c, order: i + 1 })));
-  const updateClue = (id: string, key: keyof HuntClue, val: string) =>
-    setClues((prev) => prev.map((c) => c.id === id ? { ...c, [key]: val } : c));
-
-  const copyToken = (id: string, token: string) => {
-    navigator.clipboard.writeText(token).catch(() => {});
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+  const importFile = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      const rows = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+      const parsed: QuizItem[] = [];
+      for (const r of rows.slice(1)) {
+        const [text, a, b, c, d, ans, pts] = r.map((x) => String(x).trim());
+        if (!text || !a || !b) continue;
+        const options = [a, b, c, d].filter(Boolean);
+        const letter = (ans || 'A').toUpperCase().charCodeAt(0) - 65;
+        parsed.push({ id: newId('qz'), text, options, answer: Math.min(Math.max(letter, 0), options.length - 1), points: parseInt(pts || '1000', 10) || 1000, seconds: 15 });
+      }
+      onChange([...questions, ...parsed]);
+      setImportMsg(`Imported ${parsed.length} question${parsed.length === 1 ? '' : 's'}.`);
+    } catch {
+      setImportMsg('Could not read that file. Use columns: Question, A, B, C, D, Answer (A–D), Points.');
+    } finally {
+      if (fileRef.current) fileRef.current.value = '';
+    }
   };
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="font-display font-bold text-white text-base flex items-center gap-2">
-            <MapPin className="w-4.5 h-4.5 text-premium-neon" />
-            Scavenger Hunt Builder
-          </h3>
-          <p className="text-[11px] text-zinc-400 mt-0.5">
-            Place QR codes at each checkpoint. Guests scan to unlock the next clue.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={addClue}
-          className="px-4 py-2 rounded-xl bg-premium-gold text-black text-xs font-bold shadow-gold scale-on-click flex items-center gap-1.5"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Add Checkpoint
-        </button>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => { const q = newQuizItem(); onChange([...questions, q]); setOpenId(q.id); }} className="px-3 py-2 rounded-xl bg-premium-gold text-black text-xs font-bold scale-on-click flex items-center gap-1.5"><Plus className="w-3.5 h-3.5" /> Question</button>
+        <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={(e) => importFile(e.target.files?.[0])} />
+        <button type="button" onClick={() => fileRef.current?.click()} className="px-3 py-2 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-white text-xs font-bold scale-on-click flex items-center gap-1.5"><Upload className="w-3.5 h-3.5" /> Import CSV / Excel</button>
+        <button type="button" onClick={() => downloadBlob('quiz-template.csv', new Blob([toCsv([['Question', 'A', 'B', 'C', 'D', 'Answer', 'Points'], ['Who is known as the King of Pop?', 'Elvis', 'Prince', 'Michael Jackson', 'Bowie', 'C', '1000']])], { type: 'text/csv' }))} className="text-[11px] font-mono text-premium-neon hover:underline">Template ↓</button>
+        <span className="text-[11px] text-zinc-500 ml-auto">{questions.length} questions</span>
       </div>
-
-      {/* Flow diagram */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2">
-        {clues.map((clue, idx) => (
-          <React.Fragment key={clue.id}>
-            <div className={`flex-shrink-0 flex flex-col items-center gap-1.5 p-3 rounded-2xl border min-w-[90px] ${
-              clue.generated
-                ? 'border-premium-neon/30 bg-premium-neon/5'
-                : 'border-premium-borderDark bg-premium-surfaceDark'
-            }`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                clue.generated ? 'bg-premium-neon text-black' : 'bg-zinc-800 text-zinc-400'
-              }`}>
-                {clue.order}
-              </div>
-              <div className="text-[9px] text-center text-zinc-400 leading-tight max-w-[80px] line-clamp-2">
-                {clue.location || 'No location yet'}
-              </div>
-              {clue.generated && <QrCode className="w-3.5 h-3.5 text-premium-neon" />}
+      {importMsg && <p className="text-xs text-premium-gold">{importMsg}</p>}
+      {questions.map((q, i) => {
+        const open = openId === q.id;
+        return (
+          <div key={q.id} className={`rounded-2xl border bg-premium-surfaceDark ${open ? 'border-premium-gold/50' : 'border-premium-borderDark'}`}>
+            <div className="flex items-center gap-2.5 p-3">
+              <span className="text-[10px] font-mono text-zinc-600 w-5">{i + 1}</span>
+              <button type="button" onClick={() => setOpenId(open ? null : q.id)} className="flex-1 min-w-0 text-left">
+                <span className="block text-xs font-bold text-white truncate">{q.text}</span>
+                <span className="block text-[10px] text-zinc-500">Answer: {q.options[q.answer]} · {q.points} pts · {q.seconds}s</span>
+              </button>
+              <button type="button" onClick={() => onChange(move(questions, i, -1))} disabled={i === 0} className="text-zinc-500 hover:text-white disabled:opacity-20 scale-on-click" aria-label="Move up"><ArrowUp className="w-3.5 h-3.5" /></button>
+              <button type="button" onClick={() => onChange(move(questions, i, 1))} disabled={i === questions.length - 1} className="text-zinc-500 hover:text-white disabled:opacity-20 scale-on-click" aria-label="Move down"><ArrowDown className="w-3.5 h-3.5" /></button>
+              <button type="button" onClick={() => onChange(questions.filter((x) => x.id !== q.id))} className="text-zinc-600 hover:text-premium-danger scale-on-click" aria-label="Delete question"><Trash2 className="w-3.5 h-3.5" /></button>
             </div>
-            {idx < clues.length - 1 && (
-              <ChevronRight className="w-4 h-4 text-zinc-600 flex-shrink-0" />
-            )}
-          </React.Fragment>
-        ))}
-        <button
-          type="button"
-          onClick={addClue}
-          className="flex-shrink-0 w-16 h-20 rounded-2xl border-2 border-dashed border-premium-borderDark flex items-center justify-center text-zinc-600 hover:border-premium-neon/50 hover:text-premium-neon scale-on-click"
-        >
-          <Plus className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* Clue cards */}
-      <div className="space-y-3">
-        {clues.map((clue) => {
-          const isEditing = editId === clue.id;
-          return (
-            <div
-              key={clue.id}
-              className={`rounded-2xl border transition-all ${
-                isEditing
-                  ? 'border-premium-neon/40 bg-premium-neon/5'
-                  : 'border-premium-borderDark bg-premium-charcoal'
-              }`}
-            >
-              {/* Row header */}
-              <div
-                className="p-4 flex items-center gap-3 cursor-pointer"
-                onClick={() => setEditId(isEditing ? null : clue.id)}
-              >
-                <GripVertical className="w-3.5 h-3.5 text-zinc-600 cursor-grab" />
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                  clue.generated ? 'bg-premium-neon text-black' : 'bg-zinc-800 text-zinc-400'
-                }`}>
-                  {clue.order}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold text-white truncate">{clue.location || 'New Checkpoint'}</div>
-                  <div className="text-[10px] text-zinc-500 truncate">{clue.hint || 'Add a hint for the admin'}</div>
-                </div>
-                {clue.generated && (
-                  <div className="flex items-center gap-1 text-[10px] text-premium-neon font-mono">
-                    <QrCode className="w-3.5 h-3.5" />
-                    QR ready
-                  </div>
-                )}
-                <button type="button" onClick={(e) => { e.stopPropagation(); removeClue(clue.id); }} className="text-zinc-600 hover:text-premium-danger">
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Expanded editor */}
-              {isEditing && (
-                <div className="px-4 pb-4 space-y-3 border-t border-premium-borderDark/50 pt-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[10px] text-zinc-400 font-bold block mb-1.5">Location name</label>
-                      <input
-                        value={clue.location}
-                        onChange={(e) => updateClue(clue.id, 'location', e.target.value)}
-                        placeholder="e.g. Registration Desk"
-                        className="w-full bg-premium-black border border-premium-borderDark text-white px-3 py-2 rounded-xl text-xs outline-none focus:border-premium-neon"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-zinc-400 font-bold block mb-1.5">Admin hint (not shown to guest)</label>
-                      <input
-                        value={clue.hint}
-                        onChange={(e) => updateClue(clue.id, 'hint', e.target.value)}
-                        placeholder="e.g. On the pillar by door B"
-                        className="w-full bg-premium-black border border-premium-borderDark text-white px-3 py-2 rounded-xl text-xs outline-none focus:border-premium-neon"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-zinc-400 font-bold block mb-1.5">Riddle / Message shown to guest when they scan</label>
-                    <textarea
-                      value={clue.riddle}
-                      onChange={(e) => updateClue(clue.id, 'riddle', e.target.value)}
-                      placeholder="Write a riddle that guides the guest to the next clue…"
-                      rows={2}
-                      className="w-full bg-premium-black border border-premium-borderDark text-white px-3 py-2 rounded-xl text-xs outline-none focus:border-premium-neon resize-none"
-                    />
-                  </div>
-
-                  {/* QR token + mock */}
-                  <div className="flex items-start gap-4 pt-1">
-                    <div className="w-20 h-20 rounded-xl bg-white flex items-center justify-center flex-shrink-0">
-                      <QrCode className="w-14 h-14 text-black" />
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <div>
-                        <label className="text-[10px] text-zinc-400 font-bold block mb-1">QR Token</label>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-sm text-premium-neon bg-premium-black border border-premium-borderDark px-3 py-1.5 rounded-xl">
-                            {clue.token}
-                          </span>
-                          <button type="button" onClick={() => copyToken(clue.id, clue.token)} className="text-zinc-400 hover:text-white">
-                            {copiedId === clue.id ? <Check className="w-3.5 h-3.5 text-premium-success" /> : <Copy className="w-3.5 h-3.5" />}
-                          </button>
-                        </div>
-                      </div>
+            {open && (
+              <div className="px-4 pb-4 pt-1 space-y-3 border-t border-premium-borderDark/60">
+                <textarea rows={2} value={q.text} onChange={(e) => patch(q.id, { text: e.target.value })} className={`${input} resize-y`} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {q.options.map((opt, oi) => (
+                    <div key={oi} className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => updateClue(clue.id, 'generated' as keyof HuntClue, 'true')}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-premium-neon/10 text-premium-neon border border-premium-neon/30 hover:bg-premium-neon/20 scale-on-click"
+                        onClick={() => patch(q.id, { answer: oi })}
+                        className={`w-7 h-7 rounded-lg text-[11px] font-bold shrink-0 scale-on-click ${q.answer === oi ? 'bg-premium-success text-black' : 'bg-premium-charcoal border border-premium-borderDark text-zinc-400'}`}
+                        aria-label={`Mark ${String.fromCharCode(65 + oi)} as correct`}
+                        title="Mark as correct answer"
                       >
-                        <Download className="w-3.5 h-3.5" />
-                        Generate & Download QR
+                        {q.answer === oi ? <Check className="w-3.5 h-3.5 mx-auto" /> : String.fromCharCode(65 + oi)}
                       </button>
+                      <input value={opt} onChange={(e) => patch(q.id, { options: q.options.map((o, k) => (k === oi ? e.target.value : o)) })} className={input} />
                     </div>
-                  </div>
+                  ))}
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Prize config */}
-      <div className="p-4 rounded-2xl bg-premium-charcoal border border-premium-borderDark">
-        <h4 className="text-xs font-bold text-white mb-3 flex items-center gap-2">
-          <Trophy className="w-4 h-4 text-premium-gold" />
-          Final Prize / Reward
-        </h4>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-[10px] text-zinc-400 font-bold block mb-1.5">Prize name</label>
-            <input placeholder="e.g. AirPods Pro" className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white px-3 py-2 rounded-xl text-xs outline-none focus:border-premium-gold" />
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="text-[10px] text-zinc-500 font-mono uppercase">Points<input type="number" min={0} value={q.points} onChange={(e) => patch(q.id, { points: Math.max(0, parseInt(e.target.value || '0', 10)) })} className={`${input} mt-1`} /></label>
+                  <label className="text-[10px] text-zinc-500 font-mono uppercase">Seconds<input type="number" min={5} value={q.seconds} onChange={(e) => patch(q.id, { seconds: Math.max(5, parseInt(e.target.value || '15', 10)) })} className={`${input} mt-1`} /></label>
+                </div>
+              </div>
+            )}
           </div>
-          <div>
-            <label className="text-[10px] text-zinc-400 font-bold block mb-1.5">Winners (top N)</label>
-            <input type="number" defaultValue="3" className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white px-3 py-2 rounded-xl text-xs outline-none focus:border-premium-gold" />
-          </div>
-        </div>
-      </div>
+        );
+      })}
     </div>
   );
 }
 
-/* ─── Quiz Builder ───────────────────────────────────────── */
-
-interface QuizQuestion {
-  id: string;
-  question: string;
-  options: string[];
-  correct: number;
-  points: number;
-  timeLimit: number;
+function ClueQr({ token }: { token: string }) {
+  const [url, setUrl] = useState('');
+  useEffect(() => {
+    QRCode.toDataURL(`ALL41-HUNT-${token}`, { width: 300, margin: 1 }).then(setUrl).catch(() => setUrl(''));
+  }, [token]);
+  if (!url) return <div className="w-14 h-14 rounded-lg bg-white/10" />;
+  return (
+    <button type="button" onClick={() => downloadDataUrl(`clue-${token}.png`, url)} title="Download QR" className="shrink-0 scale-on-click">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt={`QR ${token}`} className="w-14 h-14 rounded-lg bg-white p-1" />
+    </button>
+  );
 }
 
-const SAMPLE_QUIZ: QuizQuestion[] = [
-  {
-    id: 'q1',
-    question: 'In what year was this company founded?',
-    options: ['2018', '2020', '2022', '2024'],
-    correct: 1,
-    points: 100,
-    timeLimit: 15,
-  },
-  {
-    id: 'q2',
-    question: 'Which of these is our flagship product?',
-    options: ['Alpha Suite', 'Beta Core', 'Gamma Cloud', 'Delta AI'],
-    correct: 2,
-    points: 150,
-    timeLimit: 20,
-  },
-];
+function HuntEditor({ clues, onChange }: { clues: ClueItem[]; onChange: (c: ClueItem[]) => void }) {
+  const patch = (id: string, p: Partial<ClueItem>) => onChange(clues.map((c) => (c.id === id ? { ...c, ...p } : c)));
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={() => onChange([...clues, newClue()])} className="px-3 py-2 rounded-xl bg-premium-gold text-black text-xs font-bold scale-on-click flex items-center gap-1.5"><Plus className="w-3.5 h-3.5" /> Clue</button>
+        <span className="text-[11px] text-zinc-500 ml-auto">{clues.length} clues · click a QR to download it</span>
+      </div>
+      {clues.map((c, i) => (
+        <div key={c.id} className="p-3 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark flex gap-3">
+          <ClueQr token={c.token} />
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono text-premium-gold font-bold">#{i + 1}</span>
+              <MapPin className="w-3.5 h-3.5 text-zinc-500" />
+              <input value={c.location} onChange={(e) => patch(c.id, { location: e.target.value })} placeholder="Where is this QR hidden?" className={input} />
+            </div>
+            <input value={c.riddle} onChange={(e) => patch(c.id, { riddle: e.target.value })} placeholder="Riddle shown to guests" className={input} />
+            <div className="flex items-center gap-2">
+              <Search className="w-3.5 h-3.5 text-zinc-500" />
+              <input value={c.hint} onChange={(e) => patch(c.id, { hint: e.target.value })} placeholder="Hint (optional)" className={input} />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <button type="button" onClick={() => onChange(move(clues, i, -1))} disabled={i === 0} className="text-zinc-500 hover:text-white disabled:opacity-20 scale-on-click" aria-label="Move up"><ArrowUp className="w-3.5 h-3.5" /></button>
+            <button type="button" onClick={() => onChange(move(clues, i, 1))} disabled={i === clues.length - 1} className="text-zinc-500 hover:text-white disabled:opacity-20 scale-on-click" aria-label="Move down"><ArrowDown className="w-3.5 h-3.5" /></button>
+            <button type="button" onClick={() => onChange(clues.filter((x) => x.id !== c.id))} className="text-zinc-600 hover:text-premium-danger scale-on-click" aria-label="Delete clue"><Trash2 className="w-3.5 h-3.5" /></button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-function QuizBuilder() {
-  const [questions, setQuestions] = useState<QuizQuestion[]>(SAMPLE_QUIZ);
-  const [uploadState, setUploadState] = useState<'idle' | 'parsing' | 'done' | 'error'>('idle');
-  const [editId, setEditId] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+export function GamesBuilder({ eventId }: { eventId: string }) {
+  const { config, base, update } = useEventConfig(eventId);
+  const { activities, activeId } = config.games;
+  const guests = useGuests(eventId);
+  const [selectedId, setSelectedId] = useState<string>(activeId || activities[0]?.id || '');
+  const [tab, setTab] = useState<Tab>('content');
+  const [copied, setCopied] = useState('');
+  const activity = activities.find((a) => a.id === selectedId) ?? activities[0];
 
-  const simulateUpload = () => {
-    setUploadState('parsing');
-    setTimeout(() => setUploadState('done'), 1800);
+  const setActivities = (next: Activity[], extra: Partial<typeof config.games> = {}) => update('games', { activities: next, ...extra });
+  const patch = (p: Partial<Activity>) => activity && setActivities(activities.map((a) => (a.id === activity.id ? { ...a, ...p } : a)));
+
+  const add = (kind: Activity['kind']) => {
+    const a = newActivity(kind, base, activities.filter((x) => x.kind === kind).length + 1);
+    setActivities([...activities, a]);
+    setSelectedId(a.id);
+    setTab('content');
+  };
+  const remove = (a: Activity) => {
+    if (activities.length === 1) return alert('Keep at least one activity.');
+    if (!confirm(`Delete “${a.name}”?`)) return;
+    const next = activities.filter((x) => x.id !== a.id);
+    setActivities(next, activeId === a.id ? { activeId: next[0].id } : {});
+    if (selectedId === a.id) setSelectedId(next[0].id);
+  };
+  const duplicate = (a: Activity) => {
+    const copy: Activity = { ...structuredClone(a), id: newId('act'), name: `${a.name} (copy)` };
+    setActivities([...activities, copy]);
+    setSelectedId(copy.id);
   };
 
-  const removeQuestion = (id: string) => setQuestions((prev) => prev.filter((q) => q.id !== id));
-  const updateOption = (qid: string, idx: number, val: string) =>
-    setQuestions((prev) => prev.map((q) => q.id === qid ? { ...q, options: q.options.map((o, i) => i === idx ? val : o) } : q));
-  const setCorrect = (qid: string, idx: number) =>
-    setQuestions((prev) => prev.map((q) => q.id === qid ? { ...q, correct: idx } : q));
+  const allUrl = `/events/${config.info.slug}/games`;
+  const screenUrl = activity ? `${allUrl}/${activity.id}` : '';
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="font-display font-bold text-white text-base flex items-center gap-2">
-            <Zap className="w-4.5 h-4.5 text-premium-gold" />
-            Live Trivia Quiz
-          </h3>
-          <p className="text-[11px] text-zinc-400 mt-0.5">
-            Upload a spreadsheet or build questions manually. Guests answer in real-time on the Stage LED.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setQuestions((prev) => [...prev, {
-            id: `q${Date.now()}`,
-            question: '',
-            options: ['', '', '', ''],
-            correct: 0,
-            points: 100,
-            timeLimit: 15,
-          }])}
-          className="px-4 py-2 rounded-xl bg-premium-gold text-black text-xs font-bold shadow-gold scale-on-click flex items-center gap-1.5"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Add Question
-        </button>
-      </div>
-
-      {/* CSV uploader */}
-      <div
-        className={`relative p-5 rounded-2xl border-2 border-dashed transition-all ${
-          uploadState === 'done'
-            ? 'border-premium-success/50 bg-premium-success/5'
-            : uploadState === 'parsing'
-              ? 'border-premium-gold/50 bg-premium-gold/5'
-              : 'border-premium-borderDark bg-premium-surfaceDark hover:border-premium-gold/40'
-        }`}
-      >
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".csv,.xlsx,.xls"
-          className="hidden"
-          onChange={simulateUpload}
-        />
-        <div className="flex items-center gap-4">
-          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${
-            uploadState === 'done' ? 'bg-premium-success/20' : uploadState === 'parsing' ? 'bg-premium-gold/20' : 'bg-zinc-800'
-          }`}>
-            {uploadState === 'done'
-              ? <CheckCircle2 className="w-6 h-6 text-premium-success" />
-              : uploadState === 'parsing'
-                ? <div className="w-5 h-5 border-2 border-premium-gold border-t-transparent rounded-full animate-spin" />
-                : <FileText className="w-6 h-6 text-zinc-500" />
-            }
-          </div>
-          <div className="flex-1">
-            {uploadState === 'idle' && (
-              <>
-                <div className="text-sm font-bold text-white">Upload CSV or Excel</div>
-                <div className="text-[10px] text-zinc-500 mt-0.5">Columns: Question · Option A · Option B · Option C · Option D · Correct (A-D) · Points · Time (s)</div>
-              </>
-            )}
-            {uploadState === 'parsing' && (
-              <>
-                <div className="text-sm font-bold text-premium-gold">Parsing spreadsheet…</div>
-                <div className="text-[10px] text-zinc-400 mt-0.5">Reading questions and answers</div>
-              </>
-            )}
-            {uploadState === 'done' && (
-              <>
-                <div className="text-sm font-bold text-premium-success">12 questions imported!</div>
-                <div className="text-[10px] text-zinc-400 mt-0.5">quiz_questions.xlsx · 14 KB · {new Date().toLocaleDateString()}</div>
-              </>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="px-3 py-2 rounded-xl bg-zinc-800 border border-premium-borderDark text-zinc-300 text-xs font-bold hover:border-premium-gold/50 scale-on-click flex items-center gap-1.5"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              Browse
-            </button>
-            <a
-              href="#"
-              onClick={(e) => e.preventDefault()}
-              className="px-3 py-2 rounded-xl bg-zinc-800 border border-premium-borderDark text-zinc-400 text-xs font-bold hover:border-premium-gold/50 scale-on-click flex items-center gap-1.5"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Template
-            </a>
-          </div>
-        </div>
-
-        {/* Drag hint */}
-        <div className="mt-3 text-[10px] text-zinc-600 text-center">or drag and drop here</div>
-      </div>
-
-      {/* Stats strip */}
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { label: 'Questions', val: questions.length, color: 'text-premium-gold' },
-          { label: 'Total Points', val: questions.reduce((s, q) => s + q.points, 0), color: 'text-premium-neon' },
-          { label: 'Est. Duration', val: `${Math.ceil(questions.reduce((s, q) => s + q.timeLimit, 0) / 60)} min`, color: 'text-premium-success' },
-        ].map((s) => (
-          <div key={s.label} className="p-3 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-center">
-            <div className={`text-lg font-display font-bold ${s.color}`}>{s.val}</div>
-            <div className="text-[10px] text-zinc-500 mt-0.5">{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Question list */}
-      <div className="space-y-2">
-        {questions.map((q, idx) => {
-          const isEditing = editId === q.id;
+      <div className="flex gap-3 overflow-x-auto pb-1">
+        {activities.map((a) => {
+          const sel = activity?.id === a.id;
           return (
             <div
-              key={q.id}
-              className={`rounded-2xl border transition-all ${
-                isEditing ? 'border-premium-gold/40 bg-premium-gold/5' : 'border-premium-borderDark bg-premium-charcoal'
-              }`}
+              key={a.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => setSelectedId(a.id)}
+              onKeyDown={(e) => { if (e.key === 'Enter') setSelectedId(a.id); }}
+              className={`min-w-[210px] p-4 rounded-2xl border text-left cursor-pointer scale-on-click transition-all ${sel ? 'bg-premium-charcoal border-premium-gold shadow-gold' : 'bg-premium-charcoal border-premium-borderDark hover:border-premium-gold/40'}`}
             >
-              <div
-                className="p-4 flex items-center gap-3 cursor-pointer"
-                onClick={() => setEditId(isEditing ? null : q.id)}
-              >
-                <div className="w-6 h-6 rounded-lg bg-premium-surfaceDark flex items-center justify-center text-[11px] font-bold text-zinc-500 flex-shrink-0">
-                  {idx + 1}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-white truncate">{q.question || 'New question…'}</div>
-                  <div className="text-[10px] text-zinc-500">{q.options.filter(Boolean).length} options · {q.points} pts · {q.timeLimit}s</div>
-                </div>
-                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-premium-success/10 border border-premium-success/20 text-[10px] font-bold text-premium-success">
-                  <Check className="w-3 h-3" />
-                  {['A', 'B', 'C', 'D'][q.correct]}
-                </div>
-                <button type="button" onClick={(e) => { e.stopPropagation(); removeQuestion(q.id); }} className="text-zinc-600 hover:text-premium-danger">
-                  <X className="w-3.5 h-3.5" />
-                </button>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-premium-gold">{a.kind === 'quiz' ? 'Trivia quiz' : 'Scavenger hunt'}</span>
+                {activeId === a.id && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-premium-success/15 text-premium-success border border-premium-success/30">ON STAGE</span>}
               </div>
-
-              {isEditing && (
-                <div className="px-4 pb-4 space-y-3 border-t border-premium-borderDark/50 pt-3">
-                  <div>
-                    <label className="text-[10px] text-zinc-400 font-bold block mb-1.5">Question</label>
-                    <textarea
-                      value={q.question}
-                      onChange={(e) => setQuestions((prev) => prev.map((qq) => qq.id === q.id ? { ...qq, question: e.target.value } : qq))}
-                      rows={2}
-                      className="w-full bg-premium-black border border-premium-borderDark text-white px-3 py-2 rounded-xl text-xs outline-none focus:border-premium-gold resize-none"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {q.options.map((opt, oi) => (
-                      <div key={oi} className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setCorrect(q.id, oi)}
-                          className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 border-2 ${
-                            q.correct === oi
-                              ? 'bg-premium-success border-premium-success text-black'
-                              : 'border-zinc-700 text-zinc-500 hover:border-premium-success/50'
-                          }`}
-                        >
-                          {['A', 'B', 'C', 'D'][oi]}
-                        </button>
-                        <input
-                          value={opt}
-                          onChange={(e) => updateOption(q.id, oi, e.target.value)}
-                          placeholder={`Option ${['A', 'B', 'C', 'D'][oi]}`}
-                          className="flex-1 bg-premium-black border border-premium-borderDark text-white px-3 py-2 rounded-xl text-xs outline-none focus:border-premium-gold"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[10px] text-zinc-400 font-bold block mb-1.5">Points</label>
-                      <input
-                        type="number"
-                        value={q.points}
-                        onChange={(e) => setQuestions((prev) => prev.map((qq) => qq.id === q.id ? { ...qq, points: Number(e.target.value) } : qq))}
-                        className="w-full bg-premium-black border border-premium-borderDark text-white px-3 py-2 rounded-xl text-xs outline-none focus:border-premium-gold"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-zinc-400 font-bold block mb-1.5">Time limit (seconds)</label>
-                      <input
-                        type="number"
-                        value={q.timeLimit}
-                        onChange={(e) => setQuestions((prev) => prev.map((qq) => qq.id === q.id ? { ...qq, timeLimit: Number(e.target.value) } : qq))}
-                        className="w-full bg-premium-black border border-premium-borderDark text-white px-3 py-2 rounded-xl text-xs outline-none focus:border-premium-gold"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
+              <div className="text-sm font-display font-bold text-white mt-1 truncate">{a.name}</div>
+              <div className="text-[11px] text-zinc-400">{a.kind === 'quiz' ? `${a.questions.length} questions` : `${a.clues.length} clues`}</div>
+              <div className="flex justify-end gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
+                <button type="button" onClick={() => duplicate(a)} className="text-zinc-500 hover:text-white scale-on-click" aria-label="Duplicate"><Copy className="w-3.5 h-3.5" /></button>
+                <button type="button" onClick={() => remove(a)} className="text-zinc-600 hover:text-premium-danger scale-on-click" aria-label="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+              </div>
             </div>
           );
         })}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Main GamesBuilder ──────────────────────────────────── */
-
-interface GamesBuilderProps {
-  subTab: 'quiz' | 'scavenger' | 'link';
-  setSubTab: (t: 'quiz' | 'scavenger' | 'link') => void;
-}
-
-export function GamesBuilder({ subTab, setSubTab }: GamesBuilderProps) {
-  return (
-    <div className="space-y-5">
-      {/* Tab switcher */}
-      <div className="flex items-center gap-2 bg-premium-surfaceDark border border-premium-borderDark rounded-2xl p-1.5 w-max flex-wrap">
-        {([['quiz', 'Live Trivia Quiz', Zap], ['scavenger', 'Scavenger Hunt', MapPin], ['link', 'Link URL', QrCode]] as const).map(([id, label, Icon]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setSubTab(id)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 scale-on-click ${
-              subTab === id ? 'bg-premium-gold text-black shadow-gold' : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <Icon className="w-3.5 h-3.5" />
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {subTab !== 'link' && (
-        <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark">
-          {subTab === 'quiz' && <QuizBuilder />}
-          {subTab === 'scavenger' && <ScavengerBuilder />}
+        <div className="min-w-[180px] flex flex-col gap-2">
+          <button type="button" onClick={() => add('quiz')} className="flex-1 p-3 rounded-2xl border-2 border-dashed border-premium-borderDark text-zinc-400 hover:text-white hover:border-premium-gold/50 text-xs font-bold flex items-center justify-center gap-1.5 scale-on-click"><Plus className="w-4 h-4" /> Trivia quiz</button>
+          <button type="button" onClick={() => add('scavenger')} className="flex-1 p-3 rounded-2xl border-2 border-dashed border-premium-borderDark text-zinc-400 hover:text-white hover:border-premium-gold/50 text-xs font-bold flex items-center justify-center gap-1.5 scale-on-click"><Plus className="w-4 h-4" /> Scavenger hunt</button>
         </div>
-      )}
+      </div>
 
-      {subTab === 'link' && (
-        <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-5">
-          <div>
-            <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-1">Games Live URL</p>
-            <p className="text-xs text-zinc-400">Share this link so guests can join your live games from their phones.</p>
-          </div>
-          <div className="flex items-center gap-2 bg-premium-surfaceDark border border-premium-borderDark rounded-2xl px-4 py-3">
-            <span className="text-premium-neon font-mono text-sm flex-1 truncate">https://play.all41.app/g/your-event-slug</span>
-            <button type="button" className="p-2 rounded-xl bg-premium-black border border-premium-borderDark hover:border-zinc-600 transition-all scale-on-click">
-              <Copy className="w-4 h-4 text-zinc-400" />
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center">
-              <QrCode className="w-16 h-16 text-black" />
-            </div>
-            <div className="space-y-2">
-              <p className="text-xs text-zinc-400">QR Code for projector / printed materials</p>
-              <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 bg-premium-gold text-black rounded-xl text-xs font-bold scale-on-click shadow-gold">
-                <Download className="w-3.5 h-3.5" />
-                Download PNG
+      {activity && (
+        <>
+          <div className="flex items-center gap-2 flex-wrap">
+            {([
+              { id: 'content', label: activity.kind === 'quiz' ? 'Questions' : 'Clues', icon: Gamepad2 },
+              { id: 'guests', label: `Players (${guestPool(guests, activity.audience, activity.pickedGuestIds).length})`, icon: Users },
+              { id: 'design', label: 'Frame & Footer', icon: Palette },
+              { id: 'screen', label: 'Big Screen', icon: Tv },
+            ] as const).map((t) => (
+              <button key={t.id} type="button" onClick={() => setTab(t.id)} className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold scale-on-click ${tab === t.id ? 'bg-premium-gold/15 text-premium-gold border border-premium-gold/40' : 'bg-premium-surfaceDark text-zinc-400 border border-premium-borderDark hover:text-white'}`}>
+                <t.icon className="w-3.5 h-3.5" /> {t.label}
               </button>
-            </div>
+            ))}
           </div>
-        </div>
+
+          <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4">
+            {tab === 'content' && (
+              <>
+                <label className="block space-y-1.5">
+                  <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Activity name</span>
+                  <input value={activity.name} onChange={(e) => patch({ name: e.target.value })} className={input} />
+                </label>
+                {activity.kind === 'quiz'
+                  ? <QuizEditor questions={activity.questions} onChange={(questions) => patch({ questions })} />
+                  : <HuntEditor clues={activity.clues} onChange={(clues) => patch({ clues })} />}
+              </>
+            )}
+            {tab === 'guests' && (
+              <AudiencePicker
+                guests={guests}
+                audience={activity.audience}
+                picked={activity.pickedGuestIds}
+                anonymous={activity.anonymous}
+                digits={numberDigits(guests, config.info.capacity)}
+                noun="game"
+                onChange={(p) => patch(p)}
+              />
+            )}
+            {tab === 'design' && <FrameDesigner value={activity.frame} onChange={(p) => patch({ frame: { ...activity.frame, ...p } })} logoRef={config.design.logoUrl} />}
+            {tab === 'screen' && (
+              <div className="space-y-4">
+                <p className="text-xs text-zinc-400">Games have their own link, separate from door prizes. Each activity also has its own link.</p>
+                {[
+                  { label: `This activity: ${activity.name}`, url: screenUrl },
+                  { label: 'All games (switch between them on screen)', url: allUrl },
+                ].map((l) => (
+                  <div key={l.url} className="space-y-1.5">
+                    <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{l.label}</div>
+                    <div className="flex items-center gap-2 bg-premium-surfaceDark border border-premium-borderDark rounded-2xl px-4 py-3">
+                      <span className="flex-1 font-mono text-xs text-premium-neon truncate">{l.url}</span>
+                      <button type="button" onClick={() => { navigator.clipboard?.writeText(`${window.location.origin}${l.url}`); setCopied(l.url); setTimeout(() => setCopied(''), 1500); }} className="px-3 py-1.5 rounded-xl bg-premium-gold text-black font-bold text-[10px] scale-on-click">{copied === l.url ? 'Copied!' : 'Copy'}</button>
+                      <a href={l.url} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-xl bg-premium-charcoal border border-premium-borderDark text-white font-bold text-[10px] scale-on-click flex items-center gap-1">Open <ExternalLink className="w-3 h-3" /></a>
+                    </div>
+                  </div>
+                ))}
+                <button type="button" onClick={() => update('games', { activeId: activity.id })} disabled={activeId === activity.id} className="px-4 py-2.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black text-xs font-bold scale-on-click shadow-gold disabled:opacity-50">
+                  {activeId === activity.id ? 'This activity opens by default' : 'Open this activity by default'}
+                </button>
+                {activity.kind === 'scavenger' && (
+                  <button
+                    type="button"
+                    onClick={() => downloadBlob(`${activity.name}-clues.csv`, new Blob([toCsv([['#', 'Location', 'Riddle', 'Hint', 'QR value'], ...activity.clues.map((c, i) => [i + 1, c.location, c.riddle, c.hint, `ALL41-HUNT-${c.token}`])])], { type: 'text/csv' }))}
+                    className="px-4 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-white text-xs font-bold scale-on-click flex items-center gap-1.5"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Export clue sheet
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

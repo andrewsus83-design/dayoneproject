@@ -141,6 +141,7 @@ export interface Guest {
   rsvp_notes: string | null;
   custom_fields: Record<string, unknown>;
   qr_code_token: string;
+  guest_number?: number;
   is_checked_in: boolean;
   checked_in_at: string | null;
   checked_in_by: string | null;

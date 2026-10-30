@@ -285,7 +285,7 @@ export default function AISmartSetupPage() {
     { label: 'Gate Register',   href: `/events/${eventSlug}/gate`,         icon: QrCode,      color: 'text-premium-success' },
     { label: 'Stage LED',       href: `/events/${eventSlug}/stage`,        icon: Zap,         color: 'text-premium-gold' },
     { label: 'Live Photo Wall', href: `/events/${eventSlug}/photowall/live`,icon: Camera,     color: 'text-premium-neon' },
-    { label: 'Raffle Stage',    href: `/events/${eventSlug}/raffle`,       icon: Gift,        color: 'text-premium-danger' },
+    { label: 'Door Prize',      href: `/events/${eventSlug}/doorprize`,       icon: Gift,        color: 'text-premium-danger' },
     { label: 'Games Room',      href: `/events/${eventSlug}/games`,        icon: Gamepad2,    color: 'text-premium-gold' },
   ];
 

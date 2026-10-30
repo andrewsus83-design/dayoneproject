@@ -265,7 +265,7 @@ export default function DashboardPage() {
                           { href: `/events/${evt.slug}`, label: 'Portal', icon: Globe, color: 'text-zinc-400' },
                           { href: `/events/${evt.slug}/stage`, label: 'Stage LED', icon: Play, color: 'text-premium-gold' },
                           { href: `/events/${evt.slug}/photowall/live`, label: 'Live Wall', icon: Camera, color: 'text-premium-neon' },
-                          { href: `/events/${evt.slug}/raffle`, label: 'Raffle', icon: Gift, color: 'text-zinc-400' },
+                          { href: `/events/${evt.slug}/doorprize`, label: 'Door Prize', icon: Gift, color: 'text-zinc-400' },
                         ].map(({ href, label, icon: Icon, color }) => (
                           <Link
                             key={href}

@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import type { DesignConfig, ThemeMode, CardStyleId, RadiusId } from './eventStore';
+import type { DesignConfig, ThemeMode, CardStyleId, RadiusId, SpacingId } from './eventStore';
 
 export interface Swatch {
   id: string;
@@ -26,19 +26,22 @@ export const LIGHT_BACKGROUNDS: Swatch[] = [
 ];
 
 export const PALETTES = [
-  { id: 'gold', label: 'Midnight Gold', primary: '#C5A059', accent: '#00F0FF' },
-  { id: 'rose', label: 'Rose Luxe', primary: '#E91E8C', accent: '#FFD700' },
-  { id: 'sapphire', label: 'Royal Sapphire', primary: '#4A90D9', accent: '#00F0FF' },
-  { id: 'emerald', label: 'Emerald Estate', primary: '#00C853', accent: '#FFD700' },
-  { id: 'platinum', label: 'Platinum', primary: '#B0B8C4', accent: '#C5A059' },
-  { id: 'custom', label: 'Custom', primary: '', accent: '' },
+  { id: 'gold', label: 'Midnight Gold', primary: '#C5A059', secondary: '#E8D3A3', accent: '#00F0FF' },
+  { id: 'rose', label: 'Rose Luxe', primary: '#E91E8C', secondary: '#F7C6D9', accent: '#FFD700' },
+  { id: 'sapphire', label: 'Royal Sapphire', primary: '#4A90D9', secondary: '#A9C8F0', accent: '#00F0FF' },
+  { id: 'emerald', label: 'Emerald Estate', primary: '#00C853', secondary: '#A7E8C4', accent: '#FFD700' },
+  { id: 'platinum', label: 'Platinum', primary: '#B0B8C4', secondary: '#E4E4E7', accent: '#C5A059' },
+  { id: 'prism', label: 'Prism Pop', primary: '#C5A059', secondary: '#CC0066', accent: '#FFD700' },
+  { id: 'custom', label: 'Custom', primary: '', secondary: '', accent: '' },
 ] as const;
 
 export const HEADING_FONTS = [
   { id: 'outfit', label: 'Outfit', family: "var(--font-outfit), 'Outfit', sans-serif", google: null },
-  { id: 'playfair', label: 'Playfair Display', family: "'Playfair Display', serif", google: 'Playfair+Display:wght@500;600;700' },
-  { id: 'montserrat', label: 'Montserrat', family: "'Montserrat', sans-serif", google: 'Montserrat:wght@500;600;700;800' },
+  { id: 'playfair', label: 'Playfair Display', family: "'Playfair Display', serif", google: 'Playfair+Display:wght@500;600;700;800' },
+  { id: 'montserrat', label: 'Montserrat', family: "'Montserrat', sans-serif", google: 'Montserrat:wght@500;600;700;800;900' },
   { id: 'cinzel', label: 'Cinzel', family: "'Cinzel', serif", google: 'Cinzel:wght@500;600;700' },
+  { id: 'cormorant', label: 'Cormorant Garamond', family: "'Cormorant Garamond', serif", google: 'Cormorant+Garamond:wght@500;600;700' },
+  { id: 'spacegrotesk', label: 'Space Grotesk', family: "'Space Grotesk', sans-serif", google: 'Space+Grotesk:wght@500;600;700' },
 ] as const;
 
 export const BODY_FONTS = [
@@ -46,6 +49,16 @@ export const BODY_FONTS = [
   { id: 'inter', label: 'Inter', family: "'Inter', sans-serif", google: 'Inter:wght@400;500;600;700' },
   { id: 'opensans', label: 'Open Sans', family: "'Open Sans', sans-serif", google: 'Open+Sans:wght@400;600;700' },
   { id: 'lora', label: 'Lora', family: "'Lora', serif", google: 'Lora:wght@400;500;600' },
+  { id: 'poppins', label: 'Poppins', family: "'Poppins', sans-serif", google: 'Poppins:wght@400;500;600;700' },
+  { id: 'montserrat', label: 'Montserrat', family: "'Montserrat', sans-serif", google: 'Montserrat:wght@400;500;600;700' },
+] as const;
+
+export const ACCENT_FONTS = [
+  { id: 'none', label: 'Off — use heading font', family: '', google: null },
+  { id: 'greatvibes', label: 'Great Vibes', family: "'Great Vibes', cursive", google: 'Great+Vibes' },
+  { id: 'dancing', label: 'Dancing Script', family: "'Dancing Script', cursive", google: 'Dancing+Script:wght@500;700' },
+  { id: 'caveat', label: 'Caveat', family: "'Caveat', cursive", google: 'Caveat:wght@500;700' },
+  { id: 'cinzeldeco', label: 'Cinzel Decorative', family: "'Cinzel Decorative', serif", google: 'Cinzel+Decorative:wght@400;700' },
 ] as const;
 
 export const CARD_STYLES: { id: CardStyleId; label: string; desc: string }[] = [
@@ -61,6 +74,14 @@ export const RADIUS_OPTIONS: { id: RadiusId; label: string; px: number; desc: st
   { id: 'round', label: 'Round', px: 32, desc: '32px' },
   { id: 'pill', label: 'Pill', px: 48, desc: '48px' },
 ];
+
+export const SPACING_OPTIONS: { id: SpacingId; label: string; desc: string; scale: number }[] = [
+  { id: 'tight', label: 'Tight', desc: 'Compact — less padding and gaps', scale: 0.7 },
+  { id: 'normal', label: 'Normal', desc: 'Balanced default spacing', scale: 1 },
+  { id: 'spacious', label: 'Spacious', desc: 'Airy — more room to breathe', scale: 1.4 },
+];
+
+export const PRISM_COLORS = ['#FFD700', '#FF8C00', '#CC0066', '#7B1D5A', '#1B3FA0', '#0099DD', '#00A36C', '#CC88FF', '#FFD700'];
 
 export const INVITATION_THEMES = [
   { name: 'Golden Field', c1: '#C5A059', c2: '#09090B', c3: '#F5F0E8' },
@@ -119,7 +140,20 @@ function readableOn(bg: string): string {
   return vsBlack >= vsWhite ? '#09090B' : '#FFFFFF';
 }
 
+function legibleOn(color: string, dark: boolean, darkenBy: number) {
+  return dark
+    ? luminance(color) < 0.12 ? mix(color, '#FFFFFF', 0.45) : color
+    : luminance(color) > 0.3 ? mix(color, '#000000', darkenBy) : color;
+}
+
 /* ───────────────────────── Resolution ───────────────────────── */
+
+export interface ResolvedSpace {
+  section: number;
+  card: number;
+  gap: number;
+  stack: number;
+}
 
 export interface ResolvedTheme {
   mode: ThemeMode;
@@ -133,27 +167,38 @@ export interface ResolvedTheme {
   primary: string;
   primaryText: string;
   onPrimary: string;
+  secondary: string;
+  secondaryText: string;
   accent: string;
   accentText: string;
   headingFamily: string;
   bodyFamily: string;
+  accentFamily: string;
   radius: number;
   buttonRadius: number;
+  space: ResolvedSpace;
   cardStyle: CSSProperties;
   vars: CSSProperties;
   fontsHref: string | null;
 }
 
-export function paletteColors(design: Pick<DesignConfig, 'palette' | 'customPrimary' | 'customAccent'>) {
+export function paletteColors(design: Pick<DesignConfig, 'palette' | 'customPrimary' | 'customSecondary' | 'customAccent'>) {
   const p = PALETTES.find((x) => x.id === design.palette);
-  if (!p || p.id === 'custom') return { primary: design.customPrimary || '#C5A059', accent: design.customAccent || '#00F0FF' };
-  return { primary: p.primary, accent: p.accent };
+  if (!p || p.id === 'custom') {
+    return {
+      primary: design.customPrimary || '#C5A059',
+      secondary: design.customSecondary || '#E8D3A3',
+      accent: design.customAccent || '#00F0FF',
+    };
+  }
+  return { primary: p.primary as string, secondary: p.secondary as string, accent: p.accent as string };
 }
 
-export function googleFontsHref(headingId: string, bodyId: string): string | null {
+export function fontsHref(ids: { heading?: string; body?: string; accent?: string }): string | null {
   const families = [
-    HEADING_FONTS.find((f) => f.id === headingId)?.google,
-    BODY_FONTS.find((f) => f.id === bodyId)?.google,
+    HEADING_FONTS.find((f) => f.id === ids.heading)?.google,
+    BODY_FONTS.find((f) => f.id === ids.body)?.google,
+    ACCENT_FONTS.find((f) => f.id === ids.accent)?.google,
   ].filter((f): f is NonNullable<typeof f> => !!f);
   if (families.length === 0) return null;
   return `https://fonts.googleapis.com/css2?${[...new Set(families)].map((f) => `family=${f}`).join('&')}&display=swap`;
@@ -163,7 +208,7 @@ export function resolveTheme(design: DesignConfig): ResolvedTheme {
   const bg = design.background || (design.mode === 'light' ? '#FBF8F1' : '#09090B');
   const mode = design.mode;
   const dark = mode === 'dark';
-  const { primary, accent } = paletteColors(design);
+  const { primary, secondary, accent } = paletteColors(design);
 
   const card = dark
     ? mix(bg, '#FFFFFF', 0.06)
@@ -174,17 +219,21 @@ export function resolveTheme(design: DesignConfig): ResolvedTheme {
   const border = dark ? mix(bg, '#FFFFFF', 0.14) : mix(bg, '#000000', 0.12);
   const text = dark ? '#FAFAFA' : '#18181B';
   const muted = dark ? '#A1A1AA' : '#52525B';
-  const subtle = dark ? '#71717A' : '#71717A';
+  const subtle = '#71717A';
 
-  const primaryText = dark
-    ? luminance(primary) < 0.12 ? mix(primary, '#FFFFFF', 0.45) : primary
-    : luminance(primary) > 0.3 ? mix(primary, '#000000', 0.35) : primary;
-  const accentText = dark
-    ? luminance(accent) < 0.12 ? mix(accent, '#FFFFFF', 0.45) : accent
-    : luminance(accent) > 0.3 ? mix(accent, '#000000', 0.5) : accent;
+  const primaryText = legibleOn(primary, dark, 0.35);
+  const secondaryText = legibleOn(secondary, dark, 0.45);
+  const accentText = legibleOn(accent, dark, 0.5);
 
   const radiusPx = RADIUS_OPTIONS.find((r) => r.id === design.radius)?.px ?? 16;
   const buttonRadius = design.radius === 'pill' ? 999 : design.radius === 'sharp' ? 8 : 14;
+  const scale = SPACING_OPTIONS.find((s) => s.id === design.spacing)?.scale ?? 1;
+  const space: ResolvedSpace = {
+    section: Math.round(80 * scale),
+    card: Math.round(24 * scale),
+    gap: Math.round(16 * scale),
+    stack: Math.round(20 * scale),
+  };
 
   const base: CSSProperties = { background: card, borderRadius: radiusPx };
   const cardStyle: CSSProperties =
@@ -208,6 +257,7 @@ export function resolveTheme(design: DesignConfig): ResolvedTheme {
 
   const headingFamily = HEADING_FONTS.find((f) => f.id === design.headingFont)?.family ?? HEADING_FONTS[0].family;
   const bodyFamily = BODY_FONTS.find((f) => f.id === design.bodyFont)?.family ?? BODY_FONTS[0].family;
+  const accentFamily = ACCENT_FONTS.find((f) => f.id === design.accentFont)?.family || headingFamily;
 
   const vars = {
     '--ev-bg': bg,
@@ -220,6 +270,7 @@ export function resolveTheme(design: DesignConfig): ResolvedTheme {
     '--ev-primary': primary,
     '--ev-primary-text': primaryText,
     '--ev-on-primary': readableOn(primary),
+    '--ev-secondary': secondary,
     '--ev-accent': accent,
     '--ev-accent-text': accentText,
   } as CSSProperties;
@@ -236,15 +287,19 @@ export function resolveTheme(design: DesignConfig): ResolvedTheme {
     primary,
     primaryText,
     onPrimary: readableOn(primary),
+    secondary,
+    secondaryText,
     accent,
     accentText,
     headingFamily,
     bodyFamily,
+    accentFamily,
     radius: radiusPx,
     buttonRadius,
+    space,
     cardStyle,
     vars,
-    fontsHref: googleFontsHref(design.headingFont, design.bodyFont),
+    fontsHref: fontsHref({ heading: design.headingFont, body: design.bodyFont, accent: design.accentFont }),
   };
 }
 
@@ -257,6 +312,19 @@ export function resolveInvitationTheme(design: DesignConfig, themeName: string):
     mode: modeForBackground(preset.c2),
     palette: 'custom',
     customPrimary: preset.c1,
+    customSecondary: mix(preset.c1, preset.c3, 0.5),
     customAccent: preset.c3,
   });
+}
+
+export function gradientText(colors: string[], animate = false): CSSProperties {
+  return {
+    backgroundImage: `linear-gradient(135deg, ${colors.join(', ')})`,
+    backgroundSize: animate ? '300% 300%' : '100% 100%',
+    WebkitBackgroundClip: 'text',
+    backgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    color: 'transparent',
+    animation: animate ? 'ev-prism 9s ease infinite' : undefined,
+  };
 }

@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, use, Suspense } from 'react';
 import Link from 'next/link';
 import { Guest } from '@/lib/types';
-import { readGuests, useEventConfigBySlug, useGuests, writeGuests } from '@/lib/eventStore';
+import { formatGuestNumber, numberDigits, readGuests, useEventConfigBySlug, useGuests, writeGuests } from '@/lib/eventStore';
 import { RegisterDeskLock } from '@/components/events/RegisterDeskLock';
 import {
   QrCode,
@@ -40,6 +40,7 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
   const [activeTab, setActiveTab] = useState<GateTab>('scan');
   // Shared with the dashboard guest list and the invitation form, so new RSVPs can be scanned here.
   const guests = useGuests(eventId);
+  const digits = numberDigits(guests);
   const setGuests = (fn: (prev: Guest[]) => Guest[]) => writeGuests(eventId, fn(readGuests(eventId)));
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -160,6 +161,7 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
     const q = searchQuery.toLowerCase();
     return (
       g.name.toLowerCase().includes(q) ||
+      formatGuestNumber(g.guest_number, digits).includes(q) ||
       (g.table_number || '').toLowerCase().includes(q) ||
       g.qr_code_token.toLowerCase().includes(q)
     );
@@ -302,7 +304,7 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
                         {scanResult.guest.name}
                       </div>
                       <div className="text-[13px] text-premium-success font-mono mt-1">
-                        Table {scanResult.guest.table_number || '—'}
+                        {scanResult.guest.guest_number ? `No. ${formatGuestNumber(scanResult.guest.guest_number, digits)} · ` : ''}Table {scanResult.guest.table_number || '—'}
                       </div>
                       <div className="text-[11px] font-bold text-premium-success uppercase tracking-wider mt-2">
                         Admitted ✓
@@ -517,6 +519,9 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
                       {/* Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
+                          {guest.guest_number && (
+                            <span className="text-[11px] font-mono font-bold text-premium-gold shrink-0">{formatGuestNumber(guest.guest_number, digits)}</span>
+                          )}
                           <span className={`text-[13px] font-bold truncate ${guest.is_checked_in ? 'text-white' : 'text-zinc-300'}`}>
                             {guest.name}
                           </span>

@@ -3,14 +3,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import {
-  AlignLeft, ArrowDown, ArrowUp, Check, CheckSquare, ChevronDown, Copy, Download, ExternalLink, Eye, GripVertical,
-  Hash, KeyRound, Link as LinkIcon, List, Mail, Phone, Plus, QrCode, RotateCcw, Settings2,
+  AlignLeft, ArrowDown, ArrowUp, Check, CheckSquare, ChevronDown, Copy, Download, ExternalLink, Eye, FileText, GripVertical,
+  Hash, Image as ImageIcon, KeyRound, Link as LinkIcon, List, Mail, Move, Phone, Plus, QrCode, RotateCcw, Scissors, Settings2,
   Share2, Smartphone, Trash2, Upload, X,
 } from 'lucide-react';
 import {
-  addResponse, deleteAsset, deleteResponse, findQuestion, formatEventDate, newId, resetEventSection, saveAsset,
-  useAssetUrl, useEventConfig, useResponses, ESSENTIALS_CORPORATE, ESSENTIALS_WEDDING,
-  type FormQuestion, type InvitationConfig, type QuestionType, type ClosingCopy, type EventInfo,
+  addResponse, deleteAsset, deleteResponse, findQuestion, formatEventDate, getQuestions, isQuestion, newId, resetEventSection, saveAsset,
+  useAssetUrl, useEventConfig, useGuests, useResponses, withPageBreaks, numberDigits, formatGuestNumber, ESSENTIALS_CORPORATE, ESSENTIALS_WEDDING,
+  type FormItem, type FormQuestion, type InvitationConfig, type QuestionType, type ClosingCopy, type EventInfo,
 } from '@/lib/eventStore';
 import { INVITATION_THEMES, resolveInvitationTheme, resolveTheme } from '@/lib/eventTheme';
 import { compressImage, downloadBlob, downloadDataUrl, toCsv } from '@/lib/image';
@@ -52,10 +52,10 @@ const EXTRA_CORPORATE: FormQuestion[] = [
   { id: 'sg-9', type: 'long_text', label: 'Topics you want to discuss', required: false },
 ];
 
-const VARIABLES = ['{name}', '{fullname}', '{party}', '{guests}', '{event}', '{date}', '{time}', '{venue}', '{code}'];
+const VARIABLES = ['{name}', '{fullname}', '{party}', '{guests}', '{event}', '{date}', '{time}', '{venue}', '{code}', '{number}', '{opens}'];
 
 type FormTab = 'cover' | 'questions' | 'closing' | 'share' | 'responses' | 'pwa' | 'settings';
-type ClosingView = 'confirmed' | 'declined' | 'closed';
+type ClosingView = 'confirmed' | 'declined' | 'closed' | 'upcoming';
 type ClosingField = 'heading' | 'message' | 'smallPrint';
 
 const inputCls =
@@ -76,6 +76,11 @@ function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; labe
   );
 }
 
+function ContentThumb({ refId }: { refId: string }) {
+  const url = useAssetUrl(refId);
+  return <span className="w-8 h-8 rounded-lg bg-premium-black bg-cover bg-center shrink-0 border border-premium-borderDark" style={{ backgroundImage: url ? `url(${url})` : undefined }} />;
+}
+
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <div>
@@ -89,6 +94,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 export function InvitationFormBuilder({ eventId }: { eventId: string }) {
   const { config, event, update, savedAt } = useEventConfig(eventId);
   const responses = useResponses(eventId);
+  const guests = useGuests(eventId);
   const inv = config.invitation;
   const info = config.info;
   const isWedding = event.event_type === 'wedding';
@@ -119,7 +125,8 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
   const theme = useMemo(() => resolveInvitationTheme(config.design, inv.theme), [config.design, inv.theme]);
   const eventTheme = useMemo(() => resolveTheme(config.design), [config.design]);
   const photo = useAssetUrl(inv.photoUrl);
-  const hero = useAssetUrl(config.landing.heroUrl);
+  const heroBlock = config.landing.blocks.find((b) => b.type === 'hero');
+  const hero = useAssetUrl(heroBlock && heroBlock.type === 'hero' ? heroBlock.imageUrl : '');
   const coverUrl = photo || hero || event.cover_image_url || '';
 
   useEffect(() => {
@@ -132,9 +139,87 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
   const report = (res: { ok: boolean; error?: string }) => setStorageError(res.ok ? null : res.error ?? 'Could not save.');
   const setInv = (patch: Partial<InvitationConfig>) => report(update('invitation', patch));
   const setInfo = (patch: Partial<EventInfo>) => report(update('info', patch));
-  const setQuestions = (qs: FormQuestion[]) => setInv({ questions: qs });
-  const patchQuestion = (id: string, patch: Partial<FormQuestion>) =>
-    setQuestions(inv.questions.map((q) => (q.id === id ? { ...q, ...patch } : q)));
+  const items = inv.items;
+  const questions = useMemo(() => getQuestions(items), [items]);
+  const setItems = (next: FormItem[]) => setInv({ items: next });
+  const patchItem = (id: string, patch: Partial<FormItem>) =>
+    setItems(items.map((it) => (it.id === id ? ({ ...it, ...patch } as FormItem) : it)));
+  const patchQuestion = (id: string, patch: Partial<FormQuestion>) => patchItem(id, patch as Partial<FormItem>);
+  const insertItems = (newItems: FormItem[]) => {
+    const at = selectedQ ? items.findIndex((it) => it.id === selectedQ) + 1 : items.length;
+    const next = [...items];
+    next.splice(at > 0 ? at : next.length, 0, ...newItems);
+    setItems(next);
+  };
+  const removeItem = (it: FormItem) => {
+    if ((it.kind === 'image' || it.kind === 'file') && it.url) deleteAsset(it.url);
+    setItems(items.filter((x) => x.id !== it.id));
+    if (selectedQ === it.id) setSelectedQ(null);
+  };
+  const setQuestionsPerPage = (perPage: number) => {
+    // Keep images/files attached to the question that follows them, then rebuild the breaks.
+    const content = items.filter((it) => it.kind !== 'page_break');
+    const out: FormItem[] = [];
+    let count = 0;
+    content.forEach((it) => {
+      if (isQuestion(it)) {
+        if (perPage > 0 && count > 0 && count % perPage === 0) out.push({ kind: 'page_break', id: newId('pb'), title: '', description: '' });
+        count += 1;
+      }
+      out.push(it);
+    });
+    setItems(out);
+  };
+  const pageCount = 1 + items.filter((it) => it.kind === 'page_break').length;
+  const perPageNow = (() => {
+    if (pageCount === 1) return 0;
+    const sizes: number[] = [];
+    let c = 0;
+    items.forEach((it) => { if (it.kind === 'page_break') { sizes.push(c); c = 0; } else if (isQuestion(it)) c += 1; });
+    sizes.push(c);
+    return sizes.every((n, i) => n === sizes[0] || (i === sizes.length - 1 && n <= sizes[0])) ? sizes[0] : -1;
+  })();
+
+  const contentFileRef = useRef<HTMLInputElement>(null);
+  const [contentUploadKind, setContentUploadKind] = useState<'image' | 'file'>('image');
+  const uploadContent = async (file: File | undefined) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      if (contentUploadKind === 'image') {
+        const saved = saveAsset(await compressImage(file, 1200, 0.8));
+        if (!saved.ok || !saved.ref) return report(saved);
+        const id = newId('img');
+        insertItems([{ kind: 'image', id, url: saved.ref, caption: '' }]);
+        setSelectedQ(id);
+      } else {
+        if (file.size > 1.5 * 1024 * 1024) {
+          setStorageError('Files can be up to 1.5 MB while events are saved in this browser.');
+          return;
+        }
+        const dataUrl = await new Promise<string>((res, rej) => {
+          const fr = new FileReader();
+          fr.onload = () => res(String(fr.result));
+          fr.onerror = () => rej(new Error('Could not read that file.'));
+          fr.readAsDataURL(file);
+        });
+        const saved = saveAsset(dataUrl);
+        if (!saved.ok || !saved.ref) return report(saved);
+        const id = newId('file');
+        insertItems([{ kind: 'file', id, url: saved.ref, name: file.name, size: file.size, label: file.name.replace(/\.[^.]+$/, '') }]);
+        setSelectedQ(id);
+      }
+    } catch (e) {
+      setStorageError(e instanceof Error ? e.message : 'Upload failed.');
+    } finally {
+      setUploading(false);
+      if (contentFileRef.current) contentFileRef.current.value = '';
+    }
+  };
+  const pickContent = (kind: 'image' | 'file') => {
+    setContentUploadKind(kind);
+    requestAnimationFrame(() => contentFileRef.current?.click());
+  };
 
   const flash = (key: string) => {
     setCopied(key);
@@ -168,46 +253,43 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
   /* ── Questions ── */
   const essentials = isWedding ? ESSENTIALS_WEDDING : ESSENTIALS_CORPORATE;
   const extras = isWedding ? EXTRA_WEDDING : EXTRA_CORPORATE;
-  const hasLabel = (label: string) => inv.questions.some((q) => q.label.trim().toLowerCase() === label.trim().toLowerCase());
+  const hasLabel = (label: string) => questions.some((q) => q.label.trim().toLowerCase() === label.trim().toLowerCase());
   const addSuggested = (q: FormQuestion) => {
     if (hasLabel(q.label)) return;
-    const role = q.role && findQuestion(inv.questions, q.role) ? undefined : q.role;
+    const role = q.role && findQuestion(questions, q.role) ? undefined : q.role;
     const id = newId('q');
-    setQuestions([...inv.questions, { ...q, id, role, options: q.options ? [...q.options] : undefined }]);
+    insertItems([{ ...q, kind: 'question', id, role, options: q.options ? [...q.options] : undefined }]);
     setSelectedQ(id);
   };
   const addEssentials = () => {
     const missing = essentials.filter((q) => !hasLabel(q.label)).map((q) => ({ ...q, id: newId('q') }));
-    setQuestions([...inv.questions, ...missing]);
+    setItems([...items, ...withPageBreaks(missing)]);
   };
   const addCustom = () => {
     if (!newLabel.trim()) return;
     const id = newId('q');
-    setQuestions([
-      ...inv.questions,
-      { id, type: newType, label: newLabel.trim(), required: false, options: newType === 'multiple' ? ['Option 1', 'Option 2'] : undefined },
-    ]);
+    insertItems([{ kind: 'question', id, type: newType, label: newLabel.trim(), required: false, options: newType === 'multiple' ? ['Option 1', 'Option 2'] : undefined }]);
     setSelectedQ(id);
     setNewLabel('');
     setNewType('text');
     setShowAdd(false);
   };
-  const moveQuestion = (id: string, dir: -1 | 1) => {
-    const idx = inv.questions.findIndex((q) => q.id === id);
+  const moveItem = (id: string, dir: -1 | 1) => {
+    const idx = items.findIndex((q) => q.id === id);
     const target = idx + dir;
-    if (idx < 0 || target < 0 || target >= inv.questions.length) return;
-    const next = [...inv.questions];
+    if (idx < 0 || target < 0 || target >= items.length) return;
+    const next = [...items];
     [next[idx], next[target]] = [next[target], next[idx]];
-    setQuestions(next);
+    setItems(next);
   };
   const dropOn = (targetId: string) => {
     if (!dragId || dragId === targetId) return;
-    const next = [...inv.questions];
+    const next = [...items];
     const from = next.findIndex((q) => q.id === dragId);
     const to = next.findIndex((q) => q.id === targetId);
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
-    setQuestions(next);
+    setItems(next);
     setDragId(null);
   };
   const changeType = (q: FormQuestion, type: QuestionType) => {
@@ -241,16 +323,17 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
   const attendingCount = responses.filter((r) => r.attending).reduce((s, r) => s + r.party, 0);
   const declinedCount = responses.filter((r) => !r.attending).length;
   const exportCsv = () => {
-    const header = ['Submitted', 'Name', 'Attending', 'Party', 'Email', 'Phone', 'Pass code', ...inv.questions.map((q) => q.label)];
+    const header = ['Submitted', 'Guest No.', 'Name', 'Attending', 'Party', 'Email', 'Phone', 'Pass code', ...questions.map((q) => q.label)];
     const rows = responses.map((r) => [
       new Date(r.submittedAt).toLocaleString(),
+      r.number ? formatGuestNumber(r.number, numberDigits(guests, info.capacity)) : '',
       r.name,
       r.attending ? 'Yes' : 'No',
       r.party,
       r.email,
       r.phone,
       r.token,
-      ...inv.questions.map((q) => r.answers[q.id] ?? ''),
+      ...questions.map((q) => r.answers[q.id] ?? ''),
     ]);
     downloadBlob(`${slug}-responses.csv`, new Blob([toCsv([header, ...rows])], { type: 'text/csv;charset=utf-8' }));
   };
@@ -263,18 +346,18 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
   };
 
   /* ── Preview screen ── */
-  const selectedIndex = Math.max(0, inv.questions.findIndex((q) => q.id === selectedQ));
   const tabScreen: PreviewScreen =
-    formTab === 'questions' ? (inv.questions.length ? 'question' : 'cover')
+    formTab === 'questions' ? (items.length ? 'page' : 'cover')
     : formTab === 'closing' ? closingView
     : formTab === 'responses' ? 'confirmed'
     : formTab === 'settings' && !inv.accepting ? 'closed'
+    : formTab === 'settings' && inv.opensMode === 'scheduled' ? 'upcoming'
     : 'cover';
   const previewScreen = previewOverride ?? tabScreen;
 
   const TABS = [
     { id: 'cover' as const, label: 'Cover', icon: Eye },
-    { id: 'questions' as const, label: `Questions (${inv.questions.length})`, icon: List },
+    { id: 'questions' as const, label: `Questions (${questions.length}) · ${pageCount} page${pageCount === 1 ? '' : 's'}`, icon: List },
     { id: 'closing' as const, label: 'Closing', icon: QrCode },
     { id: 'share' as const, label: 'Share', icon: Share2 },
     { id: 'responses' as const, label: `Responses (${responses.length})`, icon: CheckSquare },
@@ -393,8 +476,8 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
               <label className="text-[10px] font-mono uppercase text-zinc-500 tracking-widest mb-2 block">Cover Content</label>
               <div className="space-y-3">
                 <div className="grid grid-cols-3 gap-3 items-center">
-                  <label className="text-xs text-zinc-400">Small heading above title</label>
-                  <input value={inv.heading} onChange={(e) => setInv({ heading: e.target.value })} className={`col-span-2 ${inputCls}`} />
+                  <label className="text-xs text-zinc-400">“You’re invited” text<span className="block text-[10px] text-zinc-600">Line above the event name</span></label>
+                  <input value={inv.heading} onChange={(e) => setInv({ heading: e.target.value })} placeholder="You're invited" className={`col-span-2 ${inputCls}`} />
                 </div>
                 <div className="grid grid-cols-3 gap-3 items-start">
                   <label className="text-xs text-zinc-400 pt-2">Message</label>
@@ -412,7 +495,7 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
             </div>
 
             <div>
-              <label className="text-[10px] font-mono uppercase text-zinc-500 tracking-widest mb-2 block">Cover Photo</label>
+              <label className="text-[10px] font-mono uppercase text-zinc-500 tracking-widest mb-2 block">Cover Photo · zoom, move and resize it under the live preview</label>
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
               {inv.photoUrl && photo ? (
                 <div className="relative h-40 rounded-2xl overflow-hidden border border-premium-borderDark">
@@ -463,19 +546,36 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
           <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="font-display font-bold text-white text-base">Questions</h3>
-                <p className="text-[11px] text-zinc-400 mt-0.5">Guests answer one at a time. Click a question to edit it; drag or use the arrows to reorder.</p>
+                <h3 className="font-display font-bold text-white text-base">Questions & Pages</h3>
+                <p className="text-[11px] text-zinc-400 mt-0.5">Like Google Forms: questions, images and files, split into pages with page breaks. Click an item to edit it; drag or use the arrows to reorder.</p>
               </div>
               <button
                 type="button"
-                onClick={() => { if (confirm('Replace all questions with the default set?')) { setQuestions(essentials.map((q) => ({ ...q }))); setSelectedQ(null); } }}
+                onClick={() => { if (confirm('Replace everything with the default questions?')) { setItems(withPageBreaks(essentials)); setSelectedQ(null); } }}
                 className="shrink-0 px-3 py-1.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-zinc-400 hover:text-white text-[11px] font-bold scale-on-click flex items-center gap-1.5"
               >
                 <RotateCcw className="w-3 h-3" /> Defaults
               </button>
             </div>
 
-            {inv.questions.length === 0 ? (
+            <div className="p-3 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-bold text-zinc-300 mr-1">Questions per page</span>
+              {[1, 2, 3, 5, 0].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setQuestionsPerPage(n)}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border scale-on-click ${perPageNow === n ? 'bg-premium-gold text-black border-premium-gold' : 'bg-premium-charcoal text-zinc-400 border-premium-borderDark hover:text-white'}`}
+                >
+                  {n === 0 ? 'All on one page' : n}
+                </button>
+              ))}
+              <span className="text-[10px] text-zinc-500 ml-auto">{pageCount} page{pageCount === 1 ? '' : 's'}{perPageNow === -1 ? ' · custom breaks' : ''}</span>
+            </div>
+
+            <input ref={contentFileRef} type="file" accept={contentUploadKind === 'image' ? 'image/*' : '*/*'} className="hidden" onChange={(e) => uploadContent(e.target.files?.[0])} />
+
+            {items.length === 0 ? (
               <div className="p-8 rounded-2xl border-2 border-dashed border-premium-borderDark flex flex-col items-center gap-3 text-center">
                 <AlignLeft className="w-6 h-6 text-zinc-500" />
                 <div className="text-sm font-bold text-white">No questions yet</div>
@@ -485,131 +585,193 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
               </div>
             ) : (
               <div className="space-y-2">
-                {inv.questions.map((q, idx) => {
-                  const Icon = TYPE_ICONS[q.type];
-                  const open = selectedQ === q.id;
-                  return (
-                    <div
-                      key={q.id}
-                      draggable
-                      onDragStart={() => setDragId(q.id)}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={() => dropOn(q.id)}
-                      onDragEnd={() => setDragId(null)}
-                      className={`rounded-2xl border transition-colors ${open ? 'bg-premium-surfaceDark border-premium-gold/50' : 'bg-premium-surfaceDark border-premium-borderDark'} ${dragId === q.id ? 'opacity-50' : ''}`}
-                    >
-                      <div className="p-3 flex items-center gap-2.5">
-                        <GripVertical className="w-3.5 h-3.5 text-zinc-600 shrink-0 cursor-grab" />
-                        <span className="text-[10px] font-mono text-zinc-600 w-4 shrink-0">{idx + 1}</span>
-                        <button type="button" onClick={() => setSelectedQ(open ? null : q.id)} className="flex-1 min-w-0 flex items-center gap-2.5 text-left">
-                          <Icon className="w-4 h-4 text-zinc-500 shrink-0" />
-                          <span className="min-w-0">
-                            <span className="block text-xs font-bold text-white truncate">{q.label || 'Untitled question'}</span>
-                            <span className="block text-[10px] text-zinc-500">
-                              {TYPE_LABELS[q.type]}
-                              {q.role && <span className="text-premium-neon"> · {ROLE_LABELS[q.role]}</span>}
-                            </span>
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => patchQuestion(q.id, { required: !q.required })}
-                          className={`text-[10px] font-mono px-2 py-0.5 rounded-full border scale-on-click ${q.required ? 'border-premium-danger/40 text-premium-danger bg-premium-danger/10' : 'border-zinc-700 text-zinc-500'}`}
-                        >
-                          {q.required ? 'Required' : 'Optional'}
-                        </button>
-                        <button type="button" onClick={() => moveQuestion(q.id, -1)} disabled={idx === 0} className="text-zinc-500 hover:text-white disabled:opacity-20 scale-on-click" aria-label="Move up">
-                          <ArrowUp className="w-3.5 h-3.5" />
-                        </button>
-                        <button type="button" onClick={() => moveQuestion(q.id, 1)} disabled={idx === inv.questions.length - 1} className="text-zinc-500 hover:text-white disabled:opacity-20 scale-on-click" aria-label="Move down">
-                          <ArrowDown className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setQuestions(inv.questions.filter((x) => x.id !== q.id)); if (open) setSelectedQ(null); }}
-                          className="text-zinc-600 hover:text-premium-danger scale-on-click"
-                          aria-label="Delete question"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                <div className="text-[10px] font-mono uppercase tracking-widest text-premium-gold px-1">Page 1</div>
+                {(() => {
+                  let pageNo = 1;
+                  let qNo = 0;
+                  return items.map((it, idx) => {
+                    const open = selectedQ === it.id;
+                    const rowControls = (
+                      <>
+                        <button type="button" onClick={() => moveItem(it.id, -1)} disabled={idx === 0} className="text-zinc-500 hover:text-white disabled:opacity-20 scale-on-click" aria-label="Move up"><ArrowUp className="w-3.5 h-3.5" /></button>
+                        <button type="button" onClick={() => moveItem(it.id, 1)} disabled={idx === items.length - 1} className="text-zinc-500 hover:text-white disabled:opacity-20 scale-on-click" aria-label="Move down"><ArrowDown className="w-3.5 h-3.5" /></button>
+                        <button type="button" onClick={() => removeItem(it)} className="text-zinc-600 hover:text-premium-danger scale-on-click" aria-label="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                      </>
+                    );
+                    const dragProps = {
+                      draggable: true,
+                      onDragStart: () => setDragId(it.id),
+                      onDragOver: (e: React.DragEvent) => e.preventDefault(),
+                      onDrop: () => dropOn(it.id),
+                      onDragEnd: () => setDragId(null),
+                    };
 
-                      {open && (
-                        <div className="px-4 pb-4 pt-1 space-y-3 border-t border-premium-borderDark/60">
-                          <Field label="Question">
-                            <input value={q.label} onChange={(e) => patchQuestion(q.id, { label: e.target.value })} className={inputCls} />
-                          </Field>
-                          <Field label="Answer type">
-                            <div className="flex gap-1.5 flex-wrap">
-                              {(Object.keys(TYPE_LABELS) as QuestionType[]).map((t) => {
-                                const TIcon = TYPE_ICONS[t];
-                                return (
-                                  <button
-                                    key={t}
-                                    type="button"
-                                    onClick={() => changeType(q, t)}
-                                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-bold scale-on-click ${
-                                      q.type === t ? 'bg-premium-gold text-black border-premium-gold' : 'border-premium-borderDark text-zinc-400 hover:border-premium-gold/40'
-                                    }`}
-                                  >
-                                    <TIcon className="w-3 h-3" /> {TYPE_LABELS[t]}
-                                  </button>
-                                );
-                              })}
+                    if (it.kind === 'page_break') {
+                      pageNo += 1;
+                      return (
+                        <div key={it.id} {...dragProps} className={`rounded-2xl border border-dashed ${open ? 'border-premium-gold/60 bg-premium-gold/5' : 'border-premium-gold/30'} ${dragId === it.id ? 'opacity-50' : ''}`}>
+                          <div className="p-2.5 flex items-center gap-2.5">
+                            <GripVertical className="w-3.5 h-3.5 text-zinc-600 shrink-0 cursor-grab" />
+                            <Scissors className="w-3.5 h-3.5 text-premium-gold shrink-0" />
+                            <button type="button" onClick={() => setSelectedQ(open ? null : it.id)} className="flex-1 min-w-0 text-left">
+                              <span className="text-[10px] font-mono uppercase tracking-widest text-premium-gold">Page break · Page {pageNo}</span>
+                              {it.title && <span className="text-xs font-bold text-white ml-2">{it.title}</span>}
+                            </button>
+                            {rowControls}
+                          </div>
+                          {open && (
+                            <div className="px-4 pb-4 pt-1 grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-premium-gold/20">
+                              <Field label="Page title (optional)"><input value={it.title} onChange={(e) => patchItem(it.id, { title: e.target.value })} className={inputCls} /></Field>
+                              <Field label="Page description (optional)"><input value={it.description} onChange={(e) => patchItem(it.id, { description: e.target.value })} className={inputCls} /></Field>
                             </div>
-                          </Field>
-                          {q.type === 'multiple' && (
-                            <Field label="Choices">
-                              <div className="space-y-1.5">
-                                {(q.options ?? []).map((opt, oi) => (
-                                  <div key={oi} className="flex items-center gap-2">
-                                    <span className="w-5 text-[10px] font-mono text-zinc-500">{String.fromCharCode(65 + oi)}</span>
-                                    <input
-                                      value={opt}
-                                      onChange={(e) => patchQuestion(q.id, { options: (q.options ?? []).map((o, i) => (i === oi ? e.target.value : o)) })}
-                                      className={inputCls}
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => patchQuestion(q.id, { options: (q.options ?? []).filter((_, i) => i !== oi) })}
-                                      disabled={(q.options ?? []).length <= 2}
-                                      className="text-zinc-600 hover:text-premium-danger disabled:opacity-20 scale-on-click"
-                                      aria-label="Remove choice"
-                                    >
-                                      <X className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                ))}
-                                <button
-                                  type="button"
-                                  onClick={() => patchQuestion(q.id, { options: [...(q.options ?? []), `Option ${(q.options?.length ?? 0) + 1}`] })}
-                                  className="text-[11px] font-bold text-premium-gold hover:underline flex items-center gap-1"
-                                >
-                                  <Plus className="w-3 h-3" /> Add choice
-                                </button>
-                              </div>
-                            </Field>
-                          )}
-                          {['text', 'long_text', 'email', 'phone', 'number'].includes(q.type) && (
-                            <Field label="Placeholder (optional)">
-                              <input value={q.placeholder ?? ''} onChange={(e) => patchQuestion(q.id, { placeholder: e.target.value })} className={inputCls} />
-                            </Field>
                           )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                      );
+                    }
+
+                    if (it.kind === 'image' || it.kind === 'file') {
+                      return (
+                        <div key={it.id} {...dragProps} className={`rounded-2xl border transition-colors bg-premium-surfaceDark ${open ? 'border-premium-gold/50' : 'border-premium-borderDark'} ${dragId === it.id ? 'opacity-50' : ''}`}>
+                          <div className="p-3 flex items-center gap-2.5">
+                            <GripVertical className="w-3.5 h-3.5 text-zinc-600 shrink-0 cursor-grab" />
+                            <button type="button" onClick={() => setSelectedQ(open ? null : it.id)} className="flex-1 min-w-0 flex items-center gap-2.5 text-left">
+                              {it.kind === 'image' ? <ContentThumb refId={it.url} /> : <FileText className="w-4 h-4 text-premium-gold shrink-0" />}
+                              <span className="min-w-0">
+                                <span className="block text-xs font-bold text-white truncate">{it.kind === 'image' ? it.caption || 'Image' : it.label || it.name}</span>
+                                <span className="block text-[10px] text-zinc-500">{it.kind === 'image' ? 'Image' : `File · ${it.name}`}</span>
+                              </span>
+                            </button>
+                            {rowControls}
+                          </div>
+                          {open && (
+                            <div className="px-4 pb-4 pt-1 space-y-3 border-t border-premium-borderDark/60">
+                              {it.kind === 'image' ? (
+                                <Field label="Caption (optional)"><input value={it.caption} onChange={(e) => patchItem(it.id, { caption: e.target.value })} className={inputCls} /></Field>
+                              ) : (
+                                <Field label="Button label" hint="Guests can download this file from the form."><input value={it.label} onChange={(e) => patchItem(it.id, { label: e.target.value })} className={inputCls} /></Field>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    const q = it as FormQuestion;
+                    qNo += 1;
+                    const Icon = TYPE_ICONS[q.type];
+                    return (
+                      <div key={q.id} {...dragProps} className={`rounded-2xl border transition-colors bg-premium-surfaceDark ${open ? 'border-premium-gold/50' : 'border-premium-borderDark'} ${dragId === q.id ? 'opacity-50' : ''}`}>
+                        <div className="p-3 flex items-center gap-2.5">
+                          <GripVertical className="w-3.5 h-3.5 text-zinc-600 shrink-0 cursor-grab" />
+                          <span className="text-[10px] font-mono text-zinc-600 w-4 shrink-0">{qNo}</span>
+                          <button type="button" onClick={() => setSelectedQ(open ? null : q.id)} className="flex-1 min-w-0 flex items-center gap-2.5 text-left">
+                            <Icon className="w-4 h-4 text-zinc-500 shrink-0" />
+                            <span className="min-w-0">
+                              <span className="block text-xs font-bold text-white truncate">{q.label || 'Untitled question'}</span>
+                              <span className="block text-[10px] text-zinc-500">
+                                {TYPE_LABELS[q.type]}
+                                {q.role && <span className="text-premium-neon"> · {ROLE_LABELS[q.role]}</span>}
+                              </span>
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => patchQuestion(q.id, { required: !q.required })}
+                            className={`text-[10px] font-mono px-2 py-0.5 rounded-full border scale-on-click ${q.required ? 'border-premium-danger/40 text-premium-danger bg-premium-danger/10' : 'border-zinc-700 text-zinc-500'}`}
+                          >
+                            {q.required ? 'Required' : 'Optional'}
+                          </button>
+                          {rowControls}
+                        </div>
+                        {open && (
+                          <div className="px-4 pb-4 pt-1 space-y-3 border-t border-premium-borderDark/60">
+                            <Field label="Question">
+                              <input value={q.label} onChange={(e) => patchQuestion(q.id, { label: e.target.value })} className={inputCls} />
+                            </Field>
+                            <Field label="Answer type">
+                              <div className="flex gap-1.5 flex-wrap">
+                                {(Object.keys(TYPE_LABELS) as QuestionType[]).map((t) => {
+                                  const TIcon = TYPE_ICONS[t];
+                                  return (
+                                    <button
+                                      key={t}
+                                      type="button"
+                                      onClick={() => changeType(q, t)}
+                                      className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-bold scale-on-click ${
+                                        q.type === t ? 'bg-premium-gold text-black border-premium-gold' : 'border-premium-borderDark text-zinc-400 hover:border-premium-gold/40'
+                                      }`}
+                                    >
+                                      <TIcon className="w-3 h-3" /> {TYPE_LABELS[t]}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </Field>
+                            {q.type === 'multiple' && (
+                              <Field label="Choices">
+                                <div className="space-y-1.5">
+                                  {(q.options ?? []).map((opt, oi) => (
+                                    <div key={oi} className="flex items-center gap-2">
+                                      <span className="w-5 text-[10px] font-mono text-zinc-500">{String.fromCharCode(65 + oi)}</span>
+                                      <input
+                                        value={opt}
+                                        onChange={(e) => patchQuestion(q.id, { options: (q.options ?? []).map((o, i) => (i === oi ? e.target.value : o)) })}
+                                        className={inputCls}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => patchQuestion(q.id, { options: (q.options ?? []).filter((_, i) => i !== oi) })}
+                                        disabled={(q.options ?? []).length <= 2}
+                                        className="text-zinc-600 hover:text-premium-danger disabled:opacity-20 scale-on-click"
+                                        aria-label="Remove choice"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                  <button
+                                    type="button"
+                                    onClick={() => patchQuestion(q.id, { options: [...(q.options ?? []), `Option ${(q.options?.length ?? 0) + 1}`] })}
+                                    className="text-[11px] font-bold text-premium-gold hover:underline flex items-center gap-1"
+                                  >
+                                    <Plus className="w-3 h-3" /> Add choice
+                                  </button>
+                                </div>
+                              </Field>
+                            )}
+                            {['text', 'long_text', 'email', 'phone', 'number'].includes(q.type) && (
+                              <Field label="Placeholder (optional)">
+                                <input value={q.placeholder ?? ''} onChange={(e) => patchQuestion(q.id, { placeholder: e.target.value })} className={inputCls} />
+                              </Field>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             )}
 
-            <button
-              type="button"
-              onClick={() => setShowAdd((v) => !v)}
-              className="w-full py-3 rounded-2xl border-2 border-dashed border-premium-borderDark text-zinc-400 text-xs font-bold hover:border-premium-gold/50 hover:text-white flex items-center justify-center gap-2 scale-on-click"
-            >
-              <Plus className="w-4 h-4" /> Add a question
-            </button>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <button type="button" onClick={() => setShowAdd((v) => !v)} className="py-3 rounded-2xl border-2 border-dashed border-premium-borderDark text-zinc-300 text-xs font-bold hover:border-premium-gold/50 flex items-center justify-center gap-1.5 scale-on-click">
+                <Plus className="w-4 h-4" /> Question
+              </button>
+              <button type="button" onClick={() => pickContent('image')} className="py-3 rounded-2xl border-2 border-dashed border-premium-borderDark text-zinc-300 text-xs font-bold hover:border-premium-gold/50 flex items-center justify-center gap-1.5 scale-on-click">
+                <ImageIcon className="w-4 h-4" /> {uploading && contentUploadKind === 'image' ? 'Uploading…' : 'Image'}
+              </button>
+              <button type="button" onClick={() => pickContent('file')} className="py-3 rounded-2xl border-2 border-dashed border-premium-borderDark text-zinc-300 text-xs font-bold hover:border-premium-gold/50 flex items-center justify-center gap-1.5 scale-on-click">
+                <FileText className="w-4 h-4" /> {uploading && contentUploadKind === 'file' ? 'Uploading…' : 'File'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { const id = newId('pb'); insertItems([{ kind: 'page_break', id, title: '', description: '' }]); setSelectedQ(id); }}
+                className="py-3 rounded-2xl border-2 border-dashed border-premium-gold/40 text-premium-gold text-xs font-bold hover:border-premium-gold flex items-center justify-center gap-1.5 scale-on-click"
+              >
+                <Scissors className="w-4 h-4" /> Page break
+              </button>
+            </div>
+            <p className="text-[10px] text-zinc-500 -mt-2">New items are added after the selected one.</p>
 
             {showAdd && (
               <div className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-gold/30 space-y-3">
@@ -696,6 +858,7 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
                 { id: 'confirmed', label: 'Confirmed' },
                 { id: 'declined', label: 'Declined' },
                 { id: 'closed', label: 'Form closed' },
+                { id: 'upcoming', label: 'Not open yet' },
               ] as const).map((v) => (
                 <button
                   key={v.id}
@@ -729,6 +892,10 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
                 />
               </Field>
               {closingView === 'confirmed' && (
+                <>
+                <Field label="“You’re invited” text on the ticket">
+                  <input value={inv.ticketLabel} onChange={(e) => setInv({ ticketLabel: e.target.value })} placeholder="You're invited" className={inputCls} />
+                </Field>
                 <Field label="Small print under the QR code">
                   <textarea
                     ref={(el) => { closingRefs.current.smallPrint = el; }}
@@ -739,6 +906,7 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
                     className={`${inputCls} resize-none ${activeField === 'smallPrint' ? 'border-premium-gold/60' : ''}`}
                   />
                 </Field>
+                </>
               )}
 
               <div>
@@ -764,6 +932,7 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
                 <div className="text-[10px] font-mono uppercase text-zinc-500 tracking-widest mb-1">What guests can do</div>
                 {([
                   { key: 'showTicket', label: 'Show the ticket with QR code', sub: 'The QR is what you scan at the door.' },
+                  { key: 'guestNumbers', label: 'Show the guest number on the ticket', sub: 'Every guest gets a number (001, 002…). Door prize draws use it.' },
                   { key: 'showCalendar', label: '"Add to calendar" button', sub: 'Downloads an .ics file.' },
                   { key: 'showDirections', label: '"Directions" button', sub: 'Opens the map link from Event Information.' },
                   { key: 'showContact', label: 'Show your phone and email', sub: 'Guests can call or email you.' },
@@ -776,6 +945,11 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
                     <Toggle on={inv[item.key]} label={item.label} onClick={() => setInv({ [item.key]: !inv[item.key] } as Partial<InvitationConfig>)} />
                   </div>
                 ))}
+                {inv.guestNumbers && (
+                  <Field label="Number label on the ticket">
+                    <input value={inv.numberLabel} onChange={(e) => setInv({ numberLabel: e.target.value })} placeholder="Guest No." className={inputCls} />
+                  </Field>
+                )}
                 {inv.showContact && (
                   <div className="grid grid-cols-2 gap-3 pt-1">
                     <Field label="Your phone">
@@ -903,7 +1077,10 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
                   <div key={r.id}>
                     <div className="flex items-center gap-3 px-4 py-3 text-xs">
                       <button type="button" onClick={() => setExpandedResponse(expandedResponse === r.id ? null : r.id)} className="flex-1 min-w-0 text-left">
-                        <span className="font-bold text-white block truncate">{r.name}</span>
+                        <span className="font-bold text-white block truncate">
+                          {r.number && <span className="font-mono text-premium-gold mr-2">#{formatGuestNumber(r.number, numberDigits(guests, info.capacity))}</span>}
+                          {r.name}
+                        </span>
                         <span className="text-[10px] text-zinc-500 font-mono">{new Date(r.submittedAt).toLocaleString()} · {r.token}</span>
                       </button>
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${r.attending ? 'bg-premium-success/15 text-premium-success border-premium-success/30' : 'bg-premium-danger/15 text-premium-danger border-premium-danger/30'}`}>
@@ -915,7 +1092,7 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
                     </div>
                     {expandedResponse === r.id && (
                       <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {inv.questions.map((q) => (
+                        {questions.map((q) => (
                           <div key={q.id} className="p-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark">
                             <div className="text-[10px] text-zinc-500 font-bold">{q.label}</div>
                             <div className="text-xs text-white mt-0.5 break-words">{r.answers[q.id] || '—'}</div>
@@ -931,7 +1108,7 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
               <button
                 type="button"
                 onClick={() => {
-                  const nameQ = findQuestion(inv.questions, 'name');
+                  const nameQ = findQuestion(questions, 'name');
                   report(addResponse(eventId, {
                     id: newId('rsp'), submittedAt: new Date().toISOString(),
                     answers: nameQ ? { [nameQ.id]: 'Test Guest' } : {},
@@ -1006,6 +1183,45 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
               <p className="text-[11px] text-zinc-400 mt-0.5">Rules for the form.</p>
             </div>
 
+            <div className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark space-y-3">
+              <div>
+                <div className="text-xs font-bold text-white">Registration opens</div>
+                <div className="text-[10px] text-zinc-500">Before this time guests see the “Not open yet” page with a countdown.</div>
+              </div>
+              <div className="flex gap-2">
+                {([
+                  { id: 'now', label: 'Now' },
+                  { id: 'scheduled', label: 'Pick date & time' },
+                ] as const).map((o) => (
+                  <button
+                    key={o.id}
+                    type="button"
+                    onClick={() => setInv({ opensMode: o.id })}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold border scale-on-click ${inv.opensMode === o.id ? 'bg-premium-gold text-black border-premium-gold' : 'bg-premium-charcoal text-zinc-400 border-premium-borderDark hover:text-white'}`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+              {inv.opensMode === 'scheduled' && (
+                <div className="space-y-1.5">
+                  <input
+                    type="datetime-local"
+                    value={inv.opensAt}
+                    onChange={(e) => setInv({ opensAt: e.target.value })}
+                    className={`${inputCls} [color-scheme:dark] max-w-xs`}
+                  />
+                  <p className="text-[10px] text-zinc-500">
+                    {inv.opensAt
+                      ? new Date(inv.opensAt).getTime() > Date.now()
+                        ? `Opens ${new Date(inv.opensAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })} (your local time).`
+                        : 'That time has passed — the form is open now.'
+                      : 'Choose when replies open.'}
+                  </p>
+                </div>
+              )}
+            </div>
+
             <Field label="Form name" hint="Only you see this.">
               <input value={inv.formName} onChange={(e) => setInv({ formName: e.target.value })} className={inputCls} />
             </Field>
@@ -1069,13 +1285,17 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
               coverUrl={coverUrl}
               isWedding={isWedding}
               forcedScreen={previewScreen}
-              forcedQuestionIndex={selectedIndex}
+              forcedItemId={selectedQ}
+              logoRef={config.design.logoUrl}
+              logoSize={config.design.logoSize}
+              numberPad={numberDigits(guests, info.capacity)}
+              onAdjustPhoto={previewScreen === 'cover' && coverUrl ? (patch) => setInv(patch) : undefined}
             />
           </div>
         </div>
         <div className="flex flex-wrap justify-center gap-1 max-w-[280px]">
           {([
-            ['cover', 'Cover'], ['question', 'Question'], ['review', 'Review'], ['confirmed', 'Confirmed'], ['declined', 'Declined'], ['closed', 'Closed'],
+            ['cover', 'Cover'], ['page', 'Pages'], ['review', 'Review'], ['confirmed', 'Confirmed'], ['declined', 'Declined'], ['closed', 'Closed'], ['upcoming', 'Not open'],
           ] as const).map(([id, label]) => (
             <button
               key={id}
@@ -1088,6 +1308,38 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
           ))}
         </div>
 
+
+        {coverUrl && previewScreen === 'cover' && (
+          <div className="w-full max-w-[280px] p-4 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono uppercase text-zinc-500 tracking-widest flex items-center gap-1"><Move className="w-3 h-3" /> Image adjuster</span>
+              <button type="button" onClick={() => setInv({ photoZoom: 1, photoX: 50, photoY: 50, photoHeight: 240 })} className="text-[10px] font-bold text-zinc-400 hover:text-white scale-on-click">Reset</button>
+            </div>
+            {([
+              { key: 'photoZoom', label: 'Zoom', min: 1, max: 2.5, step: 0.05, fmt: (v: number) => `${Math.round(v * 100)}%` },
+              { key: 'photoX', label: 'Left ↔ Right', min: 0, max: 100, step: 1, fmt: (v: number) => `${v}%` },
+              { key: 'photoY', label: 'Top ↕ Bottom', min: 0, max: 100, step: 1, fmt: (v: number) => `${v}%` },
+              { key: 'photoHeight', label: 'Height', min: 140, max: 420, step: 10, fmt: (v: number) => `${v}px` },
+            ] as const).map((c) => (
+              <label key={c.key} className="block">
+                <span className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                  <span className="font-bold">{c.label}</span>
+                  <span className="font-mono text-premium-gold">{c.fmt(inv[c.key])}</span>
+                </span>
+                <input
+                  type="range"
+                  min={c.min}
+                  max={c.max}
+                  step={c.step}
+                  value={inv[c.key]}
+                  onChange={(e) => setInv({ [c.key]: Number(e.target.value) } as Partial<InvitationConfig>)}
+                  className="w-full accent-[#C5A059]"
+                />
+              </label>
+            ))}
+            <p className="text-[10px] text-zinc-500">Tip: drag the photo in the preview to move it.</p>
+          </div>
+        )}
         <div className="w-full max-w-[280px] p-4 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-3">
           <div className="text-[10px] font-mono uppercase text-zinc-500 tracking-widest">Share form link</div>
           <div className="flex items-center gap-2 bg-premium-surfaceDark border border-premium-borderDark rounded-xl px-3 py-2">
