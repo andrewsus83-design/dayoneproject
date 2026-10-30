@@ -3,7 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import confetti from 'canvas-confetti';
-import { EyeOff, Gift, Trophy, WifiOff } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowLeft, EyeOff, Gift, Trophy, WifiOff } from 'lucide-react';
+import { guestAppPath } from '@/lib/guestsApi';
 import { publicWinnerLabel, usePublicDoorPrizes, type ServerWinner } from '@/lib/doorPrizeApi';
 
 const REVEAL_MS = 12_000;
@@ -86,6 +88,9 @@ export function DoorPrizeViewer({ slug, initialId }: { slug: string; initialId?:
 
       <header className="relative z-20 px-4 sm:px-8 pt-6 pb-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
+          <Link href={guestAppPath(slug, 'prize')} className="p-2 rounded-xl bg-premium-charcoal border border-premium-borderDark text-zinc-400 hover:text-white scale-on-click shrink-0" aria-label="Back to the guest app">
+            <ArrowLeft className="w-4 h-4" />
+          </Link>
           <div className="w-10 h-10 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-xl shadow-gold shrink-0">D1</div>
           <div className="min-w-0">
             <h1 className="text-lg sm:text-xl font-display font-medium text-white truncate">{data.event.name}</h1>

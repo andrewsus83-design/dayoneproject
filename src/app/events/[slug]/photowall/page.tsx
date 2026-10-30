@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useEventConfigBySlug } from '@/lib/eventStore';
 import { isSampleSlug } from '@/lib/events';
+import { guestAppPath } from '@/lib/guestsApi';
 import { MOCK_PHOTO_WALL_UPLOADS } from '@/lib/mockData';
 import { PinterestMasonryPhotoWall } from '@/components/events/PinterestMasonryPhotoWall';
 import {
@@ -52,8 +53,8 @@ function Shell({ slug, title, subtitle, children }: { slug: string; title: strin
       <div className="max-w-md mx-auto min-h-screen flex flex-col border-x border-premium-borderDark">
         <header className="h-16 px-4 border-b border-premium-borderDark bg-premium-surfaceDark/90 backdrop-blur-md flex items-center gap-3 sticky top-0 z-40">
           <Link
-            href={`/events/${slug}`}
-            aria-label="Back to the event"
+            href={guestAppPath(slug, 'activity')}
+            aria-label="Back to the guest app"
             className="p-2 rounded-xl bg-premium-charcoal border border-premium-borderDark text-zinc-400 hover:text-white scale-on-click"
           >
             <ArrowLeft className="w-4 h-4" />

@@ -7,7 +7,7 @@ import confetti from 'canvas-confetti';
 import { ArrowLeft, CheckCircle2, Clock, Gamepad2, QrCode, RefreshCw, Ticket, Trophy, Users, XCircle } from 'lucide-react';
 import { isSampleSlug } from '@/lib/events';
 import { getClientDomain } from '@/lib/domain';
-import { useMyPass } from '@/lib/guestsApi';
+import { guestAppPath, useMyPass } from '@/lib/guestsApi';
 import {
   ANSWER_STYLES, answerQuiz, formatJoinCode, joinWithCode, myQuiz, readJoinedGame, storeJoinedGame, usePublicQuiz, useServerNow,
   type JoinFailure, type JoinedGame, type QuizMe, type QuizSession,
@@ -24,7 +24,7 @@ function Shell({ slug, score, children }: { slug: string; score?: number | null;
   return (
     <div className="min-h-screen bg-premium-black text-zinc-100 flex flex-col max-w-md mx-auto border-x border-premium-borderDark select-none font-sans">
       <header className="h-14 px-4 bg-premium-surfaceDark border-b border-premium-borderDark flex items-center justify-between sticky top-0 z-40">
-        <Link href={`/events/${slug}/pass`} className="p-2 rounded-xl bg-premium-charcoal text-zinc-400 hover:text-white border border-premium-borderDark scale-on-click" aria-label="Back to my pass">
+        <Link href={guestAppPath(slug, 'activity')} className="p-2 rounded-xl bg-premium-charcoal text-zinc-400 hover:text-white border border-premium-borderDark scale-on-click" aria-label="Back to the guest app">
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div className="text-center">

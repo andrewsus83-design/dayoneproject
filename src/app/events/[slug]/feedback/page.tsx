@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, Check, Star } from 'lucide-react';
 import { addFeedback, fillVariables, formatEventDate, formatEventTime, newId, useEventConfigBySlug, useSampleGuests } from '@/lib/eventStore';
-import { isServerEventId, useMyPass } from '@/lib/guestsApi';
+import { guestAppPath, isServerEventId, useMyPass } from '@/lib/guestsApi';
 import { resolveTheme } from '@/lib/eventTheme';
 import { EventFonts } from '@/components/events/EventFonts';
 
@@ -66,8 +66,8 @@ function FeedbackContent({ slug }: { slug: string }) {
     <div className="min-h-screen flex flex-col" style={{ ...theme.vars, background: theme.bg, color: theme.text, fontFamily: theme.bodyFamily }}>
       <EventFonts href={theme.fontsHref} />
       <div className="w-full max-w-md mx-auto flex-1 flex flex-col px-5 py-6" style={{ gap: theme.space.stack }}>
-        <Link href={`/events/${slug}`} className="inline-flex items-center gap-1.5 text-xs font-bold self-start scale-on-click" style={{ color: theme.muted }}>
-          <ArrowLeft className="w-4 h-4" /> Event page
+        <Link href={guestAppPath(slug, 'setting')} className="inline-flex items-center gap-1.5 text-xs font-bold self-start scale-on-click" style={{ color: theme.muted }}>
+          <ArrowLeft className="w-4 h-4" /> Back
         </Link>
 
         <div className="flex-1 flex flex-col justify-center" style={{ gap: theme.space.stack }}>

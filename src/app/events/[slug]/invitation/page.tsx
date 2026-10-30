@@ -1,12 +1,13 @@
 'use client';
 
 import React, { use, Suspense, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   addResponse, readGuests, useAssetUrl, useEventConfigBySlug, useResponses, useSampleGuests, writeGuests, formatEventDate,
   nextGuestNumber, numberDigits,
   type FormResponse,
 } from '@/lib/eventStore';
-import { isServerEventId, registerGuest, useStoredPass, type RegisterResult } from '@/lib/guestsApi';
+import { guestAppPath, isServerEventId, registerGuest, useStoredPass, type RegisterResult } from '@/lib/guestsApi';
 import { resolveTheme } from '@/lib/eventTheme';
 import { InvitationFormView, type SubmitResult } from '@/components/events/InvitationFormView';
 import { EventFonts } from '@/components/events/EventFonts';
@@ -50,6 +51,7 @@ function InvitationContent({ slug }: { slug: string }) {
   const responses = useResponses(sample ? eventId : '');
   const sampleGuests = useSampleGuests(eventId);
   const heldPass = useStoredPass(slug);
+  const router = useRouter();
   const inv = config.invitation;
   const photo = useAssetUrl(inv.photoUrl);
   const heroBlock = config.landing.blocks.find((b) => b.type === 'hero');
@@ -135,6 +137,14 @@ function InvitationContent({ slug }: { slug: string }) {
     return { ok: true, token: res.token, number: res.guest_number, name: res.name };
   };
 
+  // A guest who is coming goes straight to the guest app, on their QR pass.
+  const submitAndOpenApp = async (r: FormResponse): Promise<SubmitResult> => {
+    const res = await handleSubmit(r);
+    const token = sample ? r.token : res.ok ? res.token : undefined;
+    if (res.ok && r.attending && token) router.replace(sample ? `/events/${slug}/pass?t=${encodeURIComponent(token)}` : guestAppPath(slug));
+    return res;
+  };
+
   if (!hydrated) {
     return <div className="min-h-screen bg-premium-black flex items-center justify-center text-zinc-500 text-sm">Loading invitation…</div>;
   }
@@ -152,7 +162,7 @@ function InvitationContent({ slug }: { slug: string }) {
         logoSize={config.design.logoSize}
         closedReason={closedReason}
         notOpenUntil={notOpenUntil}
-        onSubmit={handleSubmit}
+        onSubmit={submitAndOpenApp}
         numberPad={numberDigits(sample ? sampleGuests : [], config.info.capacity)}
         backHref={`/events/${slug}`}
       />
