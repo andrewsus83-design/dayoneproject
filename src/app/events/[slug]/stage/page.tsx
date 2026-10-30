@@ -12,7 +12,7 @@ import { createClient } from '@/lib/supabase/client';
 import { feedToUploads, organizerPhotoApi, useWallFeed } from '@/lib/photoWallApi';
 import { publicWinnerLabel } from '@/lib/doorPrizeApi';
 import {
-  STAGE_MODULE_NAMES, defaultTicker, newerStage, normalizeStageState, showableModules, useLocalStage, useStageFeed,
+  STAGE_MODULE_IDS, STAGE_MODULE_NAMES, defaultTicker, newerStage, normalizeStageState, showableModules, useLocalStage, useStageFeed,
 } from '@/lib/stageApi';
 import { MOCK_PHOTO_WALL_UPLOADS } from '@/lib/mockData';
 import type { StageModuleId } from '@/lib/types';
@@ -55,7 +55,12 @@ function StageBigScreenContent({ slug }: { slug: string }) {
   const { eventId, event, config } = useEventConfigBySlug(slug);
   const sample = isSampleSlug(slug);
   const clientDomain = getClientDomain(slug);
-  const keyParam = useSearchParams().get('key');
+  const search = useSearchParams();
+  const keyParam = search.get('key');
+  // Live screens show one module through this page (?output=1&module=<id>): no controls, no keys, no pointer.
+  const outputMode = search.get('output') === '1';
+  const moduleParam = search.get('module');
+  const forced = moduleParam && (STAGE_MODULE_IDS as readonly string[]).includes(moduleParam) ? (moduleParam as StageModuleId) : null;
 
   // What the operator set: the server's copy, or this device's newer one (sample events: this device only).
   const { feed, state: feedState } = useStageFeed(slug, !sample, 2000);
@@ -66,15 +71,15 @@ function StageBigScreenContent({ slug }: { slug: string }) {
   // A technician's key press holds until the operator changes something.
   const [override, setOverride] = useState<{ module: StageModuleId | 'auto'; rev: number } | null>(null);
   const held = override && override.rev === remote.rev ? override.module : null;
-  const isAutoRotating = held ? held === 'auto' : remote.auto_rotate;
+  const isAutoRotating = forced ? false : held ? held === 'auto' : remote.auto_rotate;
   const [rotIndex, setRotIndex] = useState(0);
   const rotating = showable[rotIndex % showable.length];
   const fixed = held && held !== 'auto' ? held : remote.active_module;
-  const stageMode: StageModuleId = isAutoRotating
+  const stageMode: StageModuleId = forced ?? (isAutoRotating
     ? rotating.id
     : held && held !== 'auto'
       ? fixed
-      : showable.some((m) => m.id === fixed) ? fixed : 'welcome';
+      : showable.some((m) => m.id === fixed) ? fixed : 'welcome');
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hudVisible, setHudVisible] = useState(false);
@@ -125,6 +130,9 @@ function StageBigScreenContent({ slug }: { slug: string }) {
       color: { dark: '#09090B', light: '#ffffff' },
     }).then(setQrUploadUrl);
 
+    // Live screens are driven from the switcher only.
+    if (outputMode) return;
+
     // Keyboard shortcuts for ballroom technicians
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'f' || e.key === 'F') toggleFullscreen();
@@ -141,7 +149,7 @@ function StageBigScreenContent({ slug }: { slug: string }) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [clientDomain]);
+  }, [clientDomain, outputMode]);
 
   // Auto-rotation between the enabled modules, each for its own slide time
   useEffect(() => {
@@ -172,7 +180,11 @@ function StageBigScreenContent({ slug }: { slug: string }) {
   const pick = (m: StageModuleId) => setOverride({ module: m, rev: remote.rev });
 
   return (
-    <div className="min-h-screen bg-premium-black text-zinc-100 flex flex-col justify-between overflow-x-hidden relative select-none font-sans">
+    <div
+      // Live screens wait for this mark before fading the module in.
+      data-stage-root=""
+      className={`min-h-screen bg-premium-black text-zinc-100 flex flex-col justify-between overflow-x-hidden relative select-none font-sans ${outputMode ? 'cursor-none [&_*]:!cursor-none' : ''}`}
+    >
       {/* Background Stage Ambient Glows */}
       <div className="absolute top-0 left-1/4 w-[800px] h-[800px] bg-premium-neon/10 blur-[180px] pointer-events-none rounded-full" />
       <div className="absolute bottom-0 right-1/4 w-[800px] h-[800px] bg-premium-gold/10 blur-[180px] pointer-events-none rounded-full" />
@@ -225,14 +237,16 @@ function StageBigScreenContent({ slug }: { slug: string }) {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            className="p-2.5 rounded-2xl bg-premium-charcoal border border-premium-borderDark text-zinc-300 hover:text-white transition-colors scale-on-click"
-            title="Toggle Stage Fullscreen (Key: F)"
-          >
-            {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
-          </button>
+          {!outputMode && (
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              className="p-2.5 rounded-2xl bg-premium-charcoal border border-premium-borderDark text-zinc-300 hover:text-white transition-colors scale-on-click"
+              title="Toggle Stage Fullscreen (Key: F)"
+            >
+              {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+            </button>
+          )}
         </div>
       </header>
 

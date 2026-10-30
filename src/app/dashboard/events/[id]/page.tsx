@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Header } from '@/components/dashboard/Header';
 import { StageLedEditor } from '@/components/dashboard/StageLedEditor';
+import { LiveScreenSwitcher } from '@/components/screens/LiveScreenSwitcher';
 import { PinterestMasonryPhotoWall } from '@/components/events/PinterestMasonryPhotoWall';
 import { LandingPageBuilder } from '@/components/dashboard/event/LandingPageBuilder';
 import { InvitationFormBuilder } from '@/components/dashboard/event/InvitationFormBuilder';
@@ -752,9 +753,17 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
            ========================================================================= */}
         {activeTab === 'live' && (
           <div className="space-y-6 animate-in fade-in duration-200">
-            <div>
+            {isServerEventId(eventId) ? (
+              <LiveScreenSwitcher eventId={eventId} slug={event.slug} />
+            ) : (
+              <p className="p-4 rounded-2xl bg-premium-charcoal border border-premium-borderDark text-xs text-zinc-400">
+                Live Screens (several named screens, preview before going live, your own presentations and videos) work for events saved to your organization.
+              </p>
+            )}
+
+            <div className="pt-4 border-t border-premium-borderDark">
               <h3 className="text-2xl font-display font-bold text-white">LIVE Launchers</h3>
-              <p className="text-xs text-zinc-400">Open any event screen in a new tab, and direct what the stage LED shows.</p>
+              <p className="text-xs text-zinc-400">Open any event screen in a new tab, and direct what the classic stage LED page shows.</p>
             </div>
 
             <StageLedEditor eventId={eventId} />

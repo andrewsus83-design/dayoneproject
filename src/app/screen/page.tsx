@@ -9,6 +9,7 @@ import { displayName } from '@/lib/auth';
 import { listOrgEvents } from '@/lib/orgEvents';
 import type { OrgEventRow } from '@/lib/events';
 import { StageLedEditor } from '@/components/dashboard/StageLedEditor';
+import { LiveScreenSwitcher } from '@/components/screens/LiveScreenSwitcher';
 
 /** Landing page for screen managers: pick the event, then switch what its stage screen shows. Nothing else. */
 export default function ScreenHome() {
@@ -101,7 +102,11 @@ export default function ScreenHome() {
                 </button>
               )}
             </div>
-            <StageLedEditor eventId={chosen.id} />
+            <LiveScreenSwitcher eventId={chosen.id} slug={chosen.slug} />
+            <div className="pt-4 border-t border-premium-borderDark space-y-3">
+              <h3 className="text-lg font-display font-bold text-white">Classic stage page</h3>
+              <StageLedEditor eventId={chosen.id} />
+            </div>
           </div>
         )}
       </div>
