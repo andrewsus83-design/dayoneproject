@@ -27,25 +27,6 @@ function QuizRunner({ questions, players, onScore }: { questions: QuizItem[]; pl
 
   useEffect(() => onScore(score), [score, onScore]);
 
-  // Follow the operator desk (question index / reveal / podium).
-  useEffect(() => {
-    const apply = (data: { activeQuestionIdx?: number; gameStep?: string }) => {
-      if (typeof data.activeQuestionIdx === 'number' && questions.length) setIndex(data.activeQuestionIdx % questions.length);
-      if (data.gameStep === 'question_active') { setFinished(false); setSubmitted(false); setSelected(null); setTimer(q?.seconds ?? 15); }
-      else if (data.gameStep === 'answers_locked' || data.gameStep === 'reveal') { setFinished(false); setSubmitted(true); }
-      else if (data.gameStep === 'podium') { setFinished(true); confetti({ particleCount: 120, spread: 80, origin: { y: 0.5 } }); }
-    };
-    try {
-      const saved = localStorage.getItem('all41_live_stage_state');
-      if (saved) apply(JSON.parse(saved));
-    } catch {}
-    if (!('BroadcastChannel' in window)) return;
-    const channel = new BroadcastChannel('all41_stage_bus');
-    channel.onmessage = (ev) => { if (ev.data?.type === 'STAGE_PUSH_LIVE') apply(ev.data); };
-    return () => channel.close();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [questions.length]);
-
   const answer = (i: number) => {
     if (!q) return;
     setSelected(i);
