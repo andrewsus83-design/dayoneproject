@@ -226,12 +226,12 @@ export function SlotMachine({
 
   const start = async () => {
     if (phase === 'spinning' || askingRef.current) return;
-    askingRef.current = true;
-    setAsking(true);
     setError(null);
+    askingRef.current = true;
+    if (resolve) setAsking(true);
     const forced = await askForPick(resolve, setError);
     askingRef.current = false;
-    setAsking(false);
+    if (resolve) setAsking(false);
     if (forced === null) return;
 
     const resting = restingRef.current.key === layoutKey
