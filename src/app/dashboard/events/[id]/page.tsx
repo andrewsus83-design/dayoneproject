@@ -741,8 +741,10 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
           <div className="space-y-6 animate-in fade-in duration-200">
             <div>
               <h3 className="text-2xl font-display font-bold text-white">LIVE Launchers</h3>
-              <p className="text-xs text-zinc-400">Open any event screen in a new tab.</p>
+              <p className="text-xs text-zinc-400">Open any event screen in a new tab, and direct what the stage LED shows.</p>
             </div>
+
+            <StageLedEditor eventId={eventId} />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[
