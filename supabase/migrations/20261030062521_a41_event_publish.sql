@@ -4,12 +4,12 @@
 --   config   everything the builder holds (private: organization members only, through RLS on a41_events)
 --   site     the part guests may see (info, landing page, design, invitation form, terms), served by a41_public_event
 --   saved_at when it was last saved, so screens know when to refresh
+-- The grants, the saved_at trigger and the column grant follow in the next three migrations
+-- (a41_event_publish_grants, a41_event_saved_at_stamp, a41_event_publish_column_grants).
 alter table public.a41_events
   add column if not exists config jsonb not null default '{}'::jsonb,
   add column if not exists site jsonb not null default '{}'::jsonb,
   add column if not exists saved_at timestamptz;
--- Organizers update the event column by column (package and capacity stay admin-only); saved_at is set by the server.
-grant update (config, site) on public.a41_events to authenticated;
 
 create or replace function a41_private.public_event_json(p_event public.a41_events)
 returns jsonb
@@ -47,25 +47,6 @@ as $$
       and a41_private.is_org_owner(e.org_id)
   )
 $$;
-revoke all on function a41_private.can_edit_event_folder(text) from public, anon;
-grant execute on function a41_private.can_edit_event_folder(text) to authenticated;
-
--- The server sets saved_at whenever the setup changes, so device clocks never matter (a41_event_saved_at_stamp).
-create or replace function a41_private.stamp_saved_at()
-returns trigger
-language plpgsql set search_path = ''
-as $$
-begin
-  if new.config is distinct from old.config or new.site is distinct from old.site then
-    new.saved_at := now();
-  end if;
-  return new;
-end
-$$;
-
-create trigger a41_events_stamp_saved_at
-before update on public.a41_events
-for each row execute function a41_private.stamp_saved_at();
 
 create policy a41_event_assets_insert on storage.objects for insert to authenticated
   with check (bucket_id = 'a41_event_assets' and (select a41_private.can_edit_event_folder(name)));
