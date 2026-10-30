@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { cacheOrgEvents } from '@/lib/eventStore';
 import type { OrgEventRow } from '@/lib/events';
 
-const COLUMNS = 'id, name, slug, type, timezone, starts_at, ends_at, venue_name, venue_address, status, package, created_at';
+export const COLUMNS = 'id, name, slug, type, timezone, starts_at, ends_at, venue_name, venue_address, status, package, created_at';
 
 export const EVENT_TIMEZONE = 'Asia/Jakarta';
 const TIMEZONE_OFFSET = '+07:00';
@@ -24,7 +24,7 @@ export function slugProblem(slug: string): string | null {
   return null;
 }
 
-function readable(error: PostgrestError): string {
+export function readable(error: PostgrestError): string {
   if (error.code === '23505') return 'That event link is already taken. Try another one.';
   if (error.message.includes('free_event_limit')) {
     return 'Your account includes one active free event. Ask your dayoneproject.xyz admin to upgrade it before you add another.';

@@ -83,19 +83,6 @@ export const SPACING_OPTIONS: { id: SpacingId; label: string; desc: string; scal
 
 export const PRISM_COLORS = ['#FFD700', '#FF8C00', '#CC0066', '#7B1D5A', '#1B3FA0', '#0099DD', '#00A36C', '#CC88FF', '#FFD700'];
 
-export const INVITATION_THEMES = [
-  { name: 'Golden Field', c1: '#C5A059', c2: '#09090B', c3: '#F5F0E8' },
-  { name: 'Sage Garden', c1: '#10B981', c2: '#0A100D', c3: '#D1FAE5' },
-  { name: 'Mint Hero', c1: '#00F0FF', c2: '#09090B', c3: '#0E7490' },
-  { name: 'Neon Launch', c1: '#00F0FF', c2: '#09090B', c3: '#FF3366' },
-  { name: 'Gala Gold', c1: '#C5A059', c2: '#0F0A00', c3: '#BE123C' },
-  { name: 'Parol Party', c1: '#FF3366', c2: '#1A0A00', c3: '#F59E0B' },
-  { name: 'Summit', c1: '#4A90D9', c2: '#0A0A1A', c3: '#8B5CF6' },
-  { name: 'Bali Blush', c1: '#E58BB4', c2: '#1A0010', c3: '#FB923C' },
-  { name: 'Ivory Gold', c1: '#B08A45', c2: '#FBF8F1', c3: '#7A5C2E' },
-  { name: 'Blush Light', c1: '#D9467A', c2: '#FBEFF0', c3: '#A16207' },
-];
-
 /* ───────────────────────── Color math ───────────────────────── */
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -320,19 +307,6 @@ export function resolveTheme(design: DesignConfig): ResolvedTheme {
     vars,
     fontsHref: fontsHref({ heading: design.headingFont, body: design.bodyFont, accent: design.accentFont }),
   };
-}
-
-export function resolveInvitationTheme(design: DesignConfig, themeName: string): ResolvedTheme {
-  const preset = INVITATION_THEMES.find((t) => t.name === themeName);
-  if (!preset) return resolveTheme(design);
-  // A theme only swaps the colors; light/dark mode and background always come from Design Studio.
-  return resolveTheme({
-    ...design,
-    palette: 'custom',
-    customPrimary: preset.c1,
-    customSecondary: mix(preset.c1, preset.c3, 0.5),
-    customAccent: preset.c3,
-  });
 }
 
 export function gradientText(colors: string[], animate = false): CSSProperties {

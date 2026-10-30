@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import QRCode from 'qrcode';
 import {
   AlignLeft, ArrowDown, ArrowUp, Check, CheckSquare, ChevronDown, Copy, Download, ExternalLink, Eye, FileText, GripVertical,
@@ -12,7 +13,7 @@ import {
   useAssetUrl, useEventConfig, useGuests, useResponses, withPageBreaks, numberDigits, formatGuestNumber, ESSENTIALS_CORPORATE, ESSENTIALS_WEDDING,
   type FormItem, type FormQuestion, type InvitationConfig, type QuestionType, type ClosingCopy, type EventInfo,
 } from '@/lib/eventStore';
-import { DARK_BACKGROUNDS, INVITATION_THEMES, LIGHT_BACKGROUNDS, resolveInvitationTheme, resolveTheme } from '@/lib/eventTheme';
+import { DARK_BACKGROUNDS, LIGHT_BACKGROUNDS, PALETTES, resolveTheme } from '@/lib/eventTheme';
 import { compressImage, downloadBlob, downloadDataUrl, toCsv } from '@/lib/image';
 import { InvitationFormView, type PreviewScreen } from '@/components/events/InvitationFormView';
 import { EventFonts } from '@/components/events/EventFonts';
@@ -122,8 +123,9 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
   useEffect(() => setOrigin(window.location.origin), []);
 
   const formUrl = `${origin}/events/${slug}/invitation`;
-  const theme = useMemo(() => resolveInvitationTheme(config.design, inv.theme), [config.design, inv.theme]);
-  const eventTheme = useMemo(() => resolveTheme(config.design), [config.design]);
+  // The invitation always uses the event's colors from Design Studio, like the landing page.
+  const theme = useMemo(() => resolveTheme(config.design), [config.design]);
+  const paletteLabel = PALETTES.find((p) => p.id === config.design.palette)?.label ?? 'Custom';
   const photo = useAssetUrl(inv.photoUrl);
   const heroBlock = config.landing.blocks.find((b) => b.type === 'hero');
   const hero = useAssetUrl(heroBlock && heroBlock.type === 'hero' ? heroBlock.imageUrl : '');
@@ -415,43 +417,28 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
           <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-6">
             <h3 className="font-display font-bold text-white text-base">Cover Page</h3>
 
-            <div>
-              <label className="text-[10px] font-mono uppercase text-zinc-500 tracking-widest mb-2 block">Color Theme</label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-4 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setInv({ theme: 'event' })}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[10px] font-bold text-left min-w-0 scale-on-click transition-all ${
-                    inv.theme === 'event' ? 'border-premium-gold text-white bg-premium-gold/10' : 'border-premium-borderDark text-zinc-300 hover:border-premium-gold/50'
-                  }`}
-                >
-                  <span className="flex gap-0.5 items-center">
-                    <span className="w-3.5 h-3.5 rounded-full border border-white/10" style={{ backgroundColor: eventTheme.primary }} />
-                    <span className="w-3.5 h-3.5 rounded-full border border-white/10" style={{ backgroundColor: eventTheme.bg }} />
-                    <span className="w-2.5 h-2.5 rounded-full opacity-70" style={{ backgroundColor: eventTheme.accent }} />
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="flex gap-0.5 items-center shrink-0">
+                    <span className="w-4 h-4 rounded-full border border-white/10" style={{ backgroundColor: theme.primary }} />
+                    <span className="w-4 h-4 rounded-full border border-white/10" style={{ backgroundColor: theme.bg }} />
+                    <span className="w-3 h-3 rounded-full opacity-70" style={{ backgroundColor: theme.accent }} />
                   </span>
-                  Event Design
-                </button>
-                {INVITATION_THEMES.map((th) => (
-                  <button
-                    key={th.name}
-                    type="button"
-                    onClick={() => setInv({ theme: th.name })}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[10px] font-bold text-left min-w-0 scale-on-click transition-all ${
-                      inv.theme === th.name ? 'border-premium-gold text-white bg-premium-gold/10' : 'border-premium-borderDark text-zinc-300 hover:border-premium-gold/50'
-                    }`}
-                  >
-                    <span className="flex gap-0.5 items-center">
-                      <span className="w-3.5 h-3.5 rounded-full border border-white/10" style={{ backgroundColor: th.c1 }} />
-                      <span className="w-3.5 h-3.5 rounded-full border border-white/10" style={{ backgroundColor: eventTheme.bg }} />
-                      <span className="w-2.5 h-2.5 rounded-full opacity-70" style={{ backgroundColor: th.c3 }} />
-                    </span>
-                    {th.name}
-                  </button>
-                ))}
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-white">Colors: {paletteLabel}</div>
+                    <div className="text-[10px] text-zinc-500 mt-0.5">The invitation uses your event colors, so it always matches the landing page.</div>
+                  </div>
+                </div>
+                <Link
+                  href={`/dashboard/events/${eventId}?tab=design`}
+                  scroll={false}
+                  className="px-3 py-1.5 rounded-xl border border-premium-borderDark text-[11px] font-bold text-zinc-300 hover:text-white hover:border-premium-gold/50 scale-on-click"
+                >
+                  Change in Design Studio
+                </Link>
               </div>
-              <p className="text-[10px] text-zinc-600 mt-1.5">Every theme follows the light/dark mode and background from Design Studio. “Event Design” also uses its colors.</p>
-              <div className="flex flex-wrap items-center justify-between gap-3 mt-3 p-3 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark">
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark">
                 <div>
                   <div className="text-xs font-bold text-white">Page mode</div>
                   <div className="text-[10px] text-zinc-500 mt-0.5">Shared with Design Studio, so the landing page changes too.</div>

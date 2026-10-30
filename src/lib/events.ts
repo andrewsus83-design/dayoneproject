@@ -103,6 +103,16 @@ function savedEventWithSlug(slug: string): OrgEventRow | undefined {
   return Object.values(readStored<Record<string, OrgEventRow>>(ORG_EVENTS_KEY) ?? {}).find((r) => r.slug === slug);
 }
 
+/** Built-in sample events (they never come from the server). */
+export function isSampleSlug(slug: string): boolean {
+  return BASE_EVENTS.some((e) => e.slug === slug) || slug in SLUG_ALIASES;
+}
+
+/** True once this device knows an event with this link (created here, opened before, or loaded from the server). */
+export function hasLocalEvent(slug: string): boolean {
+  return !!readSlugIndex()[slug] || !!savedEventWithSlug(slug);
+}
+
 export function resolveEventIdFromSlug(slug: string, useIndex = true): string {
   const custom = useIndex ? readSlugIndex()[slug] ?? savedEventWithSlug(slug)?.id : undefined;
   if (custom) return custom;

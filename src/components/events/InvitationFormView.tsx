@@ -361,8 +361,9 @@ export function InvitationFormView({
     </a>
   );
 
+  // Safari misplaces sticky bars inside the builder's scaled-down phone, so the preview pins the cover's bar with layout instead.
   const bottomBar = (children: React.ReactNode, sticky = true) => (
-    <div className={`${sticky ? 'sticky bottom-0' : 'relative'} z-20 mt-auto`} style={{ padding: `${sp.gap}px ${sp.card}px ${sp.card}px`, background: `linear-gradient(to top, ${theme.bg} 72%, ${alpha(theme.bg, 0)})` }}>
+    <div className={`${sticky && !embedded ? 'sticky bottom-0' : 'relative'} z-20 mt-auto shrink-0`} style={{ padding: `${sp.gap}px ${sp.card}px ${sp.card}px`, background: `linear-gradient(to top, ${theme.bg} 72%, ${alpha(theme.bg, 0)})` }}>
       {formError && <p className="text-sm font-bold text-premium-danger mb-2">{formError}</p>}
       <div className="flex gap-3">{children}</div>
     </div>
@@ -450,6 +451,7 @@ export function InvitationFormView({
     ];
     body = (
       <>
+        <div className={embedded ? 'flex-1 min-h-0 overflow-y-auto' : 'contents'}>
         {coverUrl ? (
           <div
             className={`relative overflow-hidden shrink-0 ${onAdjustPhoto ? (dragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
@@ -499,6 +501,7 @@ export function InvitationFormView({
             {info.venue && <div className="flex items-center gap-2.5"><MapPin className="w-4 h-4 shrink-0" style={{ color: theme.primaryText }} />{[info.venue, info.city].filter(Boolean).join(', ')}</div>}
           </div>
           {invitation.message && <p className="text-sm leading-relaxed" style={{ color: theme.muted }}>{fill(invitation.message)}</p>}
+        </div>
         </div>
         {bottomBar(
           notYet ? (
@@ -757,7 +760,7 @@ export function InvitationFormView({
           )}
         </nav>
       )}
-      <div className={`flex flex-col ${embedded ? 'min-h-full' : 'flex-1 w-full max-w-lg mx-auto'}`}>{body}</div>
+      <div className={`flex flex-col ${embedded ? 'h-full' : 'flex-1 w-full max-w-lg mx-auto'}`}>{body}</div>
       {!embedded && (screen.kind === 'done' || screen.kind === 'closed') && (
         <p className="text-center text-[11px] py-6" style={{ color: theme.subtle }}>{isWedding ? 'With love' : 'Powered by'} · dayoneproject.xyz</p>
       )}

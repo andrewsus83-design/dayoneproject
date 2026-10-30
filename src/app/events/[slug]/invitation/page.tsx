@@ -6,7 +6,7 @@ import {
   nextGuestNumber, numberDigits,
   type FormResponse,
 } from '@/lib/eventStore';
-import { resolveInvitationTheme } from '@/lib/eventTheme';
+import { resolveTheme } from '@/lib/eventTheme';
 import { InvitationFormView } from '@/components/events/InvitationFormView';
 import { EventFonts } from '@/components/events/EventFonts';
 import type { Guest } from '@/lib/types';
@@ -25,7 +25,7 @@ function InvitationContent({ slug }: { slug: string }) {
   const heroBlock = config.landing.blocks.find((b) => b.type === 'hero');
   const hero = useAssetUrl(heroBlock && heroBlock.type === 'hero' ? heroBlock.imageUrl : '');
   const coverUrl = photo || hero || event.cover_image_url || '';
-  const theme = useMemo(() => resolveInvitationTheme(config.design, inv.theme), [config.design, inv.theme]);
+  const theme = useMemo(() => resolveTheme(config.design), [config.design]);
   const isWedding = event.event_type === 'wedding';
 
   const closedReason = useMemo(() => {

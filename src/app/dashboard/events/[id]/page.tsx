@@ -14,6 +14,7 @@ import { RaffleEngine } from '@/components/dashboard/event/RaffleEngine';
 import { BroadcastStudio } from '@/components/dashboard/event/BroadcastStudio';
 import { EventDesignStudio } from '@/components/dashboard/event/EventDesignStudio';
 import { CommentsWall } from '@/components/dashboard/event/CommentsWall';
+import { PublishButton } from '@/components/dashboard/event/PublishButton';
 import {
   POPVERSE_QUIZ_QUESTIONS,
   MOCK_PHOTO_WALL_UPLOADS,
@@ -352,7 +353,7 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
     <div className="flex-1 flex flex-col font-sans select-none bg-premium-black text-zinc-100 min-h-screen">
       {/* Slim top bar — breadcrumb + quick actions only */}
       <div className="h-14 flex items-center justify-between px-8 border-b border-premium-borderDark/60 flex-shrink-0 bg-premium-black/80 backdrop-blur-sm sticky top-0 z-30">
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <Link href="/dashboard" className="text-zinc-600 hover:text-zinc-400 transition-colors flex-shrink-0">
             <ArrowRight className="w-4 h-4 rotate-180" />
           </Link>
@@ -363,7 +364,7 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
             : <Briefcase className="w-3.5 h-3.5 text-premium-neon flex-shrink-0" />
           }
         </div>
-        <nav aria-label="Open event screens" className="flex items-center gap-1 overflow-x-auto shrink-0 max-w-[70%] py-1">
+        <nav aria-label="Open event screens" className="flex items-center gap-1 overflow-x-auto min-w-0 max-w-[60%] py-1">
           <span className="hidden 2xl:inline text-[10px] font-mono uppercase tracking-widest text-zinc-600 mr-1">View</span>
           {([
             { label: 'Landing Page', href: `/events/${event.slug}`, icon: Globe },
@@ -395,6 +396,8 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
             );
           })}
         </nav>
+        <span className="w-px h-6 bg-premium-borderDark mx-3 shrink-0" />
+        <PublishButton eventId={eventId} />
       </div>
 
       <div className="px-8 py-8 max-w-5xl mx-auto w-full space-y-8">

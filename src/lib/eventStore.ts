@@ -118,7 +118,6 @@ export interface ClosingCopy {
 }
 
 export interface InvitationConfig {
-  theme: string;
   heading: string;
   subtitle: string;
   message: string;
@@ -328,7 +327,11 @@ export interface EventConfig {
 }
 
 export type EventSection = keyof EventConfig;
-type StoredConfig = { [K in EventSection]?: Partial<EventConfig[K]> } & { updatedAt?: number };
+/**
+ * updatedAt changes with every edit on this device. savedAt is when the server copy was saved (server time) and
+ * savedVersion the updatedAt that copy matches, so any later edit shows up as unsaved.
+ */
+type StoredConfig = { [K in EventSection]?: Partial<EventConfig[K]> } & { updatedAt?: number; savedAt?: number; savedVersion?: number };
 
 export interface FormResponse {
   id: string;
@@ -424,7 +427,6 @@ export function buildDefaults(base: Event): EventConfig {
       logoSize: 'm',
     },
     invitation: {
-      theme: 'event',
       heading: "You're invited",
       subtitle: isWedding ? 'are getting married' : 'Guest registration',
       message: isWedding
@@ -811,6 +813,35 @@ export function resetEventSection(eventId: string, section: EventSection): Write
   return writeJSON(eventKey(eventId), next);
 }
 
+/** The event as this device has it: defaults merged with every change. */
+export function readEventConfig(eventId: string): EventConfig {
+  return mergeConfig(buildDefaults(getBaseEvent(eventId)), readJSON<StoredConfig>(eventKey(eventId)));
+}
+
+export interface SyncState {
+  updatedAt: number | null;
+  /** When the server copy was saved (server time), or null if never. */
+  savedAt: number | null;
+  /** This device has changes the server does not have yet. */
+  unsaved: boolean;
+}
+
+function syncState(stored: StoredConfig | null): SyncState {
+  const updatedAt = stored?.updatedAt ?? null;
+  return { updatedAt, savedAt: stored?.savedAt ?? null, unsaved: updatedAt !== null && updatedAt !== stored?.savedVersion };
+}
+
+export function readSyncState(eventId: string): SyncState {
+  return syncState(readJSON<StoredConfig>(eventKey(eventId)));
+}
+
+/** Makes the server copy this device's copy (after saving, or when the server has a newer one). */
+export function replaceEventConfig(eventId: string, config: Partial<EventConfig> & Pick<EventConfig, 'info'>, savedAt: number): WriteResult {
+  const version = Date.now();
+  updateSlugIndex(eventId, config.info.slug);
+  return writeJSON(eventKey(eventId), { ...config, updatedAt: version, savedAt, savedVersion: version });
+}
+
 /** Remembers the organization's backend events on this device so every screen can open them by id or link. */
 export function cacheOrgEvents(rows: OrgEventRow[], merge = false): WriteResult {
   const next: Record<string, OrgEventRow> = merge ? { ...(readJSON<Record<string, OrgEventRow>>(ORG_EVENTS_KEY) ?? {}) } : {};
@@ -832,7 +863,7 @@ export function useEventConfig(eventId: string) {
     <K extends EventSection>(section: K, patch: Partial<EventConfig[K]>) => updateEventConfig(eventId, section, patch),
     [eventId],
   );
-  return { base, config, event, update, savedAt: stored?.updatedAt ?? null };
+  return { base, config, event, update, savedAt: stored?.updatedAt ?? null, sync: syncState(stored) };
 }
 
 export function useEventConfigBySlug(slug: string) {
@@ -858,7 +889,7 @@ export function deleteAsset(ref: string) {
   } catch {}
 }
 
-function readAsset(ref: string): string {
+export function readAsset(ref: string): string {
   if (!ref) return '';
   if (!ref.startsWith('asset:')) return ref;
   try {
