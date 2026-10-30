@@ -11,7 +11,7 @@ const ADMIN_NAV = [
   { label: 'Users', href: '/admin/users', icon: Users },
   { label: 'Events', href: '/admin/events', icon: Calendar },
   { label: 'API Keys', href: '/admin/keys', icon: KeyRound },
-  { label: 'WhatsApp Queue & Pacing', href: '/admin/whatsapp', icon: MessageSquare },
+  { label: 'WhatsApp & Email', href: '/admin/whatsapp', icon: MessageSquare },
 ];
 
 export function AdminSidebar() {

@@ -2,6 +2,7 @@ import {
   fillVariables, formatEventDate, formatEventTime, formatGuestNumber, formatOpensAt,
   type BroadcastConfig, type BroadcastKind, type BroadcastTemplate, type EventConfig,
 } from './eventStore';
+import type { ResolvedTheme } from './eventTheme';
 import type { Guest } from './types';
 
 export interface RenderedMessage {
@@ -87,6 +88,51 @@ export function emailBody(msg: RenderedMessage): string {
   return [msg.message, `${msg.buttonLabel}: ${msg.link}`, msg.feedback ? `${msg.feedback.label}: ${msg.feedback.link}` : '']
     .filter(Boolean)
     .join('\n\n');
+}
+
+const esc = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+/** The event's look, as the email needs it. */
+export type EmailLook = Pick<
+  ResolvedTheme,
+  'bg' | 'card' | 'border' | 'text' | 'muted' | 'subtle' | 'primary' | 'primaryText' | 'onPrimary' | 'headingFamily' | 'bodyFamily' | 'radius' | 'buttonRadius'
+>;
+
+/**
+ * The HTML email sent from the server: the event's colors and fonts, the image (only when it is a public web
+ * address), heading, message and buttons. The server puts the guest's pass at the a41:pass marker.
+ */
+export function emailHtml(msg: RenderedMessage, theme: EmailLook, opts: { eventName: string; imageUrl?: string }): string {
+  // Colors and fonts go into style attributes: escape them like any other text.
+  const look = Object.fromEntries(
+    Object.entries(theme).map(([k, v]) => [k, typeof v === 'string' ? esc(v) : Number(v) || 0]),
+  ) as unknown as EmailLook;
+  const image = opts.imageUrl && /^https:\/\//i.test(opts.imageUrl) ? opts.imageUrl : '';
+  const body = esc(msg.message).replace(/\r?\n/g, '<br>');
+  const button = (href: string, label: string, primary: boolean) =>
+    `<a href="${esc(href)}" style="display:inline-block;margin:0 8px 8px 0;padding:12px 22px;font-family:${look.bodyFamily};font-size:15px;font-weight:bold;text-decoration:none;border-radius:${look.buttonRadius}px;${
+      primary ? `background:${look.primary};color:${look.onPrimary};border:1px solid ${look.primary}` : `color:${look.primaryText};border:1px solid ${look.primary}`
+    }">${esc(label)}</a>`;
+  const buttons = [
+    msg.buttonLabel ? button(msg.link, msg.buttonLabel, true) : '',
+    msg.feedback ? button(msg.feedback.link, msg.feedback.label, false) : '',
+  ].join('');
+  return [
+    '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">',
+    `<title>${esc(msg.subject)}</title></head>`,
+    `<body style="margin:0;padding:0;background:${look.bg}">`,
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${look.bg}"><tr><td align="center" style="padding:24px 12px">`,
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background:${look.card};border:1px solid ${look.border};border-radius:${look.radius}px;overflow:hidden">`,
+    image ? `<tr><td><img src="${esc(image)}" width="560" alt="" style="display:block;width:100%;max-width:560px;height:auto;border:0"></td></tr>` : '',
+    `<tr><td style="padding:28px 28px 8px;font-family:${look.headingFamily};font-size:24px;font-weight:bold;line-height:1.25;color:${look.text}">${esc(msg.heading)}</td></tr>`,
+    `<tr><td style="padding:8px 28px 0;font-family:${look.bodyFamily};font-size:15px;line-height:1.6;color:${look.muted}">${body}</td></tr>`,
+    `<tr><td style="padding:24px 28px 20px">${buttons}</td></tr>`,
+    '</table>',
+    '<!--a41:pass-->',
+    `<p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${look.subtle}">${esc(opts.eventName)} · sent with dayoneproject.xyz</p>`,
+    '</td></tr></table></body></html>',
+  ].join('');
 }
 
 export function emailHref(email: string | null | undefined, subject: string, body: string): string {
