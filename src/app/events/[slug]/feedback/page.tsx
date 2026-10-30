@@ -4,7 +4,8 @@ import React, { use, Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, Check, Star } from 'lucide-react';
-import { addFeedback, fillVariables, formatEventDate, formatEventTime, newId, useEventConfigBySlug, useGuests } from '@/lib/eventStore';
+import { addFeedback, fillVariables, formatEventDate, formatEventTime, newId, useEventConfigBySlug, useSampleGuests } from '@/lib/eventStore';
+import { isServerEventId, useMyPass } from '@/lib/guestsApi';
 import { resolveTheme } from '@/lib/eventTheme';
 import { EventFonts } from '@/components/events/EventFonts';
 
@@ -13,8 +14,14 @@ const LABELS = ['', 'Poor', 'Fair', 'Good', 'Great', 'Amazing'];
 function FeedbackContent({ slug }: { slug: string }) {
   const token = useSearchParams().get('t');
   const { eventId, hydrated, config } = useEventConfigBySlug(slug);
-  const guests = useGuests(eventId);
-  const guest = token ? guests.find((g) => g.qr_code_token === token) : undefined;
+  // Who is giving feedback: the pass in the Thank You link (or saved on this phone); samples look it up locally.
+  const sample = !isServerEventId(eventId);
+  const sampleGuests = useSampleGuests(eventId);
+  const mine = useMyPass(slug, { token: sample ? null : token });
+  const sampleGuest = sample && token ? sampleGuests.find((g) => g.qr_code_token === token) : undefined;
+  const guest = sample
+    ? sampleGuest && { id: sampleGuest.id, name: sampleGuest.name }
+    : mine.pass ? { id: undefined, name: mine.pass.guest.name } : undefined;
   const fb = config.broadcast.feedback;
   const theme = useMemo(() => resolveTheme(config.design), [config.design]);
   const [rating, setRating] = useState(0);

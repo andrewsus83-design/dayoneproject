@@ -1,17 +1,40 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, LogOut, ScanLine } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useSessionUser } from '@/lib/useSession';
 import { displayName } from '@/lib/auth';
 
+interface DeskEvent {
+  id: string;
+  name: string;
+  slug: string;
+  starts_at: string;
+}
+
 /** Landing page for register-desk staff: pick the event, then the desk opens unlocked. */
 export default function DeskHome() {
   const router = useRouter();
   const { user } = useSessionUser();
   const [slug, setSlug] = useState('');
+  // Events of the organizations this account belongs to (the database only returns those).
+  const [events, setEvents] = useState<DeskEvent[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    createClient()
+      .from('a41_events')
+      .select('id, name, slug, starts_at')
+      .eq('status', 'published')
+      .gte('ends_at', new Date(Date.now() - 12 * 3600_000).toISOString())
+      .order('starts_at')
+      .then(({ data }) => alive && setEvents((data ?? []) as DeskEvent[]));
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const open = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,6 +58,29 @@ export default function DeskHome() {
             <p className="text-xs text-zinc-500 mt-1">{user ? `Signed in as ${displayName(user)}` : 'Loading…'}</p>
           </div>
         </div>
+
+        {events && events.length > 0 && (
+          <div className="p-4 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-2">
+            <p className="px-2 text-[10px] font-mono uppercase tracking-widest text-zinc-500">Your events</p>
+            {events.map((ev) => (
+              <button
+                key={ev.id}
+                type="button"
+                onClick={() => router.push(`/events/${ev.slug}/gate`)}
+                className="w-full p-3 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark hover:border-premium-gold/50 text-left flex items-center gap-3 scale-on-click"
+              >
+                <ScanLine className="w-4 h-4 text-premium-gold shrink-0" />
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm font-bold text-white truncate">{ev.name}</span>
+                  <span className="block text-[11px] text-zinc-500 font-mono truncate">
+                    /events/{ev.slug} · {new Date(ev.starts_at).toLocaleDateString([], { dateStyle: 'medium' })}
+                  </span>
+                </span>
+                <ArrowRight className="w-4 h-4 text-zinc-500 shrink-0" />
+              </button>
+            ))}
+          </div>
+        )}
 
         <form onSubmit={open} className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4">
           <label className="block space-y-1.5">
