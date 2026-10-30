@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, use, Suspense } from 'react';
+import React, { useState, useEffect, use, Suspense } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft, Mail, MessageSquare, Send, Eye, Edit3, Check,
@@ -151,11 +151,15 @@ function BroadcastContent({ eventId }: { eventId: string }) {
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sentSet, setSentSet] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
+  const [mockDate, setMockDate] = useState('');
+
+  useEffect(() => {
+    setMockDate(new Date(event.start_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
+  }, [event.start_date]);
 
   const tpl = TEMPLATES[activeTemplate];
   const mockQrToken = 'ALL41-X7K2M4';
   const mockName = isWedding ? 'Sophia Rossi' : 'Alex Chen';
-  const mockDate = new Date(event.start_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const preview = tpl.preview(mockName, event.name, mockDate, mockQrToken, isWedding);
   const subject = tpl.subject.replace('{eventName}', event.name);
 

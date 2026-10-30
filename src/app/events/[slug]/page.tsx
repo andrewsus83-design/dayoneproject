@@ -29,9 +29,11 @@ function EventLandingContent({ slug }: { slug: string }) {
   const isWedding = event.event_type === 'wedding';
   const [copied, setCopied] = useState(false);
   const [timeLeft, setTimeLeft] = useState({ d: 0, h: 0, m: 0, s: 0 });
+  const [eventTime, setEventTime] = useState('');
 
-  // Countdown timer
+  // Countdown timer + locale-sensitive time (must be client-only to avoid hydration mismatch)
   useEffect(() => {
+    setEventTime(new Date(event.start_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
     const tick = () => {
       const diff = new Date(event.start_date).getTime() - Date.now();
       if (diff <= 0) return;
@@ -130,7 +132,7 @@ function EventLandingContent({ slug }: { slug: string }) {
 
             <div className="flex flex-wrap items-center gap-4 text-sm text-zinc-300">
               <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-premium-gold" /> {formatDate(event.start_date)}</span>
-              <span className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-premium-gold" /> {new Date(event.start_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+              {eventTime && <span className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-premium-gold" /> {eventTime}</span>}
               <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4 text-premium-gold" /> {event.location_name}</span>
             </div>
 

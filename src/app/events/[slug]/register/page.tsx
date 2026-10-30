@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, use, Suspense } from 'react';
+import React, { useState, useEffect, use, Suspense } from 'react';
 import Link from 'next/link';
 import {
   MOCK_EVENT,
@@ -71,12 +71,18 @@ function RSVPFormContent({ slug }: { slug: string }) {
 
   const isWedding = event.event_type === 'wedding';
   const [step, setStep] = useState<Step>('name');
-  const [qrToken] = useState(generateQRToken);
+  const [qrToken, setQrToken] = useState('');
+  const [eventDateStr, setEventDateStr] = useState('');
   const [form, setForm] = useState<FormData>({
     firstName: '', lastName: '', email: '', phone: '',
     dietary: 'No restrictions', plusOne: false, plusOneName: '',
     tableNote: '', agreedToTerms: false,
   });
+
+  useEffect(() => {
+    setQrToken(generateQRToken());
+    setEventDateStr(new Date(event.start_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }));
+  }, [event.start_date]);
 
   const set = (field: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setForm(prev => ({ ...prev, [field]: e.target.value }));
@@ -327,7 +333,7 @@ function RSVPFormContent({ slug }: { slug: string }) {
                     <div className="text-sm text-zinc-400">{event.name}</div>
                   </div>
                   <div className="flex items-center justify-between text-xs text-zinc-500">
-                    <span className="flex items-center gap-1"><CalendarDays className="w-3 h-3" /> {new Date(event.start_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                    <span className="flex items-center gap-1"><CalendarDays className="w-3 h-3" /> {eventDateStr}</span>
                     <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {event.location_name?.split(',')[0]}</span>
                   </div>
                   {/* QR code placeholder */}
