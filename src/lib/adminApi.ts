@@ -55,6 +55,7 @@ async function rpc<T>(fn: string, args?: Record<string, unknown>): Promise<T> {
 
 export const adminApi = {
   listUsers: () => usersFn<{ users: AdminUser[] }>({ action: 'list' }).then((r) => r.users),
+  /** password is the access code for register-desk accounts; leave empty for organizers and admins. */
   createUser: (input: { email: string; name: string; role: AppRole; password: string }) =>
     usersFn<{ user: AdminUser; existing: boolean }>({ action: 'create', ...input }),
   updateUser: (id: string, patch: { role?: AppRole | null; name?: string; password?: string; disabled?: boolean }) =>

@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Check, Copy, KeyRound, Loader2, Plus, RefreshCw, ShieldCheck, UserMinus, UserX, Users } from 'lucide-react';
 import { adminApi, generatePassword, type AdminUser } from '@/lib/adminApi';
-import type { AppRole } from '@/lib/auth';
+import { ROLE_LABELS, type AppRole } from '@/lib/auth';
 
 const input = 'w-full bg-premium-surfaceDark border border-premium-borderDark text-white px-3 py-2.5 rounded-xl text-sm outline-none focus:border-premium-gold placeholder:text-zinc-600';
 
@@ -15,9 +15,9 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', email: '', role: 'organizer' as AppRole, password: generatePassword() });
+  const [form, setForm] = useState({ name: '', email: '', role: 'organizer' as AppRole, password: generatePassword(10) });
   const [creating, setCreating] = useState(false);
-  const [created, setCreated] = useState<{ email: string; password: string | null } | null>(null);
+  const [created, setCreated] = useState<{ email: string; role: AppRole; code: string | null; existing: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
   const [resetFor, setResetFor] = useState<{ id: string; password: string } | null>(null);
 
@@ -41,9 +41,10 @@ export default function AdminUsersPage() {
     setCreating(true);
     setError(null);
     try {
-      const res = await adminApi.createUser({ ...form, email: form.email.trim().toLowerCase() });
-      setCreated({ email: res.user.email, password: res.existing ? null : form.password });
-      setForm({ name: '', email: '', role: 'organizer', password: generatePassword() });
+      const desk = form.role === 'desk';
+      const res = await adminApi.createUser({ ...form, email: form.email.trim().toLowerCase(), password: desk ? form.password : '' });
+      setCreated({ email: res.user.email, role: form.role, code: desk && !res.existing ? form.password : null, existing: res.existing });
+      setForm({ name: '', email: '', role: 'organizer', password: generatePassword(10) });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create the user.');
@@ -77,7 +78,7 @@ export default function AdminUsersPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold text-white tracking-tight flex items-center gap-3"><Users className="w-7 h-7 text-premium-gold" /> Users</h1>
-          <p className="text-sm text-zinc-400 mt-1">Create accounts for organizers and admins. They sign in at app.dayoneproject.xyz/login.</p>
+          <p className="text-sm text-zinc-400 mt-1">Organizers and admins sign in with a code sent to their email. Register desk staff sign in with their email and an access code you generate here.</p>
         </div>
         <button type="button" onClick={load} className="px-4 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-zinc-300 hover:text-white text-xs font-bold scale-on-click flex items-center gap-1.5">
           <RefreshCw className="w-3.5 h-3.5" /> Refresh
@@ -100,24 +101,31 @@ export default function AdminUsersPage() {
           <label className="space-y-1.5">
             <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Role</span>
             <div className="flex gap-1 bg-premium-surfaceDark p-1 rounded-xl border border-premium-borderDark">
-              {(['organizer', 'admin'] as const).map((r) => (
-                <button key={r} type="button" onClick={() => setForm({ ...form, role: r })} className={`flex-1 px-3 py-2 rounded-lg text-xs font-bold capitalize scale-on-click ${form.role === r ? 'bg-premium-gold text-black shadow-gold' : 'text-zinc-400 hover:text-white'}`}>
-                  {r}
+              {(['organizer', 'admin', 'desk'] as const).map((r) => (
+                <button key={r} type="button" onClick={() => setForm({ ...form, role: r })} className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold scale-on-click ${form.role === r ? 'bg-premium-gold text-black shadow-gold' : 'text-zinc-400 hover:text-white'}`}>
+                  {ROLE_LABELS[r]}
                 </button>
               ))}
             </div>
           </label>
-          <label className="space-y-1.5">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Temporary password</span>
-            <div className="flex gap-2">
-              <input required minLength={8} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className={`${input} font-mono`} />
-              <button type="button" onClick={() => setForm({ ...form, password: generatePassword() })} title="New password" className="px-3 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-zinc-400 hover:text-white scale-on-click">
-                <RefreshCw className="w-4 h-4" />
-              </button>
+          {form.role === 'desk' ? (
+            <label className="space-y-1.5">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Access code (generated)</span>
+              <div className="flex gap-2">
+                <input required minLength={8} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className={`${input} font-mono`} />
+                <button type="button" onClick={() => setForm({ ...form, password: generatePassword(10) })} title="New code" className="px-3 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-zinc-400 hover:text-white scale-on-click">
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+              </div>
+            </label>
+          ) : (
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Sign-in</span>
+              <p className="text-xs text-zinc-400 bg-premium-surfaceDark border border-premium-borderDark rounded-xl px-3 py-2.5">A one-time code is emailed each time they sign in. No password.</p>
             </div>
-          </label>
+          )}
         </div>
-        <p className="text-[11px] text-zinc-500">Organizers and admins both create and run events. Only you can open this admin area for now. If the email already has a Day One Project account, it keeps its password and simply gets access.</p>
+        <p className="text-[11px] text-zinc-500">Organizers and admins create and run events; register desk staff only open the check-in desk. Only you can open this admin area. An email that already has a Day One Project account simply gets access.</p>
         <button type="submit" disabled={creating} className="px-5 py-3 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-sm shadow-gold scale-on-click flex items-center gap-2 disabled:opacity-60">
           {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Create account
         </button>
@@ -125,16 +133,21 @@ export default function AdminUsersPage() {
         {created && (
           <div className="p-4 rounded-2xl bg-premium-success/10 border border-premium-success/30 text-sm space-y-2">
             <div className="font-bold text-premium-success flex items-center gap-1.5"><ShieldCheck className="w-4 h-4" /> Account ready</div>
-            {created.password ? (
+            {created.code ? (
               <>
-                <p className="text-zinc-300">Send these to them privately. The password is shown only once.</p>
-                <div className="font-mono text-white bg-premium-black/60 rounded-xl px-3 py-2">app.dayoneproject.xyz/login · {created.email} · {created.password}</div>
-                <button type="button" onClick={() => copy(`Sign in at https://app.dayoneproject.xyz/login\nEmail: ${created.email}\nPassword: ${created.password}`)} className="text-xs font-bold text-premium-gold flex items-center gap-1.5">
+                <p className="text-zinc-300">Send these to the desk staff privately. The access code is shown only once.</p>
+                <div className="font-mono text-white bg-premium-black/60 rounded-xl px-3 py-2">app.dayoneproject.xyz/login · Register desk · {created.email} · {created.code}</div>
+                <button type="button" onClick={() => copy(`Register desk sign-in: https://app.dayoneproject.xyz/login?as=desk\nEmail: ${created.email}\nAccess code: ${created.code}`)} className="text-xs font-bold text-premium-gold flex items-center gap-1.5">
                   {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />} {copied ? 'Copied' : 'Copy sign-in details'}
                 </button>
               </>
             ) : (
-              <p className="text-zinc-300">{created.email} already had an account, so it now has access with its existing password (or a sign-in code).</p>
+              <>
+                <p className="text-zinc-300">{created.existing ? `${created.email} already had a Day One Project account and now has access.` : `${created.email} is ready.`} They sign in at app.dayoneproject.xyz/login with a code sent to their email.</p>
+                <button type="button" onClick={() => copy(`Sign in at https://app.dayoneproject.xyz/login with your email (${created.email}). We'll email you a one-time code.`)} className="text-xs font-bold text-premium-gold flex items-center gap-1.5">
+                  {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />} {copied ? 'Copied' : 'Copy invite message'}
+                </button>
+              </>
             )}
           </div>
         )}
@@ -165,16 +178,20 @@ export default function AdminUsersPage() {
                       <div className="text-xs text-zinc-500 font-mono">{u.email}</div>
                     </td>
                     <td className="p-4">
-                      <select
-                        value={u.role ?? ''}
-                        disabled={busyId === u.id}
-                        onChange={(e) => act(u.id, { role: (e.target.value || null) as AppRole | null })}
-                        className="bg-premium-surfaceDark border border-premium-borderDark text-white px-2 py-1.5 rounded-lg text-xs outline-none"
-                      >
-                        <option value="organizer">Organizer</option>
-                        <option value="admin">Admin</option>
-                        {!u.role && <option value="">No access</option>}
-                      </select>
+                      {u.role === 'desk' ? (
+                        <span className="px-2 py-1 rounded-lg text-xs font-bold text-premium-neon border border-premium-neon/30">{ROLE_LABELS.desk}</span>
+                      ) : (
+                        <select
+                          value={u.role ?? ''}
+                          disabled={busyId === u.id}
+                          onChange={(e) => act(u.id, { role: (e.target.value || null) as AppRole | null })}
+                          className="bg-premium-surfaceDark border border-premium-borderDark text-white px-2 py-1.5 rounded-lg text-xs outline-none"
+                        >
+                          <option value="organizer">Organizer</option>
+                          <option value="admin">Admin</option>
+                          {!u.role && <option value="">No access</option>}
+                        </select>
+                      )}
                     </td>
                     <td className="p-4 text-xs text-zinc-400">{when(u.lastSignInAt)}</td>
                     <td className="p-4">
@@ -185,7 +202,9 @@ export default function AdminUsersPage() {
                     <td className="p-4 pr-6">
                       <div className="flex items-center justify-end gap-2">
                         {busyId === u.id && <Loader2 className="w-4 h-4 animate-spin text-zinc-500" />}
-                        <button type="button" title="Set a new password" onClick={() => setResetFor({ id: u.id, password: generatePassword() })} className="p-2 rounded-lg border border-premium-borderDark text-zinc-400 hover:text-white scale-on-click"><KeyRound className="w-3.5 h-3.5" /></button>
+                        {u.role === 'desk' && (
+                          <button type="button" title="New access code" onClick={() => setResetFor({ id: u.id, password: generatePassword(10) })} className="p-2 rounded-lg border border-premium-borderDark text-zinc-400 hover:text-white scale-on-click"><KeyRound className="w-3.5 h-3.5" /></button>
+                        )}
                         <button type="button" title={u.disabled ? 'Enable account' : 'Disable account'} onClick={() => act(u.id, { disabled: !u.disabled }, u.disabled ? undefined : `Disable ${u.email}? They will be signed out of everything.`)} className="p-2 rounded-lg border border-premium-borderDark text-zinc-400 hover:text-premium-danger scale-on-click"><UserX className="w-3.5 h-3.5" /></button>
                         <button type="button" title="Remove event-platform access (keeps the account)" onClick={() => act(u.id, { role: null }, `Remove ${u.email}'s access to the event dashboard? Their account is kept.`)} className="p-2 rounded-lg border border-premium-borderDark text-zinc-400 hover:text-premium-danger scale-on-click"><UserMinus className="w-3.5 h-3.5" /></button>
                       </div>
@@ -195,7 +214,7 @@ export default function AdminUsersPage() {
                     <tr className="bg-premium-surfaceDark/60">
                       <td colSpan={5} className="p-4 pl-6">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs text-zinc-400">New password for {u.email}:</span>
+                          <span className="text-xs text-zinc-400">New access code for {u.email}:</span>
                           <input value={resetFor.password} onChange={(e) => setResetFor({ ...resetFor, password: e.target.value })} className={`${input} font-mono max-w-xs`} />
                           <button type="button" onClick={async () => { await act(u.id, { password: resetFor.password }); copy(resetFor.password); setResetFor(null); }} className="px-4 py-2.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black text-xs font-bold scale-on-click">Save & copy</button>
                           <button type="button" onClick={() => setResetFor(null)} className="px-3 py-2.5 rounded-xl text-zinc-500 hover:text-white text-xs font-bold">Cancel</button>

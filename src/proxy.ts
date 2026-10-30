@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { appRole, isPlatformAdmin } from '@/lib/auth';
+import { appRole, canUseDashboard, isPlatformAdmin } from '@/lib/auth';
 
 // The dashboard lives on app.<root>; each event on <slug>.<root>. The root itself is the Day One Project website.
 const ROOT_DOMAIN = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'dayoneproject.xyz').toLowerCase();
@@ -49,7 +49,7 @@ export async function proxy(request: NextRequest) {
     host.startsWith('172.');
 
   if (isDirectRoot) {
-    if (url.pathname.startsWith('/dashboard') || url.pathname.startsWith('/admin')) {
+    if (url.pathname.startsWith('/dashboard') || url.pathname.startsWith('/admin') || url.pathname.startsWith('/desk')) {
       return guard(request);
     }
     return NextResponse.next();
@@ -96,7 +96,7 @@ export async function proxy(request: NextRequest) {
 }
 
 /**
- * /dashboard needs a signed-in organizer or admin; /admin needs a platform admin.
+ * /dashboard needs a signed-in organizer or admin, /desk any app role, /admin a platform admin.
  * Also refreshes the Supabase session cookie on the way through.
  */
 async function guard(request: NextRequest) {
@@ -128,7 +128,9 @@ async function guard(request: NextRequest) {
 
   if (!user) return redirect(`/login?next=${encodeURIComponent(pathname + search)}`);
   if (!appRole(user)) return redirect('/login?error=no_access');
-  if (pathname.startsWith('/admin') && !isPlatformAdmin(user)) return redirect('/dashboard');
+  if (pathname.startsWith('/admin') && !isPlatformAdmin(user)) return redirect(canUseDashboard(user) ? '/dashboard' : '/desk');
+  // Register-desk staff only see the desk; organizers and admins have no reason to land there.
+  if (pathname.startsWith('/dashboard') && !canUseDashboard(user)) return redirect('/desk');
   return response;
 }
 

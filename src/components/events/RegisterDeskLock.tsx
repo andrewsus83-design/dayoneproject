@@ -1,8 +1,12 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import Link from 'next/link';
+import { Lock, Eye, EyeOff, ShieldCheck, ScanLine } from 'lucide-react';
 import { DEFAULT_ACCESS, useEventConfigBySlug } from '@/lib/eventStore';
+import { createClient } from '@/lib/supabase/client';
+import { useSessionUser } from '@/lib/useSession';
+import { appRole } from '@/lib/auth';
 
 const MAX_ATTEMPTS = 5;
 const COOLDOWN_MS = 30_000;
@@ -20,6 +24,9 @@ export function RegisterDeskLock({ slug, children }: { slug: string; children: (
   const sessionKey = `all41-desk-${eventId}`;
   const currentPrint = fingerprint(expectedUser, expectedPass);
 
+  // Desk staff, organizers and admins signed in to dayoneproject.xyz skip the per-event passcode.
+  const { user, ready } = useSessionUser();
+  const signedIn = !!appRole(user);
   const [unlocked, setUnlocked] = useState(false);
   const [username, setUsername] = useState('');
   const [passcode, setPasscode] = useState('');
@@ -84,7 +91,13 @@ export function RegisterDeskLock({ slug, children }: { slug: string; children: (
     }
   };
 
-  if (!hydrated) return <div className="min-h-screen bg-premium-black" />;
+  const signOut = async () => {
+    await createClient().auth.signOut();
+    lock();
+  };
+
+  if (!hydrated || !ready) return <div className="min-h-screen bg-premium-black" />;
+  if (signedIn) return <>{children(signOut)}</>;
   if (unlocked) return <>{children(lock)}</>;
 
   const waitSeconds = lockedUntil ? Math.max(0, Math.ceil((lockedUntil - now) / 1000)) : 0;
@@ -153,7 +166,13 @@ export function RegisterDeskLock({ slug, children }: { slug: string; children: (
             <ShieldCheck className="w-4 h-4" /> Unlock Register Desk
           </button>
         </div>
-        <p className="text-[11px] text-zinc-600 text-center">The organizer sets this login in Dashboard → Settings → Register Desk Access.</p>
+        <Link
+          href={`/login?as=desk&next=${encodeURIComponent(`/events/${slug}/gate`)}`}
+          className="w-full py-3 rounded-xl border border-premium-borderDark text-zinc-300 hover:text-white text-xs font-bold flex items-center justify-center gap-2 scale-on-click"
+        >
+          <ScanLine className="w-4 h-4" /> Sign in with email and access code
+        </Link>
+        <p className="text-[11px] text-zinc-600 text-center">Or use the desk username and passcode the organizer set in Settings → Register Desk Access.</p>
       </form>
     </div>
   );
