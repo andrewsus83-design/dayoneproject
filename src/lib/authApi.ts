@@ -13,15 +13,21 @@ async function call<T>(body: Record<string, unknown>): Promise<T> {
   return data as T;
 }
 
-/** Finishes a sign-in that the server already approved. */
-async function openSession(tokenHash: string) {
-  const { error } = await createClient().auth.verifyOtp({ token_hash: tokenHash, type: 'magiclink' });
+/** The server opens authenticator sessions itself (so it can mark them as platform-admin sessions). */
+type ServerSession = { accessToken: string; refreshToken: string } | { tokenHash: string };
+
+/** Adopts a session the server already opened. (`tokenHash` is the older a41-auth reply, kept for the deploy window.) */
+async function openSession(session: ServerSession) {
+  const supabase = createClient();
+  const { error } = 'accessToken' in session
+    ? await supabase.auth.setSession({ access_token: session.accessToken, refresh_token: session.refreshToken })
+    : await supabase.auth.verifyOtp({ token_hash: session.tokenHash, type: 'magiclink' });
   if (error) throw new Error('Could not start your session. Try again.');
 }
 
 export const authApi = {
-  /** Organizers/admins: email a 6-digit code (sent through Resend). */
-  sendEmailCode: (email: string) => call<{ ok: true }>({ action: 'email-code', email }),
+  /** Organizers/admins: email a 6-digit code (sent through Resend). The reply is the same whether or not the email has an account. */
+  sendEmailCode: (email: string) => call<{ ok: true; message?: string }>({ action: 'email-code', email }),
   verifyEmailCode: async (email: string, code: string) => {
     const { error } = await createClient().auth.verifyOtp({ email, token: code, type: 'email' });
     if (error) throw new Error('That code is wrong or has expired.');
@@ -35,17 +41,15 @@ export const authApi = {
 
   /** Platform owner: email + authenticator app code. */
   authenticatorSignIn: async (email: string, code: string) => {
-    const { tokenHash } = await call<{ tokenHash: string }>({ action: 'totp-login', email, code });
-    await openSession(tokenHash);
+    await openSession(await call<ServerSession>({ action: 'totp-login', email, code }));
   },
   /** First authenticator, proven with the one-time setup code kept in Supabase Vault. */
   bootstrapStart: (email: string, setupCode: string) => call<{ secret: string; uri: string }>({ action: 'totp-bootstrap-start', email, setupCode }),
   bootstrapFinish: async (email: string, setupCode: string, code: string) => {
-    const { tokenHash } = await call<{ tokenHash: string }>({ action: 'totp-bootstrap-finish', email, setupCode, code });
-    await openSession(tokenHash);
+    await openSession(await call<ServerSession>({ action: 'totp-bootstrap-finish', email, setupCode, code }));
   },
 
-  /** Signed-in owner: replace the authenticator. */
+  /** Owner signed in with their authenticator: replace the authenticator. */
   authenticatorStatus: () => call<{ enabled: boolean }>({ action: 'totp-status' }),
   authenticatorSetup: () => call<{ secret: string; uri: string }>({ action: 'totp-setup' }),
   authenticatorConfirm: (code: string) => call<{ ok: true }>({ action: 'totp-confirm', code }),

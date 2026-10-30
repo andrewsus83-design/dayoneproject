@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { appRole, canUseDashboard, isPlatformAdmin } from '@/lib/auth';
+import { appRole, assignedRole, canUseDashboard, isPlatformAdmin } from '@/lib/auth';
 
 // The dashboard lives on app.<root>; each event on <slug>.<root>. The root itself is the Day One Project website.
 const ROOT_DOMAIN = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'dayoneproject.xyz').toLowerCase();
@@ -97,7 +97,8 @@ export async function proxy(request: NextRequest) {
 
 /**
  * /dashboard needs a signed-in organizer or admin, /desk any app role, /admin a platform admin.
- * Also refreshes the Supabase session cookie on the way through.
+ * Platform-admin rights come from the database (a41_whoami().isAdmin: the admin email signed in with the
+ * authenticator), never from the email alone. Also refreshes the Supabase session cookie on the way through.
  */
 async function guard(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -126,9 +127,18 @@ async function guard(request: NextRequest) {
     return res;
   };
 
-  if (!user) return redirect(`/login?next=${encodeURIComponent(pathname + search)}`);
+  const next = encodeURIComponent(pathname + search);
+  if (!user) return redirect(`/login?next=${next}`);
   if (!appRole(user)) return redirect('/login?error=no_access');
-  if (pathname.startsWith('/admin') && !isPlatformAdmin(user)) return redirect(canUseDashboard(user) ? '/dashboard' : '/desk');
+
+  // /admin, and accounts whose only access is the platform-admin email, need an authenticator session.
+  if (pathname.startsWith('/admin') || !assignedRole(user)) {
+    const { data: me } = await supabase.rpc('a41_whoami');
+    if (!me?.isAdmin) {
+      if (isPlatformAdmin(user)) return redirect(`/login?as=owner&error=authenticator&next=${next}`);
+      return redirect(canUseDashboard(user) ? '/dashboard' : '/desk');
+    }
+  }
   // Register-desk staff only see the desk; organizers and admins have no reason to land there.
   if (pathname.startsWith('/dashboard') && !canUseDashboard(user)) return redirect('/desk');
   return response;

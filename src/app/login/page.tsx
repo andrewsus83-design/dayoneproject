@@ -4,7 +4,7 @@ import React, { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Briefcase, KeyRound, Loader2, Mail, ScanLine, ShieldCheck, Smartphone } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { appRole, canUseDashboard, isPlatformAdmin } from '@/lib/auth';
+import { appRole, assignedRole, canUseDashboard, isPlatformAdmin } from '@/lib/auth';
 import { authApi } from '@/lib/authApi';
 import { AuthenticatorQr } from '@/components/auth/AuthenticatorQr';
 
@@ -24,9 +24,21 @@ const METHODS: { id: Method; label: string; icon: typeof Mail }[] = [
   { id: 'owner', label: 'Platform admin', icon: ShieldCheck },
 ];
 
-/** Only same-site paths are allowed after sign-in. */
+const ERRORS: Record<string, string> = {
+  no_access: 'This account does not have access yet. Ask your admin to add you.',
+  authenticator: 'Platform admin access needs your authenticator. Sign in on the Platform admin tab with your email and the code from your authenticator app.',
+};
+const ADMIN_USES_AUTHENTICATOR = 'This account signs in on the Platform admin tab with its authenticator.';
+
+/** Only same-site paths are allowed after sign-in (runs in the browser, after a sign-in). */
 function safeNext(raw: string | null): string | null {
-  return raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : null;
+  if (!raw || !raw.startsWith('/')) return null;
+  try {
+    const target = new URL(raw, window.location.origin);
+    return target.origin === window.location.origin ? target.pathname + target.search + target.hash : null;
+  } catch {
+    return null;
+  }
 }
 
 function Label({ children }: { children: React.ReactNode }) {
@@ -36,7 +48,6 @@ function Label({ children }: { children: React.ReactNode }) {
 function LoginForm() {
   const router = useRouter();
   const search = useSearchParams();
-  const next = safeNext(search.get('next'));
   const asParam = search.get('as');
   const [method, setMethod] = useState<Method>(asParam === 'desk' || asParam === 'owner' ? asParam : 'organizer');
   const [step, setStep] = useState<Step>('start');
@@ -46,9 +57,7 @@ function LoginForm() {
   const [enroll, setEnroll] = useState<{ secret: string; uri: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(
-    search.get('error') === 'no_access' ? 'This account does not have access yet. Ask your admin to add you.' : null,
-  );
+  const [error, setError] = useState<string | null>(ERRORS[search.get('error') ?? ''] ?? null);
 
   const mail = email.trim().toLowerCase();
 
@@ -76,9 +85,15 @@ function LoginForm() {
   const finish = async () => {
     const supabase = createClient();
     const { data } = await supabase.auth.getUser();
+    const next = safeNext(search.get('next'));
     if (!appRole(data.user)) {
       await supabase.auth.signOut();
-      throw new Error('This account does not have access yet. Ask your admin to add you.');
+      throw new Error(ERRORS.no_access);
+    }
+    // An account whose only access is the platform-admin email gets nothing from an emailed code or a password.
+    if (method !== 'owner' && !assignedRole(data.user)) {
+      await supabase.auth.signOut();
+      throw new Error(ADMIN_USES_AUTHENTICATOR);
     }
     // The Platform admin sign-in opens the admin dashboard; the Organizer sign-in opens the events dashboard.
     if (method === 'owner' && isPlatformAdmin(data.user)) {
@@ -87,7 +102,9 @@ function LoginForm() {
       return;
     }
     const home = canUseDashboard(data.user) ? '/dashboard' : '/desk';
-    const allowed = next && (canUseDashboard(data.user) || next.startsWith('/desk')) ? next : home;
+    // Desk staff may go back to the desk or to an event's register desk; organizers anywhere on the site.
+    const deskPage = !!next && (next.startsWith('/desk') || /^\/events\/[^/?#]+\/gate(?:[/?#]|$)/.test(next));
+    const allowed = next && (canUseDashboard(data.user) || deskPage) ? next : home;
     router.replace(allowed);
     router.refresh();
   };
@@ -96,8 +113,8 @@ function LoginForm() {
     e.preventDefault();
     if (method === 'organizer' && step === 'start') {
       run(async () => {
-        await authApi.sendEmailCode(mail);
-        setNotice(`We sent a 6-digit code to ${mail}.`);
+        const sent = await authApi.sendEmailCode(mail);
+        setNotice(sent.message ?? 'If this email has an organizer account, a code is on its way.');
         setStep('code');
       });
     } else if (method === 'organizer') {
