@@ -1,6 +1,6 @@
 'use client';
 
-import { formatEventDate, formatEventTime, formatGuestNumber, numberDigits, useEventConfigBySlug, useSampleGuests } from '@/lib/eventStore';
+import { formatEventDate, formatEventTime, formatGuestNumber, numberDigits, useEventConfigBySlug, useHydrated, useSampleGuests } from '@/lib/eventStore';
 import { forgetPass, isServerEventId, passCode, readStoredPass, storePass, useMyPass, type GuestTab } from '@/lib/guestsApi';
 import { publicWinnerLabel, usePublicDoorPrizes, type ServerWinner } from '@/lib/doorPrizeApi';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { MOCK_GUESTS } from '@/lib/mockData';
 import { Guest } from '@/lib/types';
 import { getClientDomain } from '@/lib/domain';
+import { GuestShot } from '@/components/events/GuestShot';
 import {
   MapPin,
   Calendar,
@@ -35,10 +36,11 @@ import QRCode from 'qrcode';
 
 /*
  * The guest app (PWA) a guest lands in after registering: Event · Activity · QR · Prize · Setting, with the QR pass
- * open first. Activity (trivia, photo wall) and Prize open once the guest's QR has been scanned at the door.
+ * open first. Once the guest's QR has been scanned at the door, Activity (trivia, photo wall) and Prize open and the
+ * centre QR becomes Shot, the camera for the photo wall and social media (the pass moves to Setting).
  */
 
-const TABS: GuestTab[] = ['event', 'activity', 'qr', 'prize', 'setting'];
+const TABS: GuestTab[] = ['event', 'activity', 'qr', 'shot', 'prize', 'setting'];
 
 /** What the pass card shows, from the server pass or a sample guest. */
 interface PassView {
@@ -80,6 +82,8 @@ function Notice({ title, children, tone = 'gold' }: { title: string; children: R
 function PassCard({ view }: { view: PassView }) {
   const qr = useQr(view.token);
   const checkedIn = !!view.checkedInAt;
+  // The check-in time is in the phone's time zone, which the server render does not know.
+  const hydrated = useHydrated();
   return (
     <div className="bg-premium-charcoal rounded-[2.5rem] border border-premium-borderDark flex flex-col ticket-cutout shadow-2xl relative overflow-hidden">
       <div className="p-8 flex-1 flex flex-col items-center justify-center text-center border-b-2 border-dashed border-zinc-800">
@@ -120,7 +124,7 @@ function PassCard({ view }: { view: PassView }) {
 
         <p className="text-zinc-500 text-xs">
           {checkedIn
-            ? `Welcome! Checked in at ${new Date(view.checkedInAt!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}. Activity and Prize are open to you.`
+            ? `Welcome! Checked in${hydrated ? ` at ${new Date(view.checkedInAt!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}. Activity, Prize and Shot are open to you.`
             : 'Show this QR code at the entrance. Activity and Prize open once it is scanned.'}
         </p>
       </div>
@@ -218,10 +222,11 @@ function GuestAppContent({ slug }: { slug: string }) {
 
   const requested = params.get('tab') as GuestTab | null;
   const [tab, setTabState] = useState<GuestTab>(requested && TABS.includes(requested) ? requested : 'qr');
+  const [showPass, setShowPass] = useState(false);
   const setTab = (next: GuestTab) => {
     setTabState(next);
     const q = new URLSearchParams(params.toString());
-    if (next === 'qr') q.delete('tab');
+    if (next === 'qr' || next === 'shot') q.delete('tab');
     else q.set('tab', next);
     const qs = q.toString();
     router.replace(qs ? `?${qs}` : `/events/${slug}/pass`, { scroll: false });
@@ -290,6 +295,9 @@ function GuestAppContent({ slug }: { slug: string }) {
   if (view) qrBody = <PassCard view={view} />;
 
   const checkedIn = !!view?.checkedInAt;
+  // The centre tab: the QR pass until the guest is checked in, then Shot.
+  const center: GuestTab = checkedIn ? 'shot' : 'qr';
+  const shown: GuestTab = tab === 'qr' || tab === 'shot' ? center : tab;
   const mapsUrl = info.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([info.venue, info.address, info.city].filter(Boolean).join(' '))}`;
   const time = [info.startTime && formatEventTime(info.startTime), info.endTime && formatEventTime(info.endTime)].filter(Boolean).join(' – ');
 
@@ -302,7 +310,7 @@ function GuestAppContent({ slug }: { slug: string }) {
   const NAV: { id: GuestTab; icon: typeof QrCode; label: string; central?: boolean; locked?: boolean }[] = [
     { id: 'event', icon: Calendar, label: 'Event' },
     { id: 'activity', icon: Gamepad2, label: 'Activity', locked: !checkedIn },
-    { id: 'qr', icon: QrCode, label: 'QR', central: true },
+    { id: center, icon: checkedIn ? Camera : QrCode, label: checkedIn ? 'Shot' : 'QR', central: true },
     { id: 'prize', icon: Gift, label: 'Prize', locked: !checkedIn },
     { id: 'setting', icon: Settings, label: 'Setting' },
   ];
@@ -327,23 +335,14 @@ function GuestAppContent({ slug }: { slug: string }) {
         </header>
 
         <main className="flex-1 px-5 py-5 pb-32 space-y-5">
-          {/* ── QR ── */}
-          {tab === 'qr' && (
-            <>
-              {qrBody}
-              {checkedIn && (
-                <Link
-                  href={`/events/${slug}/photowall`}
-                  className="w-full py-4 rounded-2xl bg-premium-neon/10 border border-premium-neon/25 text-premium-neon font-bold text-[13px] scale-on-click flex items-center justify-center gap-2 hover:bg-premium-neon/15 transition-colors"
-                >
-                  <Camera className="w-4 h-4" /> Post a photo to the live wall
-                </Link>
-              )}
-            </>
-          )}
+          {/* ── QR (until check-in) ── */}
+          {shown === 'qr' && qrBody}
+
+          {/* ── Shot (after check-in) ── */}
+          {shown === 'shot' && <GuestShot slug={slug} token={sample ? null : mine.token} eventName={info.name || event.name} sample={sample} />}
 
           {/* ── Event ── */}
-          {tab === 'event' && (
+          {shown === 'event' && (
             <>
               <div className="p-5 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4">
                 <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-zinc-500">Event details</span>
@@ -385,7 +384,7 @@ function GuestAppContent({ slug }: { slug: string }) {
           )}
 
           {/* ── Activity ── */}
-          {tab === 'activity' && (checkedIn ? (
+          {shown === 'activity' && (checkedIn ? (
             <>
               <div className="flex items-center gap-2 py-3 px-4 rounded-2xl bg-premium-success/10 border border-premium-success/25 text-premium-success text-[12px] font-bold">
                 <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> You&apos;re checked in. Games are open.
@@ -398,7 +397,7 @@ function GuestAppContent({ slug }: { slug: string }) {
           ))}
 
           {/* ── Prize ── */}
-          {tab === 'prize' && (checkedIn ? (
+          {shown === 'prize' && (checkedIn ? (
             <>
               <div className="flex items-center gap-2 py-3 px-4 rounded-2xl bg-premium-success/10 border border-premium-success/25 text-premium-success text-[12px] font-bold">
                 <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> You&apos;re in the door prize draw.
@@ -416,8 +415,28 @@ function GuestAppContent({ slug }: { slug: string }) {
           ))}
 
           {/* ── Setting ── */}
-          {tab === 'setting' && (
+          {shown === 'setting' && (
             <>
+              {checkedIn && view && (
+                showPass ? (
+                  <PassCard view={view} />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(true)}
+                    className="w-full flex items-center gap-4 p-4 rounded-2xl bg-premium-charcoal border border-premium-gold/30 hover:border-premium-gold/60 scale-on-click text-left"
+                  >
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 border bg-premium-gold/10 border-premium-gold/25 text-premium-gold">
+                      <QrCode className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[14px] font-bold text-white">Show my QR pass</div>
+                      <div className="text-[11px] text-zinc-500 mt-0.5">If the host asks to see it again</div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-zinc-600 flex-shrink-0" />
+                  </button>
+                )
+              )}
               {view && (
                 <div className="p-5 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-3">
                   <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-zinc-500">My pass</span>
@@ -470,7 +489,7 @@ function GuestAppContent({ slug }: { slug: string }) {
         <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[420px] z-30 pb-[env(safe-area-inset-bottom)]">
           <div className="mx-4 mb-5 glass-panel rounded-[2rem] px-2 py-2 flex items-center justify-around shadow-2xl border border-zinc-700/80">
             {NAV.map(({ id, icon: Icon, label, central, locked }) => {
-              const active = tab === id;
+              const active = shown === id;
               if (central) {
                 return (
                   <button

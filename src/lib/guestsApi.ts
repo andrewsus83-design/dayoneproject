@@ -414,11 +414,12 @@ function subscribePass(cb: () => void) {
 }
 
 /** A tab of the guest app at /events/<slug>/pass (the QR pass opens first). */
-export type GuestTab = 'event' | 'activity' | 'qr' | 'prize' | 'setting';
+/** The centre tab is the QR pass until check-in, then Shot (the camera); both open the centre tab. */
+export type GuestTab = 'event' | 'activity' | 'qr' | 'shot' | 'prize' | 'setting';
 
 /** The guest app on a tab; the trivia, photo wall, door prize and feedback pages link back with this. */
 export function guestAppPath(slug: string, tab: GuestTab = 'qr'): string {
-  return tab === 'qr' ? `/events/${slug}/pass` : `/events/${slug}/pass?tab=${tab}`;
+  return tab === 'qr' || tab === 'shot' ? `/events/${slug}/pass` : `/events/${slug}/pass?tab=${tab}`;
 }
 
 export function readStoredPass(slug: string): string | null {
