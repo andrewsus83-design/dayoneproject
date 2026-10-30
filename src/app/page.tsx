@@ -1,23 +1,42 @@
+import type { Metadata } from 'next';
 import { Navbar } from '@/components/marketing/Navbar';
 import { Hero } from '@/components/marketing/Hero';
-import { FeatureShowcase } from '@/components/marketing/FeatureShowcase';
-import { PartnerSection } from '@/components/marketing/PartnerSection';
+import { Audiences } from '@/components/marketing/Audiences';
+import { Journey } from '@/components/marketing/Journey';
+import { DayOf } from '@/components/marketing/DayOf';
+import { GuestApp } from '@/components/marketing/GuestApp';
+import { Team } from '@/components/marketing/Team';
+import { ClosingCta } from '@/components/marketing/ClosingCta';
 import { Footer } from '@/components/marketing/Footer';
 
-export const metadata = {
-  title: 'dayoneproject.xyz | All-in-One Event Experience Platform',
-  description:
-    "Southeast Asia's premier all-in-one event platform. Landing builder, digital RSVP, QR check-in, live photo wall, raffle draws, and interactive trivia.",
+const TITLE = 'Day One Project | The all-in-one event app for EOs and WOs';
+const DESCRIPTION =
+  'Run the whole event from one app: event page and RSVP, email invitations, QR passes and an offline-ready register desk, live screens, trivia, door prizes, a photo wall, and a guest app with a Shot camera.';
+
+export const metadata: Metadata = {
+  metadataBase: new URL('https://app.dayoneproject.xyz'),
+  title: TITLE,
+  description: DESCRIPTION,
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    siteName: 'Day One Project',
+    images: [{ url: '/brand/dayone-logo.png', width: 760, height: 763, alt: 'Day One Project' }],
+  },
 };
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-premium-black text-zinc-100 flex flex-col selection:bg-premium-gold selection:text-premium-black font-sans">
+    <div className="min-h-screen bg-premium-black text-zinc-100 flex flex-col font-sans">
       <Navbar />
       <main className="flex-1">
         <Hero />
-        <FeatureShowcase />
-        <PartnerSection />
+        <Audiences />
+        <Journey />
+        <DayOf />
+        <GuestApp />
+        <Team />
+        <ClosingCta />
       </main>
       <Footer />
     </div>

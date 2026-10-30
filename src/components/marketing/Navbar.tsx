@@ -1,53 +1,41 @@
-'use client';
-
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
+import { BrandMark } from './parts';
+
+const LINKS = [
+  ['For organizers', '#organizers'],
+  ['How it works', '#how-it-works'],
+  ['Day-of', '#day-of'],
+  ['Guest app', '#guest-app'],
+  ['Team', '#team'],
+];
 
 export function Navbar() {
   return (
-    <header className="sticky top-0 z-50 w-full backdrop-blur-xl bg-premium-black/80 border-b border-white/[0.06] font-sans">
-      <div className="max-w-[1440px] mx-auto px-6 md:px-12 lg:px-16 h-20 flex items-center justify-between">
-
-        {/* Brand Logo */}
-        <Link href="/" className="flex items-center gap-3.5 group flex-shrink-0">
-          <div className="w-10 h-10 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-xl shadow-gold scale-on-click transition-transform group-hover:scale-105">
-            D1
-          </div>
-          <div className="flex flex-col leading-none">
-            <span className="text-[22px] font-display font-bold tracking-tight text-white">
-              dayoneproject<span className="text-premium-gold">.xyz</span>
-            </span>
-            <span className="text-[10px] text-zinc-500 font-mono tracking-[0.18em] uppercase mt-0.5">
-              Event Platform
-            </span>
-          </div>
+    <header className="sticky top-0 z-50 w-full backdrop-blur-xl bg-premium-black/80 border-b border-white/[0.06]">
+      <div className="max-w-6xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between gap-4">
+        <Link href="/" className="flex items-center gap-2.5 scale-on-click" aria-label="Day One Project home">
+          <BrandMark size={30} priority />
+          <span className="font-display font-semibold text-white text-[17px] tracking-tight leading-none">
+            Day One <span className="text-premium-gold">Project</span>
+          </span>
         </Link>
 
-        {/* Nav Links */}
-        <nav className="hidden lg:flex items-center gap-8 text-[13px] font-medium text-zinc-400">
-          <a href="#features" className="hover:text-white transition-colors">Modules</a>
-          <a href="#features" className="hover:text-white transition-colors">Corporate</a>
-          <a href="#features" className="hover:text-white transition-colors">Weddings</a>
-          <a href="#features" className="hover:text-white transition-colors">How it works</a>
+        <nav className="hidden lg:flex items-center gap-7 text-[13px] font-medium text-zinc-400">
+          {LINKS.map(([label, href]) => (
+            <a key={href} href={href} className="hover:text-white transition-colors">
+              {label}
+            </a>
+          ))}
         </nav>
 
-        {/* CTAs */}
-        <div className="flex items-center gap-3">
-          <Link
-            href="/dashboard"
-            className="hidden sm:inline-flex items-center text-[13px] font-medium text-zinc-400 hover:text-white px-4 py-2.5 rounded-xl transition-colors scale-on-click"
-          >
-            Sign in
-          </Link>
-          <Link
-            href="/dashboard/events/new"
-            className="inline-flex items-center gap-2 text-[13px] font-bold text-black px-5 py-2.5 rounded-2xl bg-premium-gold hover:bg-premium-goldHover transition-all shadow-gold scale-on-click"
-          >
-            <span>Create Event</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-
+        <Link
+          href="/login"
+          className="inline-flex items-center gap-1.5 text-[13px] font-display font-bold text-black px-4 py-2.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover shadow-gold scale-on-click"
+        >
+          Sign in
+          <ArrowRight className="w-3.5 h-3.5" />
+        </Link>
       </div>
     </header>
   );
