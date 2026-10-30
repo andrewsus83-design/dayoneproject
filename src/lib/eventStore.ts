@@ -573,6 +573,20 @@ const DEFAULT_QUIZ: QuizItem[] = [
   { id: 'q-3', text: 'Which protocol is best suited for live audience quiz sync?', options: ['WebSockets', 'HTTP Polling', 'SMTP', 'FTP'], answer: 0, points: 1000, seconds: 15 },
 ];
 
+/** Speed scoring: full points in the first 3 seconds, then one step down every 3 seconds, to half points in the last step. */
+export const QUIZ_STEP_SECONDS = 3;
+
+export function quizPointLadder(points: number, seconds: number): number[] {
+  const steps = Math.max(1, Math.ceil(seconds / QUIZ_STEP_SECONDS));
+  const drop = steps > 1 ? 0.5 / (steps - 1) : 0;
+  return Array.from({ length: steps }, (_, i) => Math.round(points * (1 - i * drop)));
+}
+
+export function quizPointsAt(points: number, seconds: number, elapsed: number): number {
+  const ladder = quizPointLadder(points, seconds);
+  return ladder[Math.min(ladder.length - 1, Math.floor(Math.max(0, elapsed) / QUIZ_STEP_SECONDS))];
+}
+
 export function newQuizItem(): QuizItem {
   return { id: newId('qz'), text: 'New question', options: ['Option A', 'Option B', 'Option C', 'Option D'], answer: 0, points: 1000, seconds: 15 };
 }

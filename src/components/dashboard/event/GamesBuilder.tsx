@@ -7,7 +7,8 @@ import {
   ArrowDown, ArrowUp, Check, Copy, Download, ExternalLink, Gamepad2, MapPin, Palette, Plus, Search, Trash2, Trophy, Tv, Upload, Users, X,
 } from 'lucide-react';
 import {
-  formatGuestNumber, guestPool, newActivity, newClue, newId, newQuizItem, numberDigits, useEventConfig, useGuests, type Activity, type ClueItem, type QuizItem,
+  formatGuestNumber, guestPool, newActivity, newClue, newId, newQuizItem, numberDigits, QUIZ_STEP_SECONDS, quizPointLadder, useEventConfig, useGuests,
+  type Activity, type ClueItem, type QuizItem,
 } from '@/lib/eventStore';
 import { AudiencePicker } from '@/components/raffle/AudiencePicker';
 import { SendButtons } from './SendButtons';
@@ -100,6 +101,10 @@ function QuizEditor({ questions, onChange }: { questions: QuizItem[]; onChange: 
                   <label className="text-[10px] text-zinc-500 font-mono uppercase">Points<input type="number" min={0} value={q.points} onChange={(e) => patch(q.id, { points: Math.max(0, parseInt(e.target.value || '0', 10)) })} className={`${input} mt-1`} /></label>
                   <label className="text-[10px] text-zinc-500 font-mono uppercase">Seconds<input type="number" min={5} value={q.seconds} onChange={(e) => patch(q.id, { seconds: Math.max(5, parseInt(e.target.value || '15', 10)) })} className={`${input} mt-1`} /></label>
                 </div>
+                <p className="text-[10px] text-zinc-500">
+                  Faster answers score more. Every {QUIZ_STEP_SECONDS} seconds:{' '}
+                  <span className="font-mono text-premium-gold">{quizPointLadder(q.points, q.seconds).join(' → ')}</span> pts. Wrong or too late: 0.
+                </p>
               </div>
             )}
           </div>

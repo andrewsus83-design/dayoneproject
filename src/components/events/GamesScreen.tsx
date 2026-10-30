@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle2, Clock, Crown, EyeOff, MapPin, RotateCcw, Search, Users } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { formatGuestNumber, guestPool, numberDigits, useEventConfigBySlug, useGuests, type Activity, type QuizItem } from '@/lib/eventStore';
+import { formatGuestNumber, guestPool, numberDigits, quizPointsAt, useEventConfigBySlug, useGuests, type Activity, type QuizItem } from '@/lib/eventStore';
 import { StageFrameShell } from '@/components/stage/StageFrameShell';
 
 export interface Player {
@@ -49,7 +49,7 @@ function QuizRunner({ questions, players, onScore }: { questions: QuizItem[]; pl
     setSelected(i);
     setSubmitted(true);
     if (i === q.answer) {
-      setScore((s) => s + Math.round(q.points * (0.5 + timer / Math.max(q.seconds, 1) / 2)));
+      setScore((s) => s + quizPointsAt(q.points, q.seconds, q.seconds - timer));
       confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
     }
   };
@@ -118,6 +118,7 @@ function QuizRunner({ questions, players, onScore }: { questions: QuizItem[]; pl
         <span className="px-4 py-1.5 rounded-full bg-premium-surfaceDark border border-premium-borderDark text-xs font-mono text-premium-neon font-bold">Question {index + 1} of {questions.length}</span>
         <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold border font-mono ${timer <= 5 ? 'bg-premium-danger/20 text-premium-danger border-premium-danger animate-pulse' : 'bg-premium-surfaceDark text-premium-gold border-premium-gold/30'}`}>
           <Clock className="w-4 h-4" /> <span>{timer}s left</span>
+          {!submitted && <span className="pl-2 ml-1 border-l border-current/30">worth {quizPointsAt(q.points, q.seconds, q.seconds - timer)} pts</span>}
         </div>
       </div>
       <div className="p-8 sm:p-12 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark text-center shadow-2xl">
