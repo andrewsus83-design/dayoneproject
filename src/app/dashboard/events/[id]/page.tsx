@@ -1289,16 +1289,17 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
               <p className="text-xs text-zinc-400">Register desk access, which modules this event uses, and the terms guests agree to.</p>
             </div>
 
-            {/* Register desk access */}
-            <div className="p-6 rounded-[2.5rem] bg-premium-charcoal border border-premium-gold/30 space-y-4 shadow-xl">
+            {/* Register desk access: everyone signs in with their own account */}
+            <div className="p-6 rounded-[2.5rem] bg-premium-charcoal border border-premium-gold/30 space-y-3 shadow-xl">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <span className="text-[10px] font-mono uppercase text-premium-gold font-bold flex items-center gap-1.5">
                     <KeyRound className="w-3.5 h-3.5" /> Register Desk Access
                   </span>
-                  <p className="text-[11px] text-zinc-500 mt-1">
-                    The Register screen (door check-in) asks for this username and passcode before it opens. Desk staff you add in{' '}
-                    <Link href="/dashboard/settings" className="text-premium-gold font-bold hover:underline">Settings</Link> sign in with their own access code instead.
+                  <p className="text-[11px] text-zinc-500 mt-1 leading-relaxed">
+                    The Register screen (door check-in) opens only for people on your team. Desk staff sign in with their own email and the
+                    access code you give them; organizers sign in with their emailed code. Add or remove people in{' '}
+                    <Link href="/dashboard/settings" className="text-premium-gold font-bold hover:underline">Settings</Link>.
                   </p>
                 </div>
                 <a
@@ -1309,50 +1310,6 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                 >
                   <Lock className="w-3.5 h-3.5" /> Open Register
                 </a>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div>
-                  <label className="text-zinc-400 block mb-1 font-bold">Username</label>
-                  <input
-                    value={config.access.username}
-                    onChange={(e) => update('access', { username: e.target.value.trim() })}
-                    autoComplete="off"
-                    className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white p-3 rounded-xl font-mono text-xs outline-none focus:border-premium-gold"
-                  />
-                </div>
-                <div>
-                  <label className="text-zinc-400 block mb-1 font-bold">Passcode</label>
-                  <div className="relative">
-                    <input
-                      type={showPasscode ? 'text' : 'password'}
-                      value={config.access.passcode}
-                      onChange={(e) => update('access', { passcode: e.target.value.trim() })}
-                      autoComplete="new-password"
-                      className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white p-3 pr-10 rounded-xl font-mono text-xs outline-none focus:border-premium-gold"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPasscode((v) => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white scale-on-click"
-                      aria-label={showPasscode ? 'Hide passcode' : 'Show passcode'}
-                    >
-                      {showPasscode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  {config.access.passcode.length > 0 && config.access.passcode.length < 4 && (
-                    <p className="text-[10px] text-premium-danger mt-1">Use at least 4 characters.</p>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center justify-between gap-3 text-[11px] text-zinc-500">
-                <span>Default login: <span className="font-mono text-zinc-300">{DEFAULT_ACCESS.username} / {DEFAULT_ACCESS.passcode}</span></span>
-                <button
-                  type="button"
-                  onClick={() => resetEventSection(eventId, 'access')}
-                  className="font-bold text-zinc-400 hover:text-white scale-on-click flex items-center gap-1"
-                >
-                  <RotateCcw className="w-3 h-3" /> Use default
-                </button>
               </div>
             </div>
 

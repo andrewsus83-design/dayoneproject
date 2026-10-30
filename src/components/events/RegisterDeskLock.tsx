@@ -2,109 +2,63 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Lock, Eye, EyeOff, ShieldCheck, ScanLine } from 'lucide-react';
-import { DEFAULT_ACCESS, useEventConfigBySlug } from '@/lib/eventStore';
+import { useRouter } from 'next/navigation';
+import { Lock, LogIn, ShieldAlert } from 'lucide-react';
+import { useEventConfigBySlug } from '@/lib/eventStore';
+import { isSampleSlug } from '@/lib/events';
 import { createClient } from '@/lib/supabase/client';
 import { useSessionUser } from '@/lib/useSession';
 import { appRole } from '@/lib/auth';
 
-const MAX_ATTEMPTS = 5;
-const COOLDOWN_MS = 30_000;
-
-function fingerprint(username: string, passcode: string) {
-  let h = 5381;
-  for (const c of `${username.toLowerCase()}\u0000${passcode}`) h = ((h << 5) + h + c.charCodeAt(0)) | 0;
-  return String(h >>> 0);
-}
-
+/**
+ * The register desk opens only for a signed-in desk, organizer or admin account. For a real (server) event the
+ * account must also be on the team that runs it: the event row is only readable by its organization's members.
+ * Built-in sample events open for any signed-in account with an app role.
+ */
 export function RegisterDeskLock({ slug, children }: { slug: string; children: (lock: () => void) => React.ReactNode }) {
-  const { eventId, hydrated, config } = useEventConfigBySlug(slug);
-  const expectedUser = config.access.username || DEFAULT_ACCESS.username;
-  const expectedPass = config.access.passcode.length >= 4 ? config.access.passcode : DEFAULT_ACCESS.passcode;
-  const sessionKey = `all41-desk-${eventId}`;
-  const currentPrint = fingerprint(expectedUser, expectedPass);
-
-  // Desk staff, organizers and admins signed in to dayoneproject.xyz skip the per-event passcode.
+  const router = useRouter();
+  const { hydrated, config } = useEventConfigBySlug(slug);
   const { user, ready } = useSessionUser();
-  const signedIn = !!appRole(user);
-  const [unlocked, setUnlocked] = useState(false);
-  const [username, setUsername] = useState('');
-  const [passcode, setPasscode] = useState('');
-  const [showPass, setShowPass] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [attempts, setAttempts] = useState(0);
-  const [lockedUntil, setLockedUntil] = useState(0);
-  const [now, setNow] = useState(0);
+  const hasRole = !!appRole(user);
+  const sample = isSampleSlug(slug);
+  const accessKey = `${slug}:${user?.id ?? ''}`;
+  const [access, setAccess] = useState<{ key: string; member: boolean } | null>(null);
+  const loginHref = `/login?as=desk&next=${encodeURIComponent(`/events/${slug}/gate`)}`;
 
   useEffect(() => {
-    if (!hydrated) return;
-    try {
-      setUnlocked(sessionStorage.getItem(sessionKey) === currentPrint);
-    } catch {
-      setUnlocked(false);
-    }
-  }, [hydrated, sessionKey, currentPrint]);
-
-  useEffect(() => {
-    if (!lockedUntil) return;
-    setNow(Date.now());
-    const t = setInterval(() => {
-      const n = Date.now();
-      setNow(n);
-      if (n >= lockedUntil) {
-        setLockedUntil(0);
-        setAttempts(0);
-        setError(null);
-      }
-    }, 500);
-    return () => clearInterval(t);
-  }, [lockedUntil]);
-
-  const lock = () => {
-    try {
-      sessionStorage.removeItem(sessionKey);
-    } catch {}
-    setUnlocked(false);
-    setPasscode('');
-  };
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (lockedUntil) return;
-    if (username.trim().toLowerCase() === expectedUser.toLowerCase() && passcode === expectedPass) {
-      try {
-        sessionStorage.setItem(sessionKey, currentPrint);
-      } catch {}
-      setUnlocked(true);
-      setError(null);
-      setAttempts(0);
-      return;
-    }
-    const next = attempts + 1;
-    setAttempts(next);
-    setPasscode('');
-    if (next >= MAX_ATTEMPTS) {
-      setLockedUntil(Date.now() + COOLDOWN_MS);
-      setError('Too many wrong tries. Please wait 30 seconds.');
-    } else {
-      setError(`Wrong username or passcode. ${MAX_ATTEMPTS - next} ${MAX_ATTEMPTS - next === 1 ? 'try' : 'tries'} left.`);
-    }
-  };
+    if (!ready || !hasRole || sample) return;
+    let alive = true;
+    createClient()
+      .from('a41_events')
+      .select('id')
+      .eq('slug', slug)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (alive) setAccess({ key: accessKey, member: !error && !!data });
+      });
+    return () => {
+      alive = false;
+    };
+  }, [ready, hasRole, sample, slug, accessKey]);
 
   const signOut = async () => {
     await createClient().auth.signOut();
-    lock();
+  };
+  const switchAccount = async () => {
+    await signOut();
+    router.push(loginHref);
   };
 
   if (!hydrated || !ready) return <div className="min-h-screen bg-premium-black" />;
-  if (signedIn) return <>{children(signOut)}</>;
-  if (unlocked) return <>{children(lock)}</>;
+  const member = sample ? true : access?.key === accessKey ? access.member : null;
+  if (hasRole && member === null) return <div className="min-h-screen bg-premium-black" />;
+  if (hasRole && member) return <>{children(signOut)}</>;
 
-  const waitSeconds = lockedUntil ? Math.max(0, Math.ceil((lockedUntil - now) / 1000)) : 0;
+  const signedIn = !!user;
 
   return (
     <div className="min-h-screen bg-premium-black text-zinc-100 font-sans flex items-center justify-center px-6">
-      <form onSubmit={submit} className="w-full max-w-sm space-y-6">
+      <div className="w-full max-w-sm space-y-6">
         <div className="flex flex-col items-center text-center gap-4">
           <div className="w-14 h-14 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-2xl shadow-gold">D1</div>
           <div>
@@ -116,64 +70,38 @@ export function RegisterDeskLock({ slug, children }: { slug: string; children: (
           </div>
         </div>
 
-        <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4">
-          <div>
-            <label htmlFor="desk-user" className="text-xs font-bold text-zinc-400 block mb-1.5">Username</label>
-            <input
-              id="desk-user"
-              value={username}
-              onChange={(e) => { setUsername(e.target.value); setError(null); }}
-              autoComplete="username"
-              autoCapitalize="none"
-              autoFocus
-              disabled={!!lockedUntil}
-              className="w-full px-4 py-3.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-white text-sm outline-none focus:border-premium-gold disabled:opacity-50"
-            />
-          </div>
-          <div>
-            <label htmlFor="desk-pass" className="text-xs font-bold text-zinc-400 block mb-1.5">Passcode</label>
-            <div className="relative">
-              <input
-                id="desk-pass"
-                type={showPass ? 'text' : 'password'}
-                value={passcode}
-                onChange={(e) => { setPasscode(e.target.value); setError(null); }}
-                autoComplete="current-password"
-                inputMode="text"
-                disabled={!!lockedUntil}
-                className="w-full px-4 py-3.5 pr-11 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-white text-sm font-mono tracking-widest outline-none focus:border-premium-gold disabled:opacity-50"
-              />
+        <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4 text-center">
+          {signedIn ? (
+            <>
+              <p className="text-sm font-bold text-white flex items-center justify-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-premium-danger" /> This account can&apos;t open this desk
+              </p>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                {user?.email} is not on the team that runs this event. Ask the event&apos;s account owner to add you in Settings, then sign in again.
+              </p>
               <button
                 type="button"
-                onClick={() => setShowPass((v) => !v)}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white scale-on-click"
-                aria-label={showPass ? 'Hide passcode' : 'Show passcode'}
+                onClick={switchAccount}
+                className="w-full py-3.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-sm shadow-gold scale-on-click flex items-center justify-center gap-2"
               >
-                {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                <LogIn className="w-4 h-4" /> Sign in with another account
               </button>
-            </div>
-          </div>
-          {error && (
-            <p role="alert" className="text-xs font-bold text-premium-danger">
-              {error}{waitSeconds > 0 ? ` (${waitSeconds}s)` : ''}
-            </p>
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Desk staff sign in with the email and access code from the event&apos;s account owner. Organizers use their emailed code.
+              </p>
+              <Link
+                href={loginHref}
+                className="w-full py-3.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-sm shadow-gold scale-on-click flex items-center justify-center gap-2"
+              >
+                <LogIn className="w-4 h-4" /> Sign in
+              </Link>
+            </>
           )}
-          <button
-            type="submit"
-            disabled={!username.trim() || !passcode || !!lockedUntil}
-            className="w-full py-3.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-sm shadow-gold scale-on-click disabled:opacity-40 flex items-center justify-center gap-2"
-          >
-            <ShieldCheck className="w-4 h-4" /> Unlock Register Desk
-          </button>
         </div>
-        <Link
-          href={`/login?as=desk&next=${encodeURIComponent(`/events/${slug}/gate`)}`}
-          className="w-full py-3 rounded-xl border border-premium-borderDark text-zinc-300 hover:text-white text-xs font-bold flex items-center justify-center gap-2 scale-on-click"
-        >
-          <ScanLine className="w-4 h-4" /> Sign in with email and access code
-        </Link>
-        <p className="text-[11px] text-zinc-600 text-center">Or use the desk username and passcode the organizer set in Settings → Register Desk Access.</p>
-      </form>
+      </div>
     </div>
   );
 }
