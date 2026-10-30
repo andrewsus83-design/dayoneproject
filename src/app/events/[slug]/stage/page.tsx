@@ -1,5 +1,6 @@
 'use client';
 
+import { useEventConfigBySlug } from '@/lib/eventStore';
 import React, { useState, useEffect, use, Suspense } from 'react';
 import {
   MOCK_EVENT,
@@ -41,12 +42,7 @@ import QRCode from 'qrcode';
 import confetti from 'canvas-confetti';
 
 function StageBigScreenContent({ slug }: { slug: string }) {
-  const event =
-    slug === 'aria-daniel' ? MOCK_WEDDING_EVENT :
-    slug === 'sophia-marco' ? MOCK_WEDDING_BALI_EVENT :
-    slug === 'nexus' ? MOCK_CORPORATE_NEXUS_EVENT :
-    slug === 'popverse' ? MOCK_POPVERSE_EVENT :
-    MOCK_EVENT;
+  const { event } = useEventConfigBySlug(slug);
   const clientDomain = getClientDomain(slug);
   const captionsEnabled = event.settings?.enablePhotoWallCaptions ?? true;
 

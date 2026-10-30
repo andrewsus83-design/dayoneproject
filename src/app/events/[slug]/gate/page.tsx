@@ -2,8 +2,9 @@
 
 import React, { useState, useRef, useEffect, use, Suspense } from 'react';
 import Link from 'next/link';
-import { MOCK_GUESTS, MOCK_EVENT, MOCK_WEDDING_EVENT, MOCK_CORPORATE_NEXUS_EVENT, MOCK_WEDDING_BALI_EVENT, MOCK_POPVERSE_EVENT } from '@/lib/mockData';
 import { Guest } from '@/lib/types';
+import { readGuests, useEventConfigBySlug, useGuests, writeGuests } from '@/lib/eventStore';
+import { RegisterDeskLock } from '@/components/events/RegisterDeskLock';
 import {
   QrCode,
   Users,
@@ -19,6 +20,7 @@ import {
   Clock,
   UserPlus,
   X,
+  Lock,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -31,17 +33,14 @@ type ScanResult = {
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-function GateRegisterContent({ slug }: { slug: string }) {
-  const event =
-    slug === 'aria-daniel' ? MOCK_WEDDING_EVENT :
-    slug === 'sophia-marco' ? MOCK_WEDDING_BALI_EVENT :
-    slug === 'nexus' ? MOCK_CORPORATE_NEXUS_EVENT :
-    slug === 'popverse' ? MOCK_POPVERSE_EVENT :
-    MOCK_EVENT;
+function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => void }) {
+  const { eventId, event } = useEventConfigBySlug(slug);
   const isWedding = event.event_type === 'wedding';
 
   const [activeTab, setActiveTab] = useState<GateTab>('scan');
-  const [guests, setGuests] = useState<Guest[]>(MOCK_GUESTS);
+  // Shared with the dashboard guest list and the invitation form, so new RSVPs can be scanned here.
+  const guests = useGuests(eventId);
+  const setGuests = (fn: (prev: Guest[]) => Guest[]) => writeGuests(eventId, fn(readGuests(eventId)));
   const [searchQuery, setSearchQuery] = useState('');
 
   // Scan state
@@ -208,14 +207,25 @@ function GateRegisterContent({ slug }: { slug: string }) {
             </div>
           </div>
 
-          {/* Live gate counter */}
-          <div className="text-right">
-            <div className="text-xl font-display font-bold text-premium-success leading-none">
-              {checkedInCount}
+          <div className="flex items-center gap-3">
+            {/* Live gate counter */}
+            <div className="text-right">
+              <div className="text-xl font-display font-bold text-premium-success leading-none">
+                {checkedInCount}
+              </div>
+              <div className="text-[9px] font-mono text-zinc-500 leading-tight">
+                / {guests.length} in
+              </div>
             </div>
-            <div className="text-[9px] font-mono text-zinc-500 leading-tight">
-              / {guests.length} in
-            </div>
+            <button
+              type="button"
+              onClick={onLock}
+              title="Lock the register desk"
+              aria-label="Lock the register desk"
+              className="w-8 h-8 rounded-full bg-premium-charcoal border border-premium-borderDark flex items-center justify-center text-zinc-400 hover:text-premium-gold scale-on-click"
+            >
+              <Lock className="w-3.5 h-3.5" />
+            </button>
           </div>
         </header>
 
@@ -680,7 +690,7 @@ function GateRegisterContent({ slug }: { slug: string }) {
 // ─── Next.js 16 wrapper ───────────────────────────────────────────────────────
 function GateRegisterWrapper({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
-  return <GateRegisterContent slug={slug} />;
+  return <RegisterDeskLock slug={slug}>{(lock) => <GateRegisterContent slug={slug} onLock={lock} />}</RegisterDeskLock>;
 }
 
 export default function GateRegisterPage({ params }: { params: Promise<{ slug: string }> }) {

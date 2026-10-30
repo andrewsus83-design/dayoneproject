@@ -24,14 +24,7 @@ import {
   Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const EVENT_NAME_MAP: Record<string, { name: string; type: 'corporate' | 'wedding' }> = {
-  'evt-techunite-2026': { name: 'TechUnite APAC Summit', type: 'corporate' },
-  'evt-nexus-innovation-2026': { name: 'Nexus Innovation Forum', type: 'corporate' },
-  'evt-popverse-converge-2026': { name: 'POPVERSE: One Beat', type: 'corporate' },
-  'evt-aria-daniel-2026': { name: 'Aria & Daniel', type: 'wedding' },
-  'evt-sophia-marco-2026': { name: 'Sophia & Marco · Bali', type: 'wedding' },
-};
+import { useEventConfig } from '@/lib/eventStore';
 
 const WORKSPACE_NAV = [
   { label: 'My Events', href: '/dashboard', icon: Calendar, exact: true },
@@ -94,8 +87,8 @@ export function Sidebar() {
   const eventIdMatch = pathname.match(/\/dashboard\/events\/([^/?]+)/);
   const currentEventId = eventIdMatch ? eventIdMatch[1] : '';
 
-  const eventMeta = EVENT_NAME_MAP[currentEventId];
-  const isWedding = eventMeta?.type === 'wedding' || currentEventId.includes('wedding');
+  const { config: eventConfig, event: eventData } = useEventConfig(currentEventId || 'none');
+  const isWedding = eventData.event_type === 'wedding' || currentEventId.includes('wedding');
 
   const [enabledTabs, setEnabledTabs] = useState<string[]>(ALL_EVENT_TABS);
 
@@ -146,10 +139,10 @@ export function Sidebar() {
                   <span className="w-2 h-2 rounded-full bg-premium-success shadow-[0_0_6px_#00E676] animate-pulse flex-shrink-0 mt-1" />
                 </div>
                 <div className="text-[13px] font-display font-bold text-white leading-tight">
-                  {eventMeta?.name || currentEventId}
+                  {eventConfig.info.name || currentEventId}
                 </div>
                 <div className="text-[10px] font-mono text-premium-neon mt-1 truncate">
-                  {currentEventId.replace('evt-', '').replace('-2026', '')}.all41.app
+                  {eventConfig.info.slug}.all41.app
                 </div>
               </div>
             </div>

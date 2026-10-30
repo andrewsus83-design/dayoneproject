@@ -1,22 +1,29 @@
 'use client';
-import { useState, useRef } from 'react';
-import React from 'react';
+
+import React, { useMemo, useRef, useState } from 'react';
 import {
-  Image, Type, AlignLeft, Info, MousePointerClick, BookOpen, Grid3X3,
-  Sparkles, Upload, Plus, Trash2, GripVertical, Eye, EyeOff, Check,
-  Link, Star, Quote, Play, X as XIcon, Smartphone,
+  Image as ImageIcon, Type, AlignLeft, Info, BookOpen, Grid3X3, Sparkles, Upload, Plus, Trash2, Eye, EyeOff,
+  Check, Star, Quote, X as XIcon, Smartphone, ExternalLink, RotateCcw,
 } from 'lucide-react';
+import {
+  deleteAsset, formatEventDate, formatEventTime, newId, resetEventSection, saveAsset, useAssetUrl, useEventConfig,
+  type EventInfo, type LandingConfig,
+} from '@/lib/eventStore';
+import { BASE_EVENTS } from '@/lib/events';
+import { resolveTheme, type ResolvedTheme } from '@/lib/eventTheme';
+import { compressImage } from '@/lib/image';
 
 type LandingSubTab = 'hero' | 'gallery' | 'testimony' | 'info' | 'title' | 'subtitle' | 'notes';
 
-interface Props {
-  isWedding: boolean;
-  primaryColor: string;
-}
+const MAX_GALLERY = 12;
+const AI_HEROES = BASE_EVENTS.map((e) => ({ id: e.id, label: e.name.split(':')[0], url: e.cover_image_url ?? '' })).filter((h) => h.url);
+
+const inputCls =
+  'w-full px-3 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-xs text-white outline-none focus:border-premium-gold/60';
 
 function SubNav({ active, onChange }: { active: LandingSubTab; onChange: (t: LandingSubTab) => void }) {
   const tabs: { id: LandingSubTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-    { id: 'hero', label: 'Hero Image', icon: Image },
+    { id: 'hero', label: 'Hero Image', icon: ImageIcon },
     { id: 'gallery', label: 'Photo Gallery', icon: Grid3X3 },
     { id: 'testimony', label: 'Testimony', icon: Quote },
     { id: 'info', label: 'Core Information', icon: Info },
@@ -45,564 +52,507 @@ function SubNav({ active, onChange }: { active: LandingSubTab; onChange: (t: Lan
   );
 }
 
-/* ── Shared phone preview ─────────────────────────────── */
-function PhonePreview({
-  title, subtitle, info, ctaLabel, heroUrl, galleryOn, testimoniesOn, notes,
-}: {
-  title: string; subtitle: string; info: string; ctaLabel: string;
-  heroUrl: string; galleryOn: boolean; testimoniesOn: boolean; notes: string;
-}) {
+function OnOff({ on, onClick }: { on: boolean; onClick: () => void }) {
   return (
-    <div className="shrink-0 w-[210px] h-[420px] rounded-[2.5rem] bg-[#09090B] border-4 border-zinc-700 overflow-hidden shadow-2xl relative flex flex-col">
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs scale-on-click ${on ? 'bg-premium-gold text-black shadow-gold' : 'bg-zinc-800 text-zinc-400'}`}
+    >
+      {on ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+      {on ? 'ON' : 'OFF'}
+    </button>
+  );
+}
+
+function GalleryThumb({ refId, onRemove }: { refId: string; onRemove: () => void }) {
+  const url = useAssetUrl(refId);
+  return (
+    <div className="relative aspect-square rounded-xl overflow-hidden bg-zinc-800 group">
+      {url && <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${url})` }} />}
+      <button
+        type="button"
+        onClick={onRemove}
+        className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/70 flex items-center justify-center hover:bg-premium-danger scale-on-click"
+        aria-label="Remove photo"
+      >
+        <Trash2 className="w-3.5 h-3.5 text-white" />
+      </button>
+    </div>
+  );
+}
+
+function PreviewGalleryCell({ refId, theme }: { refId: string; theme: ResolvedTheme }) {
+  const url = useAssetUrl(refId);
+  return <div className="aspect-square rounded bg-cover bg-center" style={{ backgroundColor: theme.surface, backgroundImage: url ? `url(${url})` : undefined }} />;
+}
+
+function PhonePreview({ info, landing, heroUrl, theme }: { info: EventInfo; landing: LandingConfig; heroUrl: string; theme: ResolvedTheme }) {
+  const line = [formatEventDate(info.startDate, 'short'), formatEventTime(info.startTime), info.venue].filter(Boolean).join(' · ');
+  return (
+    <div className="shrink-0 w-[210px] h-[420px] rounded-[2.5rem] border-4 border-zinc-700 overflow-hidden shadow-2xl relative flex flex-col" style={{ background: theme.bg, fontFamily: theme.bodyFamily }}>
       <div className="absolute inset-x-0 top-0 h-6 flex items-center justify-center z-10">
         <div className="w-20 h-4 rounded-b-xl bg-zinc-800" />
       </div>
-      <div className="flex-1 overflow-y-auto pt-5 scrollbar-none">
-        {heroUrl ? (
-          <div className="relative h-28 bg-zinc-800">
-            <div
-              className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: `url(${heroUrl})` }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#09090B]" />
-          </div>
-        ) : (
-          <div className="h-28 bg-gradient-to-b from-zinc-800 to-[#09090B] flex items-center justify-center">
-            <Image className="w-8 h-8 text-zinc-600" />
-          </div>
-        )}
-        <div className="px-4 pt-2 space-y-1.5 pb-4">
-          <div className="text-[9px] font-mono text-amber-400 uppercase tracking-widest">{subtitle || 'Subtitle label'}</div>
-          <div className="text-sm font-display font-bold text-white leading-tight">{title || 'Event Title'}</div>
-          <div className="text-[9px] text-zinc-400">{info || 'Date · Venue · Location'}</div>
-          {notes && <div className="text-[8px] italic text-zinc-500 border-l border-zinc-700 pl-2">{notes}</div>}
-          {galleryOn && (
+      <div className="flex-1 overflow-y-auto pt-5">
+        <div className="relative h-32" style={{ background: theme.surface }}>
+          {heroUrl && <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${heroUrl})` }} />}
+          {landing.heroOverlay && <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/20 to-transparent" />}
+          <div className="absolute inset-x-0 bottom-0 h-12" style={{ background: `linear-gradient(180deg, transparent, ${theme.bg})` }} />
+        </div>
+        <div className="px-4 pt-1 space-y-1.5 pb-4" style={{ color: theme.text }}>
+          {landing.badge && (
+            <span className="inline-block text-[7px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: `${theme.primary}26`, color: theme.primaryText }}>
+              {landing.badge}
+            </span>
+          )}
+          {landing.subtitle && <div className="text-[8px] font-mono uppercase tracking-widest" style={{ color: theme.accentText }}>{landing.subtitle}</div>}
+          <div className="text-sm font-bold leading-tight" style={{ fontFamily: theme.headingFamily }}>{info.name || 'Event Title'}</div>
+          <div className="text-[8px]" style={{ color: theme.muted }}>{line || 'Date · Venue'}</div>
+          {landing.notesOn && landing.notesText && (
+            <div className="text-[8px] italic pl-2" style={{ color: theme.muted, borderLeft: `1px solid ${theme.primary}` }}>{landing.notesText}</div>
+          )}
+          {landing.galleryOn && landing.gallery.length > 0 && (
             <div className="grid grid-cols-3 gap-0.5 mt-1">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="aspect-square bg-zinc-800 rounded" />
-              ))}
+              {landing.gallery.slice(0, 6).map((p) => <PreviewGalleryCell key={p.id} refId={p.url} theme={theme} />)}
             </div>
           )}
-          {testimoniesOn && (
-            <div className="bg-zinc-800/80 rounded-xl px-3 py-2 mt-1">
-              <div className="text-[8px] italic text-zinc-300">&ldquo;Absolutely outstanding event!&rdquo;</div>
-              <div className="text-[7px] text-zinc-500 mt-0.5">— Sarah K.</div>
+          {landing.testimoniesOn && landing.testimonies[0] && (
+            <div className="rounded-xl px-3 py-2 mt-1" style={{ background: theme.card, border: `1px solid ${theme.border}` }}>
+              <div className="text-[8px] italic">&ldquo;{landing.testimonies[0].text}&rdquo;</div>
+              <div className="text-[7px] mt-0.5" style={{ color: theme.subtle }}>— {landing.testimonies[0].name}</div>
             </div>
           )}
-          <button type="button" className="w-full py-1.5 rounded-lg bg-amber-500 text-black font-bold text-[9px] mt-2 scale-on-click">
-            {ctaLabel || 'Register Now'}
-          </button>
+          <div className="w-full py-1.5 font-bold text-[9px] mt-2 text-center" style={{ background: theme.primary, color: theme.onPrimary, borderRadius: Math.min(theme.buttonRadius, 10) }}>
+            {landing.ctaLabel || 'Register Now'}
+          </div>
+          {landing.ctaSub && <div className="text-[7px] text-center" style={{ color: theme.subtle }}>{landing.ctaSub}</div>}
         </div>
       </div>
     </div>
   );
 }
 
-/* ── Testimony card ─────────────────────────────────────── */
-interface Testimony { id: string; name: string; role: string; text: string; rating: number; }
+export function LandingPageBuilder({ eventId }: { eventId: string }) {
+  const { config, event, update, savedAt } = useEventConfig(eventId);
+  const { landing, info } = config;
+  const isWedding = event.event_type === 'wedding';
+  const theme = useMemo(() => resolveTheme(config.design), [config.design]);
+  const heroAsset = useAssetUrl(landing.heroUrl);
+  const heroUrl = heroAsset || event.cover_image_url || '';
 
-/* ── Main component ──────────────────────────────────────── */
-export function LandingPageBuilder({ isWedding, primaryColor }: Props) {
   const [subTab, setSubTab] = useState<LandingSubTab>('hero');
   const [showPreviewModal, setShowPreviewModal] = useState(false);
-
-  // Hero
-  const [heroUrl, setHeroUrl] = useState('');
-  const [heroOverlay, setHeroOverlay] = useState(true);
-  const heroInputRef = useRef<HTMLInputElement>(null);
-
-  // Gallery
-  const [galleryOn, setGalleryOn] = useState(false);
-  const [galleryPhotos, setGalleryPhotos] = useState<{ id: string; url: string; caption: string }[]>([]);
-
-  // Testimony
-  const [testimoniesOn, setTestimoniesOn] = useState(false);
-  const [testimonies, setTestimonies] = useState<Testimony[]>([
-    { id: 't1', name: 'Sarah Kim', role: isWedding ? 'Bridesmaid' : 'CEO, TechCorp', text: 'Absolutely outstanding — every detail was perfect.', rating: 5 },
-  ]);
   const [newTestimony, setNewTestimony] = useState({ name: '', role: '', text: '', rating: 5 });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [showAiPicker, setShowAiPicker] = useState(false);
+  const heroInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
-  // Info
-  const [eventDate, setEventDate] = useState('2026-11-29');
-  const [eventTime, setEventTime] = useState('16:00');
-  const [venue, setVenue] = useState(isWedding ? 'Grand Ballroom, Hotel Mulia' : 'Marina Bay Sands Convention Centre');
-  const [city, setCity] = useState(isWedding ? 'Jakarta, Indonesia' : 'Singapore');
-  const [capacity, setCapacity] = useState(isWedding ? '200 Guests' : '500 Delegates');
-  const [dressCode, setDressCode] = useState(isWedding ? 'Formal — White & Gold' : 'Business Attire');
+  const report = (r: { ok: boolean; error?: string }) => setError(r.ok ? null : r.error ?? 'Could not save.');
+  const setLanding = (patch: Partial<LandingConfig>) => report(update('landing', patch));
+  const setInfo = (patch: Partial<EventInfo>) => report(update('info', patch));
 
-  // Title
-  const [title, setTitle] = useState(isWedding ? 'The Wedding of Andreas & Clara' : 'TechUnite APAC Summit 2026');
-  const [ctaLabel, setCtaLabel] = useState(isWedding ? 'RSVP Now' : 'Register Delegate Pass');
-  const [ctaSub, setCtaSub] = useState(isWedding ? 'Limited seats — reserve yours today' : 'Seats are limited — secure yours today');
+  const replaceHero = (ref: string) => {
+    if (landing.heroUrl && landing.heroUrl !== ref) deleteAsset(landing.heroUrl);
+    setLanding({ heroUrl: ref });
+  };
 
-  // Subtitle
-  const [subtitle, setSubtitle] = useState(isWedding ? 'A Celebration of Love' : 'APAC Executive Summit');
-  const [badge, setBadge] = useState(isWedding ? 'Intimate Garden Ceremony' : 'Invitation Only');
+  const uploadHero = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true);
+    try {
+      const saved = saveAsset(await compressImage(file, 1920, 0.8));
+      if (!saved.ok || !saved.ref) return report(saved);
+      replaceHero(saved.ref);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Upload failed.');
+    } finally {
+      setBusy(false);
+      if (heroInputRef.current) heroInputRef.current.value = '';
+    }
+  };
 
-  // Notes
-  const [notesOn, setNotesOn] = useState(false);
-  const [notesText, setNotesText] = useState(
-    isWedding
-      ? '"And now these three remain: faith, hope and love. But the greatest of these is love." — 1 Corinthians 13:13'
-      : '"The best way to predict the future is to create it." — Peter Drucker'
-  );
+  const uploadGallery = async (files: File[]) => {
+    if (!files.length) return;
+    const room = MAX_GALLERY - landing.gallery.length;
+    if (room <= 0) return setError(`The gallery holds up to ${MAX_GALLERY} photos.`);
+    setBusy(true);
+    const added: { id: string; url: string }[] = [];
+    try {
+      for (const file of files.slice(0, room)) {
+        const saved = saveAsset(await compressImage(file, 1000, 0.75));
+        if (!saved.ok || !saved.ref) {
+          report(saved);
+          break;
+        }
+        added.push({ id: newId('ph'), url: saved.ref });
+      }
+      if (added.length) setLanding({ gallery: [...landing.gallery, ...added] });
+      if (files.length > room) setError(`Only ${room} more photo${room === 1 ? '' : 's'} fit — the gallery holds ${MAX_GALLERY}.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Upload failed.');
+    } finally {
+      setBusy(false);
+      if (galleryInputRef.current) galleryInputRef.current.value = '';
+    }
+  };
 
-  const infoString = `${new Date(eventDate + 'T' + eventTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} · ${eventTime} · ${venue}`;
+  const line = [formatEventDate(info.startDate), formatEventTime(info.startTime), info.venue].filter(Boolean).join(' · ');
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 items-start">
-      {/* Left: editor */}
       <div className="space-y-5 min-w-0">
         <SubNav active={subTab} onChange={setSubTab} />
 
-        {/* ── Hero Image ── */}
+        {error && (
+          <div className="p-3 rounded-xl bg-premium-danger/10 border border-premium-danger/40 text-premium-danger text-xs font-bold flex items-center justify-between gap-3">
+            <span>{error}</span>
+            <button type="button" onClick={() => setError(null)} className="scale-on-click" aria-label="Dismiss"><XIcon className="w-3.5 h-3.5" /></button>
+          </div>
+        )}
+
         {subTab === 'hero' && (
           <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="font-display font-bold text-white">Hero / Cover Image</h4>
-                <p className="text-xs text-zinc-400 mt-0.5">Full-bleed banner shown at the top of the landing page.</p>
-              </div>
+            <div>
+              <h4 className="font-display font-bold text-white">Hero / Cover Image</h4>
+              <p className="text-xs text-zinc-400 mt-0.5">Full-bleed banner at the top of the landing page.</p>
             </div>
+            <input ref={heroInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => uploadHero(e.target.files?.[0])} />
 
-            {heroUrl ? (
-              <div className="relative rounded-2xl overflow-hidden h-48">
-                <div
-                  className="absolute inset-0 bg-cover bg-center"
-                  style={{ backgroundImage: `url(${heroUrl})` }}
-                />
-                {heroOverlay && <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/70" />}
+            <div className="relative rounded-2xl overflow-hidden h-48 bg-premium-surfaceDark">
+              {heroUrl && <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${heroUrl})` }} />}
+              {landing.heroOverlay && <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-black/70" />}
+              <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-black/60 border border-white/15 text-[10px] font-mono text-white">
+                {landing.heroUrl ? (landing.heroUrl.startsWith('asset:') ? 'Your upload' : 'AI gallery') : 'Event default'}
+              </div>
+              <div className="absolute top-3 right-3 flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setHeroUrl('')}
-                  className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-white hover:bg-premium-danger/80"
+                  onClick={() => heroInputRef.current?.click()}
+                  className="px-3 py-1.5 rounded-xl bg-black/70 border border-white/20 text-white text-[11px] font-bold scale-on-click flex items-center gap-1.5"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Upload className="w-3.5 h-3.5" /> {busy ? 'Compressing…' : 'Upload'}
                 </button>
+                {landing.heroUrl && (
+                  <button
+                    type="button"
+                    onClick={() => replaceHero('')}
+                    className="px-3 py-1.5 rounded-xl bg-black/70 border border-white/20 text-white text-[11px] font-bold scale-on-click flex items-center gap-1.5 hover:bg-premium-danger"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" /> Default
+                  </button>
+                )}
               </div>
-            ) : (
-              <div
-                className="h-48 rounded-2xl bg-premium-surfaceDark border-2 border-dashed border-premium-borderDark flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-premium-gold/50 transition-colors"
-                onClick={() => heroInputRef.current?.click()}
-              >
-                <div className="w-12 h-12 rounded-2xl bg-premium-gold/10 flex items-center justify-center">
-                  <Upload className="w-6 h-6 text-premium-gold" />
-                </div>
-                <div className="text-center">
-                  <div className="text-sm font-bold text-white">Upload Hero Image</div>
-                  <div className="text-xs text-zinc-400 mt-0.5">JPG, PNG, WebP — max 4MB · Recommended 1920×1080</div>
-                </div>
-                <input
-                  ref={heroInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) setHeroUrl(URL.createObjectURL(f));
-                  }}
-                />
-              </div>
-            )}
+            </div>
+            <p className="text-[10px] text-zinc-500">JPG, PNG or WebP · large photos are compressed automatically.</p>
 
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-zinc-300">Dark gradient overlay</span>
               <button
                 type="button"
-                onClick={() => setHeroOverlay(!heroOverlay)}
-                className={`px-3 py-1.5 rounded-xl font-bold scale-on-click ${heroOverlay ? 'bg-premium-gold text-black' : 'bg-zinc-800 text-zinc-400'}`}
+                onClick={() => setLanding({ heroOverlay: !landing.heroOverlay })}
+                className={`px-3 py-1.5 rounded-xl font-bold scale-on-click ${landing.heroOverlay ? 'bg-premium-gold text-black' : 'bg-zinc-800 text-zinc-400'}`}
               >
-                {heroOverlay ? 'ON' : 'OFF'}
+                {landing.heroOverlay ? 'ON' : 'OFF'}
               </button>
             </div>
 
-            {/* OpenArt generate option */}
-            <div className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark/60 flex items-center justify-between">
-              <div>
-                <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-premium-gold" />
-                  AI-generated hero image
+            <div className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark/60 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-premium-gold" /> AI-generated hero images
+                  </div>
+                  <div className="text-[10px] text-zinc-400 mt-0.5">Cinematic banners from the all41 library</div>
                 </div>
-                <div className="text-[10px] text-zinc-400 mt-0.5">Generate a cinematic banner with OpenArt nano-banana-2</div>
+                <button
+                  type="button"
+                  onClick={() => setShowAiPicker((v) => !v)}
+                  className="px-3.5 py-2 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-bold text-xs shadow-gold scale-on-click"
+                >
+                  {showAiPicker ? 'Close' : 'Browse'}
+                </button>
               </div>
-              <button
-                type="button"
-                className="px-3.5 py-2 rounded-xl bg-premium-gold text-black font-bold text-xs shadow-gold scale-on-click"
-                onClick={() => alert('OpenArt image generation would launch here')}
-              >
-                Generate
-              </button>
+              {showAiPicker && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {AI_HEROES.map((h) => (
+                    <button
+                      key={h.id}
+                      type="button"
+                      onClick={() => replaceHero(h.url)}
+                      className={`relative aspect-video rounded-xl overflow-hidden border-2 scale-on-click ${landing.heroUrl === h.url ? 'border-premium-gold' : 'border-transparent hover:border-premium-gold/50'}`}
+                    >
+                      <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${h.url})` }} />
+                      <div className="absolute inset-x-0 bottom-0 px-2 py-1 bg-black/70 text-[9px] text-white font-bold truncate text-left">{h.label}</div>
+                      {landing.heroUrl === h.url && <Check className="absolute top-1.5 right-1.5 w-4 h-4 text-premium-gold" />}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* ── Photo Gallery ── */}
         {subTab === 'gallery' && (
           <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-5">
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="font-display font-bold text-white">Photo Gallery Section</h4>
-                <p className="text-xs text-zinc-400 mt-0.5">Pinterest-style masonry grid shown on the landing page.</p>
+                <p className="text-xs text-zinc-400 mt-0.5">Masonry grid shown on the landing page.</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setGalleryOn(!galleryOn)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs scale-on-click ${galleryOn ? 'bg-premium-gold text-black shadow-gold' : 'bg-zinc-800 text-zinc-400'}`}
-              >
-                {galleryOn ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                {galleryOn ? 'ON' : 'OFF'}
-              </button>
+              <OnOff on={landing.galleryOn} onClick={() => setLanding({ galleryOn: !landing.galleryOn })} />
             </div>
-
-            {!galleryOn && (
-              <div className="p-4 rounded-2xl bg-premium-surfaceDark border border-dashed border-premium-borderDark text-center text-xs text-zinc-500">
-                Toggle ON to show a photo gallery on your landing page.
-              </div>
-            )}
-
-            {galleryOn && (
-              <>
-                {galleryPhotos.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-2">
-                    {galleryPhotos.map((p) => (
-                      <div key={p.id} className="relative aspect-square rounded-xl overflow-hidden bg-zinc-800 group">
-                        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${p.url})` }} />
-                        <button
-                          type="button"
-                          onClick={() => setGalleryPhotos((prev) => prev.filter((x) => x.id !== p.id))}
-                          className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <Trash2 className="w-3 h-3 text-white" />
-                        </button>
-                      </div>
-                    ))}
-                    <label className="aspect-square rounded-xl border-2 border-dashed border-premium-borderDark bg-premium-surfaceDark flex items-center justify-center cursor-pointer hover:border-premium-gold/50 transition-colors">
-                      <Plus className="w-5 h-5 text-zinc-500" />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => {
-                          const files = Array.from(e.target.files || []);
-                          setGalleryPhotos((prev) => [
-                            ...prev,
-                            ...files.map((f) => ({ id: Date.now() + f.name, url: URL.createObjectURL(f), caption: '' })),
-                          ]);
-                        }}
-                      />
-                    </label>
-                  </div>
-                ) : (
-                  <label className="h-32 rounded-2xl border-2 border-dashed border-premium-borderDark bg-premium-surfaceDark flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-premium-gold/50 transition-colors">
-                    <Upload className="w-6 h-6 text-zinc-500" />
-                    <span className="text-xs text-zinc-400">Upload photos (multi-select)</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => {
-                        const files = Array.from(e.target.files || []);
-                        setGalleryPhotos(files.map((f) => ({ id: Date.now() + f.name, url: URL.createObjectURL(f), caption: '' })));
-                      }}
-                    />
-                  </label>
-                )}
-                <div className="text-[10px] text-zinc-500 font-mono">
-                  {galleryPhotos.length} photo{galleryPhotos.length !== 1 ? 's' : ''} uploaded · Max 20 · WebP recommended
-                </div>
-              </>
-            )}
+            <input
+              ref={galleryInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => uploadGallery(Array.from(e.target.files || []))}
+            />
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {landing.gallery.map((p) => (
+                <GalleryThumb
+                  key={p.id}
+                  refId={p.url}
+                  onRemove={() => {
+                    deleteAsset(p.url);
+                    setLanding({ gallery: landing.gallery.filter((x) => x.id !== p.id) });
+                  }}
+                />
+              ))}
+              {landing.gallery.length < MAX_GALLERY && (
+                <button
+                  type="button"
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="aspect-square rounded-xl border-2 border-dashed border-premium-borderDark bg-premium-surfaceDark flex flex-col items-center justify-center gap-1 hover:border-premium-gold/50 transition-colors scale-on-click"
+                >
+                  <Plus className="w-5 h-5 text-zinc-400" />
+                  <span className="text-[10px] text-zinc-500">{busy ? 'Adding…' : 'Add photos'}</span>
+                </button>
+              )}
+            </div>
+            <div className="text-[10px] text-zinc-500 font-mono">
+              {landing.gallery.length} / {MAX_GALLERY} photos{!landing.galleryOn && landing.gallery.length > 0 ? ' · section is OFF, turn it ON to show it' : ''}
+            </div>
           </div>
         )}
 
-        {/* ── Testimony ── */}
         {subTab === 'testimony' && (
           <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-5">
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="font-display font-bold text-white">Testimonies / Quotes</h4>
-                <p className="text-xs text-zinc-400 mt-0.5">Social proof cards shown before the CTA button.</p>
+                <p className="text-xs text-zinc-400 mt-0.5">Social proof cards shown before the call-to-action.</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setTestimoniesOn(!testimoniesOn)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs scale-on-click ${testimoniesOn ? 'bg-premium-gold text-black shadow-gold' : 'bg-zinc-800 text-zinc-400'}`}
-              >
-                {testimoniesOn ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                {testimoniesOn ? 'ON' : 'OFF'}
-              </button>
+              <OnOff on={landing.testimoniesOn} onClick={() => setLanding({ testimoniesOn: !landing.testimoniesOn })} />
             </div>
 
-            {!testimoniesOn && (
-              <div className="p-4 rounded-2xl bg-premium-surfaceDark border border-dashed border-premium-borderDark text-center text-xs text-zinc-500">
-                Toggle ON to show testimonies on your landing page.
-              </div>
-            )}
-
-            {testimoniesOn && (
-              <>
-                <div className="space-y-3">
-                  {testimonies.map((t) => (
-                    <div key={t.id} className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark flex items-start justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-1 mb-1">
-                          {Array.from({ length: t.rating }).map((_, i) => (
-                            <Star key={i} className="w-3 h-3 fill-premium-gold text-premium-gold" />
-                          ))}
-                        </div>
-                        <p className="text-xs italic text-zinc-300">&ldquo;{t.text}&rdquo;</p>
-                        <p className="text-[10px] text-zinc-500 mt-1 font-bold">{t.name} · {t.role}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setTestimonies((prev) => prev.filter((x) => x.id !== t.id))}
-                        className="shrink-0 text-zinc-600 hover:text-premium-danger"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+            <div className="space-y-3">
+              {landing.testimonies.map((t) => (
+                <div key={t.id} className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-1 mb-1">
+                      {Array.from({ length: t.rating }).map((_, i) => <Star key={i} className="w-3 h-3 fill-premium-gold text-premium-gold" />)}
                     </div>
+                    <p className="text-xs italic text-zinc-300">&ldquo;{t.text}&rdquo;</p>
+                    <p className="text-[10px] text-zinc-500 mt-1 font-bold">{t.name}{t.role ? ` · ${t.role}` : ''}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLanding({ testimonies: landing.testimonies.filter((x) => x.id !== t.id) })}
+                    className="shrink-0 text-zinc-600 hover:text-premium-danger scale-on-click"
+                    aria-label="Delete testimony"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark/60 space-y-3">
+              <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Add testimony</p>
+              <div className="grid grid-cols-2 gap-2">
+                <input value={newTestimony.name} onChange={(e) => setNewTestimony((p) => ({ ...p, name: e.target.value }))} placeholder="Name" className={inputCls} />
+                <input value={newTestimony.role} onChange={(e) => setNewTestimony((p) => ({ ...p, role: e.target.value }))} placeholder={isWedding ? 'Relation' : 'Role / Company'} className={inputCls} />
+              </div>
+              <textarea rows={2} value={newTestimony.text} onChange={(e) => setNewTestimony((p) => ({ ...p, text: e.target.value }))} placeholder="Their testimonial…" className={`${inputCls} resize-none`} />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <button key={s} type="button" onClick={() => setNewTestimony((p) => ({ ...p, rating: s }))} className="scale-on-click" aria-label={`${s} stars`}>
+                      <Star className={`w-4 h-4 ${s <= newTestimony.rating ? 'fill-premium-gold text-premium-gold' : 'text-zinc-700'}`} />
+                    </button>
                   ))}
                 </div>
-
-                {/* Add testimony form */}
-                <div className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark/60 space-y-3">
-                  <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Add Testimony</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      value={newTestimony.name}
-                      onChange={(e) => setNewTestimony((p) => ({ ...p, name: e.target.value }))}
-                      placeholder="Name"
-                      className="px-3 py-2 rounded-xl bg-premium-black border border-premium-borderDark text-xs text-white placeholder-zinc-600 outline-none focus:border-premium-gold/60"
-                    />
-                    <input
-                      value={newTestimony.role}
-                      onChange={(e) => setNewTestimony((p) => ({ ...p, role: e.target.value }))}
-                      placeholder={isWedding ? 'Relation' : 'Role / Company'}
-                      className="px-3 py-2 rounded-xl bg-premium-black border border-premium-borderDark text-xs text-white placeholder-zinc-600 outline-none focus:border-premium-gold/60"
-                    />
-                  </div>
-                  <textarea
-                    rows={2}
-                    value={newTestimony.text}
-                    onChange={(e) => setNewTestimony((p) => ({ ...p, text: e.target.value }))}
-                    placeholder="Their testimonial..."
-                    className="w-full px-3 py-2 rounded-xl bg-premium-black border border-premium-borderDark text-xs text-white placeholder-zinc-600 outline-none focus:border-premium-gold/60 resize-none"
-                  />
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((s) => (
-                        <button key={s} type="button" onClick={() => setNewTestimony((p) => ({ ...p, rating: s }))}>
-                          <Star className={`w-4 h-4 ${s <= newTestimony.rating ? 'fill-premium-gold text-premium-gold' : 'text-zinc-700'}`} />
-                        </button>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!newTestimony.name || !newTestimony.text) return;
-                        setTestimonies((prev) => [...prev, { id: Date.now().toString(), ...newTestimony }]);
-                        setNewTestimony({ name: '', role: '', text: '', rating: 5 });
-                      }}
-                      className="px-4 py-1.5 rounded-xl bg-premium-gold text-black font-bold text-xs scale-on-click"
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
+                <button
+                  type="button"
+                  disabled={!newTestimony.name.trim() || !newTestimony.text.trim()}
+                  onClick={() => {
+                    setLanding({ testimonies: [...landing.testimonies, { id: newId('t'), ...newTestimony, name: newTestimony.name.trim(), text: newTestimony.text.trim() }], testimoniesOn: true });
+                    setNewTestimony({ name: '', role: '', text: '', rating: 5 });
+                  }}
+                  className="px-4 py-1.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-bold text-xs scale-on-click disabled:opacity-40"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* ── Core Information ── */}
         {subTab === 'info' && (
           <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4">
-            <h4 className="font-display font-bold text-white">Core Event Information</h4>
+            <div>
+              <h4 className="font-display font-bold text-white">Core Event Information</h4>
+              <p className="text-[11px] text-zinc-500 mt-0.5">Shared with Event Information and the invitation form.</p>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {[
-                { label: 'Event Date', value: eventDate, type: 'date', set: setEventDate },
-                { label: 'Event Time', value: eventTime, type: 'time', set: setEventTime },
-              ].map(({ label, value, type, set }) => (
-                <div key={label} className="space-y-1.5">
-                  <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{label}</label>
-                  <input
-                    type={type}
-                    value={value}
-                    onChange={(e) => set(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-xs text-white outline-none focus:border-premium-gold/60"
-                  />
-                </div>
-              ))}
-              {[
-                { label: 'Venue / Hall', value: venue, set: setVenue },
-                { label: 'City / Country', value: city, set: setCity },
-                { label: 'Capacity', value: capacity, set: setCapacity },
-                { label: isWedding ? 'Dress Code' : 'Attire', value: dressCode, set: setDressCode },
-              ].map(({ label, value, set }) => (
-                <div key={label} className="space-y-1.5">
-                  <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{label}</label>
-                  <input
-                    value={value}
-                    onChange={(e) => set(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-xs text-white outline-none focus:border-premium-gold/60"
-                  />
-                </div>
-              ))}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Event Date</label>
+                <input type="date" value={info.startDate} onChange={(e) => setInfo({ startDate: e.target.value })} className={`${inputCls} [color-scheme:dark]`} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Event Time</label>
+                <input type="time" value={info.startTime} onChange={(e) => setInfo({ startTime: e.target.value })} className={`${inputCls} [color-scheme:dark]`} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Venue / Hall</label>
+                <input value={info.venue} onChange={(e) => setInfo({ venue: e.target.value })} className={inputCls} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">City / Country</label>
+                <input value={info.city} onChange={(e) => setInfo({ city: e.target.value })} className={inputCls} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Capacity (guests)</label>
+                <input type="number" min={1} value={info.capacity} onChange={(e) => setInfo({ capacity: Math.max(0, parseInt(e.target.value || '0', 10)) })} className={inputCls} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{isWedding ? 'Dress Code' : 'Attire'}</label>
+                <input value={landing.dressCode} onChange={(e) => setLanding({ dressCode: e.target.value })} className={inputCls} />
+              </div>
             </div>
-            <div className="mt-2 p-3 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-[10px] font-mono text-zinc-400">
-              Preview: {infoString}
-            </div>
+            <div className="p-3 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-[10px] font-mono text-zinc-400">Preview: {line}</div>
           </div>
         )}
 
-        {/* ── Title ── */}
         {subTab === 'title' && (
           <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4">
             <h4 className="font-display font-bold text-white">Event Title & CTA Button</h4>
-            {[
-              { label: 'Main Title', value: title, set: setTitle, hint: 'Shown as H1 on landing page' },
-              { label: 'CTA Button Label', value: ctaLabel, set: setCtaLabel, hint: 'Primary call-to-action text' },
-              { label: 'CTA Sub-label', value: ctaSub, set: setCtaSub, hint: 'Small text beneath the button' },
-            ].map(({ label, value, set, hint }) => (
-              <div key={label} className="space-y-1.5">
-                <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{label}</label>
-                <input
-                  value={value}
-                  onChange={(e) => set(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-sm text-white outline-none focus:border-premium-gold/60"
-                />
-                <p className="text-[10px] text-zinc-600">{hint}</p>
+            {([
+              { label: 'Main Title', value: info.name, onChange: (v: string) => setInfo({ name: v }), hint: 'The event name — shown as the big headline' },
+              { label: 'CTA Button Label', value: landing.ctaLabel, onChange: (v: string) => setLanding({ ctaLabel: v }), hint: 'Main call-to-action text' },
+              { label: 'CTA Sub-label', value: landing.ctaSub, onChange: (v: string) => setLanding({ ctaSub: v }), hint: 'Small text beneath the bottom button' },
+            ]).map((f) => (
+              <div key={f.label} className="space-y-1.5">
+                <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{f.label}</label>
+                <input value={f.value} onChange={(e) => f.onChange(e.target.value)} className={`${inputCls} text-sm`} />
+                <p className="text-[10px] text-zinc-600">{f.hint}</p>
               </div>
             ))}
           </div>
         )}
 
-        {/* ── Subtitle / Label ── */}
         {subTab === 'subtitle' && (
           <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4">
             <h4 className="font-display font-bold text-white">Subtitle & Label Badge</h4>
-            {[
-              { label: 'Subtitle / Tagline', value: subtitle, set: setSubtitle, hint: 'Appears above the main title' },
-              { label: 'Label Badge', value: badge, set: setBadge, hint: 'Small pill badge e.g. "Invitation Only"' },
-            ].map(({ label, value, set, hint }) => (
-              <div key={label} className="space-y-1.5">
-                <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{label}</label>
-                <input
-                  value={value}
-                  onChange={(e) => set(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-sm text-white outline-none focus:border-premium-gold/60"
-                />
-                <p className="text-[10px] text-zinc-600">{hint}</p>
+            {([
+              { label: 'Subtitle / Tagline', value: landing.subtitle, onChange: (v: string) => setLanding({ subtitle: v }), hint: 'Optional line above the main title — leave empty to hide' },
+              { label: 'Label Badge', value: landing.badge, onChange: (v: string) => setLanding({ badge: v }), hint: 'Small pill badge, e.g. "Invitation Only"' },
+            ]).map((f) => (
+              <div key={f.label} className="space-y-1.5">
+                <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{f.label}</label>
+                <input value={f.value} onChange={(e) => f.onChange(e.target.value)} className={`${inputCls} text-sm`} />
+                <p className="text-[10px] text-zinc-600">{f.hint}</p>
               </div>
             ))}
-            <div className="flex items-center gap-2 flex-wrap pt-1">
-              <div className="px-3 py-1 rounded-full bg-premium-gold/15 text-premium-gold border border-premium-gold/30 text-[10px] font-bold font-mono">
-                {badge}
-              </div>
-              <div className="text-sm font-display font-bold text-zinc-400">{subtitle}</div>
-            </div>
           </div>
         )}
 
-        {/* ── Notes ── */}
         {subTab === 'notes' && (
           <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="font-display font-bold text-white">Notes / Verse / Quote</h4>
-                <p className="text-xs text-zinc-400 mt-0.5">Optional inspirational text displayed below core info.</p>
+                <p className="text-xs text-zinc-400 mt-0.5">Optional text shown below the core information.</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setNotesOn(!notesOn)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs scale-on-click ${notesOn ? 'bg-premium-gold text-black shadow-gold' : 'bg-zinc-800 text-zinc-400'}`}
-              >
-                {notesOn ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                {notesOn ? 'ON' : 'OFF'}
-              </button>
+              <OnOff on={landing.notesOn} onClick={() => setLanding({ notesOn: !landing.notesOn })} />
             </div>
-
-            {!notesOn && (
-              <div className="p-4 rounded-2xl bg-premium-surfaceDark border border-dashed border-premium-borderDark text-center text-xs text-zinc-500">
-                Toggle ON to show a verse, quote, or note on your landing page.
-              </div>
-            )}
-
-            {notesOn && (
-              <div className="space-y-3">
-                <textarea
-                  rows={4}
-                  value={notesText}
-                  onChange={(e) => setNotesText(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-sm text-white italic outline-none focus:border-premium-gold/60 resize-none"
-                />
-                <div className="p-4 rounded-2xl bg-premium-surfaceDark border-l-2 border-premium-gold text-xs italic text-zinc-300">
-                  {notesText}
-                </div>
-              </div>
-            )}
+            <textarea
+              rows={4}
+              value={landing.notesText}
+              onChange={(e) => setLanding({ notesText: e.target.value })}
+              className="w-full px-4 py-3 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-sm text-white italic outline-none focus:border-premium-gold/60 resize-none"
+            />
           </div>
         )}
 
-        {/* Save row */}
-        <div className="flex items-center justify-between pt-2">
-          <button
-            type="button"
-            onClick={() => setShowPreviewModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-zinc-300 text-sm font-bold scale-on-click hover:border-zinc-600 lg:hidden"
-          >
-            <Smartphone className="w-4 h-4" />
-            Preview
-          </button>
-          <button
-            type="button"
-            className="px-6 py-2.5 rounded-xl bg-premium-gold text-black font-bold text-sm shadow-gold scale-on-click ml-auto"
-            onClick={() => alert('Landing page saved!')}
-          >
-            Save Landing Page
-          </button>
+        <div className="flex items-center justify-between gap-3 pt-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowPreviewModal(true)}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-zinc-300 text-sm font-bold scale-on-click hover:border-zinc-600 lg:hidden"
+            >
+              <Smartphone className="w-4 h-4" /> Preview
+            </button>
+            <a
+              href={`/events/${info.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-zinc-300 text-sm font-bold scale-on-click hover:border-premium-gold/50"
+            >
+              <ExternalLink className="w-4 h-4" /> Open landing page
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                if (!confirm('Reset the landing page sections to defaults? Uploaded photos will be removed.')) return;
+                if (landing.heroUrl) deleteAsset(landing.heroUrl);
+                landing.gallery.forEach((p) => deleteAsset(p.url));
+                report(resetEventSection(eventId, 'landing'));
+              }}
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-zinc-500 hover:text-white text-xs font-bold scale-on-click"
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> Reset
+            </button>
+          </div>
+          <div className="flex items-center gap-3">
+            {savedAt && (
+              <span className="text-[11px] font-mono text-premium-success flex items-center gap-1">
+                <Check className="w-3 h-3" /> Auto-saved {new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setSaved(true);
+                setTimeout(() => setSaved(false), 1800);
+              }}
+              className={`px-6 py-2.5 rounded-xl font-bold text-sm scale-on-click transition-all ${saved ? 'bg-premium-success text-black' : 'bg-premium-gold hover:bg-premium-goldHover text-black shadow-gold'}`}
+            >
+              {saved ? '✓ Saved' : 'Save Landing Page'}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Right: phone preview — desktop only */}
       <div className="hidden lg:flex flex-col items-center gap-3 pt-[3.5rem]">
         <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Live Preview</span>
-        <PhonePreview
-          title={title}
-          subtitle={subtitle}
-          info={infoString}
-          ctaLabel={ctaLabel}
-          heroUrl={heroUrl}
-          galleryOn={galleryOn}
-          testimoniesOn={testimoniesOn}
-          notes={notesOn ? notesText : ''}
-        />
+        <PhonePreview info={info} landing={landing} heroUrl={heroUrl} theme={theme} />
       </div>
 
-      {/* Mobile preview modal */}
       {showPreviewModal && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 lg:hidden" onClick={() => setShowPreviewModal(false)}>
           <div className="relative" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              onClick={() => setShowPreviewModal(false)}
-              className="absolute -top-10 right-0 p-2 text-zinc-400 hover:text-white scale-on-click"
-            >
+            <button type="button" onClick={() => setShowPreviewModal(false)} className="absolute -top-10 right-0 p-2 text-zinc-400 hover:text-white scale-on-click" aria-label="Close preview">
               <XIcon className="w-5 h-5" />
             </button>
-            <span className="block text-center text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">Live Preview</span>
-            <PhonePreview
-              title={title}
-              subtitle={subtitle}
-              info={infoString}
-              ctaLabel={ctaLabel}
-              heroUrl={heroUrl}
-              galleryOn={galleryOn}
-              testimoniesOn={testimoniesOn}
-              notes={notesOn ? notesText : ''}
-            />
+            <PhonePreview info={info} landing={landing} heroUrl={heroUrl} theme={theme} />
           </div>
         </div>
       )}

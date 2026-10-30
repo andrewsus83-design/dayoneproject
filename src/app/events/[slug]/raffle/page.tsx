@@ -1,5 +1,6 @@
 'use client';
 
+import { useEventConfigBySlug } from '@/lib/eventStore';
 import React, { useState, useEffect, useCallback, use, Suspense } from 'react';
 import Link from 'next/link';
 import { MOCK_EVENT, MOCK_CORPORATE_NEXUS_EVENT, MOCK_WEDDING_BALI_EVENT, MOCK_POPVERSE_EVENT, MOCK_WEDDING_EVENT, MOCK_GUESTS, MOCK_RAFFLES } from '@/lib/mockData';
@@ -21,12 +22,7 @@ import confetti from 'canvas-confetti';
 import SlotMachineRaffle from '@/components/stage/SlotMachineRaffle';
 
 function RaffleStageContent({ slug }: { slug: string }) {
-  const event =
-    slug === 'aria-daniel' ? MOCK_WEDDING_EVENT :
-    slug === 'sophia-marco' ? MOCK_WEDDING_BALI_EVENT :
-    slug === 'nexus' ? MOCK_CORPORATE_NEXUS_EVENT :
-    slug === 'popverse' ? MOCK_POPVERSE_EVENT :
-    MOCK_EVENT;
+  const { event } = useEventConfigBySlug(slug);
   const [mode, setMode] = useState<'wheel' | 'claw' | 'slot'>('wheel');
   const [selectedPrize, setSelectedPrize] = useState<string>('Apple MacBook Pro M4 Max (16-inch)');
   const [isSpinning, setIsSpinning] = useState(false);
