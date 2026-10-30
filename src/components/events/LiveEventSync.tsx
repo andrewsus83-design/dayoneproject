@@ -2,9 +2,10 @@
 
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { hasLocalEvent, isSampleSlug } from '@/lib/events';
-import { syncEventBySlug } from '@/lib/eventSync';
+import { readSyncState } from '@/lib/eventStore';
+import { eventVersion, syncEventBySlug, type LiveCopy } from '@/lib/eventSync';
 
-/** How often an open page checks for a newer save. */
+/** How often an open page checks for a newer save (a tiny request; the event downloads only when it changed). */
 const REFRESH_MS = 30_000;
 const noopSubscribe = () => () => {};
 
@@ -22,7 +23,8 @@ function Notice({ title, children }: { title: string; children?: React.ReactNode
 
 /**
  * Every page under /events/<slug> runs inside this: it loads the event's saved setup from the server (so any phone
- * or screen shows the organizer's latest Save & publish) and refreshes it while the page stays open.
+ * or screen shows the organizer's latest save) and refreshes it while the page stays open. Between full loads it only
+ * asks the server for the event's save time, and downloads the event again when that changed.
  */
 export function LiveEventSync({ slug, children }: { slug: string; children: React.ReactNode }) {
   const sample = isSampleSlug(slug);
@@ -33,13 +35,44 @@ export function LiveEventSync({ slug, children }: { slug: string; children: Reac
   useEffect(() => {
     if (sample) return;
     let alive = true;
-    const refresh = () =>
-      syncEventBySlug(slug)
-        .then((found) => alive && setState(found ? 'live' : 'missing'))
-        .catch(() => alive && setState((s) => (s === 'live' ? s : 'offline')));
-    refresh();
-    const timer = setInterval(() => document.visibilityState === 'visible' && refresh(), REFRESH_MS);
-    const onVisible = () => document.visibilityState === 'visible' && refresh();
+    let busy = false;
+    // What the last full load brought; null until one succeeds.
+    let last: LiveCopy | null = null;
+
+    const load = async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        const copy = await syncEventBySlug(slug);
+        last = copy;
+        if (alive) setState(copy.found ? 'live' : 'missing');
+      } catch {
+        if (alive) setState((s) => (s === 'live' ? s : 'offline'));
+      } finally {
+        busy = false;
+      }
+    };
+
+    const check = async () => {
+      if (busy) return;
+      if (!last) return load();
+      try {
+        const version = await eventVersion(slug, last.source);
+        if (version === last.version) return;
+        // Another tab on this device may already hold that version (it just saved it).
+        if (version && last.id && readSyncState(last.id).savedIso === version) {
+          last = { ...last, version };
+          return;
+        }
+        await load();
+      } catch {
+        // Offline for a moment: the next check tries again.
+      }
+    };
+
+    load();
+    const timer = setInterval(() => document.visibilityState === 'visible' && check(), REFRESH_MS);
+    const onVisible = () => document.visibilityState === 'visible' && load();
     document.addEventListener('visibilitychange', onVisible);
     return () => {
       alive = false;

@@ -177,11 +177,21 @@ export async function pullEvent(eventId: string, { discard = false }: { discard?
   return true;
 }
 
+export interface LiveCopy {
+  /** False when there is no such event, or it is not live and this account does not run it. */
+  found: boolean;
+  id: string | null;
+  /** The server's saved_at for the copy just loaded. */
+  version: string | null;
+  /** Organizers and register desk staff load the full setup ('member'); everyone else the published page. */
+  source: 'member' | 'public';
+}
+
 /**
  * Loads an event for its public pages. Signed-in organizers and register desk staff get the full setup
- * (drafts too); everyone else gets the published page. False when there is no such live event.
+ * (drafts too); everyone else gets the published page.
  */
-export async function syncEventBySlug(slug: string): Promise<boolean> {
+export async function syncEventBySlug(slug: string): Promise<LiveCopy> {
   const supabase = createClient();
   const { data: auth } = await supabase.auth.getSession();
   if (auth.session) {
@@ -189,13 +199,13 @@ export async function syncEventBySlug(slug: string): Promise<boolean> {
     if (data) {
       const { row, config, savedAt } = splitRow(data as ServerRow);
       applyServerCopy(row, config, savedAt);
-      return true;
+      return { found: true, id: row.id, version: savedAt, source: 'member' };
     }
   }
 
   const { data, error } = await supabase.rpc('a41_public_event', { p_slug: slug });
   if (error) throw new Error(error.message);
-  if (!data) return false;
+  if (!data) return { found: false, id: null, version: null, source: 'public' };
   const pub = data as Omit<OrgEventRow, 'status' | 'package' | 'created_at'> & { site: Partial<EventConfig>; saved_at: string | null };
   applyServerCopy(
     {
@@ -206,5 +216,21 @@ export async function syncEventBySlug(slug: string): Promise<boolean> {
     pub.site,
     pub.saved_at,
   );
-  return true;
+  return { found: true, id: pub.id, version: pub.saved_at, source: 'public' };
+}
+
+/**
+ * The light check open event pages run instead of downloading the event: the saved_at of the copy the server would
+ * send now (null when there is none). A changed value means it is time for syncEventBySlug again.
+ */
+export async function eventVersion(slug: string, source: LiveCopy['source']): Promise<string | null> {
+  const supabase = createClient();
+  if (source === 'member') {
+    const { data, error } = await supabase.from('a41_events').select('saved_at').eq('slug', slug).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (data) return (data as { saved_at: string | null }).saved_at;
+  }
+  const { data, error } = await supabase.rpc('a41_event_version', { p_slug: slug });
+  if (error) throw new Error(error.message);
+  return (data as string | null) ?? null;
 }
