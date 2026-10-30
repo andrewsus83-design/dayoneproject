@@ -273,7 +273,7 @@ export function GamesScreen({ slug, initialId }: { slug: string; initialId?: str
         <header className="px-8 pt-6 pb-4 z-20 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4 min-w-0">
-              <Link href={`/events/${slug}`} className="p-2.5 rounded-2xl bg-premium-charcoal text-zinc-400 hover:text-white border border-premium-borderDark scale-on-click" aria-label="Back to event">
+              <Link href={`/dashboard/events/${eventId}?tab=games`} className="p-2.5 rounded-2xl bg-premium-charcoal text-zinc-400 hover:text-white border border-premium-borderDark scale-on-click" aria-label="Back to dashboard">
                 <ArrowLeft className="w-4 h-4" />
               </Link>
               {nameAlign === 'left' && title}

@@ -2,6 +2,7 @@
 
 import React, { Suspense, use, useCallback, useEffect, useState } from 'react';
 import { DESIGN_HEIGHT, FitBox, SourceView, designWidth } from '@/components/screens/ScreenView';
+import { ScreenControls } from '@/components/screens/ScreenControls';
 import { useScreenFeed, type ScreenFeed } from '@/lib/screensApi';
 
 interface Layer {
@@ -98,8 +99,10 @@ function ScreenOutput({ screenId }: { screenId: string }) {
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden select-none" style={{ cursor: started ? 'none' : 'default' }} onClick={started ? undefined : start}>
-      {/* Nothing on air may show a pointer once the screen is running. */}
+      {/* Nothing on air may show a pointer once the screen is running (except the controls at the top edge). */}
       {started && <style>{'*{cursor:none !important}'}</style>}
+      {/* Screen managers land on their switcher, organizers on their events. */}
+      <ScreenControls backHref="/dashboard" />
 
       <div className="absolute inset-0">
       <FitBox width={designWidth(width, height)} height={DESIGN_HEIGHT} className="w-full h-full">
@@ -143,7 +146,7 @@ function ScreenOutput({ screenId }: { screenId: string }) {
             <div className="text-xl font-display font-bold text-white">{feed.screen.name}</div>
             <div className="text-xs font-mono text-zinc-400">{width} × {height}</div>
             <div className="text-sm text-premium-gold font-bold pt-2">Click anywhere to start this screen</div>
-            <div className="text-[11px] text-zinc-500">It goes full screen and hides the pointer. Press F to leave full screen.</div>
+            <div className="text-[11px] text-zinc-500">It goes full screen and hides the pointer. Move the pointer to the top edge for Back, Full screen and Close.</div>
           </div>
         </div>
       )}

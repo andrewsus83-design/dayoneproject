@@ -6,6 +6,7 @@ import confetti from 'canvas-confetti';
 import QRCode from 'qrcode';
 import { Maximize2, Minimize2, Camera, Gamepad2, Gift, Sparkles, RotateCcw, Trophy, WifiOff } from 'lucide-react';
 import { useEventConfigBySlug, useSampleGuests } from '@/lib/eventStore';
+import { ScreenControls } from '@/components/screens/ScreenControls';
 import { isSampleSlug } from '@/lib/events';
 import { isServerEventId } from '@/lib/guestsApi';
 import { createClient } from '@/lib/supabase/client';
@@ -185,6 +186,7 @@ function StageBigScreenContent({ slug }: { slug: string }) {
       data-stage-root=""
       className={`min-h-screen bg-premium-black text-zinc-100 flex flex-col justify-between overflow-x-hidden relative select-none font-sans ${outputMode ? 'cursor-none [&_*]:!cursor-none' : ''}`}
     >
+      {!outputMode && <ScreenControls backHref={`/dashboard/events/${eventId}?tab=live`} backLabel="Dashboard" />}
       {/* Background Stage Ambient Glows */}
       <div className="absolute top-0 left-1/4 w-[800px] h-[800px] bg-premium-neon/10 blur-[180px] pointer-events-none rounded-full" />
       <div className="absolute bottom-0 right-1/4 w-[800px] h-[800px] bg-premium-gold/10 blur-[180px] pointer-events-none rounded-full" />

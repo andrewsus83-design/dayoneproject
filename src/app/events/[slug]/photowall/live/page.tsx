@@ -8,6 +8,7 @@ import { getClientDomain, getEffectiveClientUrl } from '@/lib/domain';
 import { isSampleSlug } from '@/lib/events';
 import { feedToUploads, useWallFeed } from '@/lib/photoWallApi';
 import { PinterestMasonryPhotoWall } from '@/components/events/PinterestMasonryPhotoWall';
+import { ScreenControls } from '@/components/screens/ScreenControls';
 import { Camera, Maximize2, Minimize2, QrCode, WifiOff } from 'lucide-react';
 import QRCode from 'qrcode';
 
@@ -25,7 +26,7 @@ function Notice({ title, children }: { title: string; children?: React.ReactNode
 }
 
 function LivePhotoWallContent({ slug }: { slug: string }) {
-  const { event } = useEventConfigBySlug(slug);
+  const { event, eventId } = useEventConfigBySlug(slug);
   const sample = isSampleSlug(slug);
   const key = useSearchParams().get('key');
   const clientDomain = getClientDomain(slug);
@@ -109,6 +110,7 @@ function LivePhotoWallContent({ slug }: { slug: string }) {
 
   return (
     <div className="min-h-screen bg-premium-black text-zinc-100 flex flex-col justify-between overflow-x-hidden relative select-none font-sans">
+      <ScreenControls backHref={`/dashboard/events/${eventId}?tab=live`} backLabel="Dashboard" />
       {/* Background Ambient Glows */}
       <div className="absolute top-0 left-1/4 w-[700px] h-[700px] bg-premium-neon/10 blur-[180px] pointer-events-none rounded-full" />
       <div className="absolute bottom-0 right-1/4 w-[700px] h-[700px] bg-premium-gold/10 blur-[180px] pointer-events-none rounded-full" />

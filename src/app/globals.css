@@ -185,3 +185,9 @@ body {
   .guest-app .text-\[14px\] { font-size: 16px; }
   .guest-app .text-\[15px\] { font-size: 17px; }
 }
+
+/* Big-screen controls (ScreenControls) keep a pointer even where the screen hides it on air. */
+.screen-controls,
+.screen-controls * {
+  cursor: pointer !important;
+}
