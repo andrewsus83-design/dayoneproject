@@ -154,9 +154,10 @@ function CtaFields({ label, target, url, onChange }: { label: string; target: Ct
       <Text label="Button label" value={label} onChange={(v) => onChange({ ctaLabel: v })} placeholder="Leave empty to hide the button" />
       <Segmented<CtaTarget>
         label="Button opens"
-        value={target}
+        // 'register' (older pages) opens the invitation form too, so it shows as that.
+        value={target === 'register' ? 'invitation' : target}
         onChange={(v) => onChange({ ctaTarget: v })}
-        options={[{ id: 'invitation', label: 'Invitation form' }, { id: 'register', label: 'Registration form' }, { id: 'custom', label: 'Custom link' }]}
+        options={[{ id: 'invitation', label: 'Invitation form' }, { id: 'custom', label: 'Custom link' }]}
       />
       {target === 'custom' && <Text label="Link" value={url} onChange={(v) => onChange({ ctaUrl: v })} placeholder="https://" />}
     </div>

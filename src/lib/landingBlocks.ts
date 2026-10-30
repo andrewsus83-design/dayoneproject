@@ -1,4 +1,5 @@
 import type { Event } from './types';
+import { isSampleEventId } from './events';
 import type { Testimony } from './eventStore';
 
 // 'register' is kept so pages saved before the invitation form replaced registration still load;
@@ -207,11 +208,44 @@ function popverseBlocks(): LandingBlock[] {
   ];
 }
 
+/** Starter sections for a real event: prompts the organizer replaces, never invented facts. */
+function starterSections(isWedding: boolean): { story: FeaturesBlock; dress: FactsBlock | null } {
+  const story: FeaturesBlock = isWedding
+    ? {
+        id: 'story', type: 'features', label: 'Our Story', heading: 'Our Story', layout: 'grid',
+        items: [
+          { id: 's1', subtitle: 'Year', title: 'How we met', body: 'Tell guests how you met.', color: '' },
+          { id: 's2', subtitle: 'Year', title: 'The proposal', body: 'Share the moment you said yes.', color: '' },
+          { id: 's3', subtitle: 'Year', title: 'The big day', body: 'Say what you are looking forward to.', color: '' },
+        ],
+      }
+    : {
+        id: 'why', type: 'features', label: 'Why Attend', heading: 'Why Attend', layout: 'grid',
+        items: [
+          { id: 'w1', title: 'What you will hear', subtitle: '', body: 'Name the talks, speakers or sessions guests should not miss.', color: '' },
+          { id: 'w2', title: 'Who you will meet', subtitle: '', body: 'Describe who else is coming.', color: '' },
+          { id: 'w3', title: 'What you will take home', subtitle: '', body: 'Say what guests gain by attending.', color: '' },
+        ],
+      };
+  const dress: FactsBlock | null = isWedding
+    ? {
+        id: 'dress', type: 'facts', label: '', heading: 'Dress Code & Details',
+        items: [
+          { id: 'd1', label: 'Dress Code', value: 'Add your dress code', color: '' },
+          { id: 'd2', label: 'Color Palette', value: 'Add your colors', color: '' },
+        ],
+      }
+    : null;
+  return { story, dress };
+}
+
 export function buildDefaultBlocks(base: Event): LandingBlock[] {
   if (base.id === 'evt-popverse-converge-2026') return popverseBlocks();
   const isWedding = base.event_type === 'wedding';
   const hero = createBlock('hero', isWedding) as HeroBlock;
-  const story: FeaturesBlock = isWedding
+  const sample = isSampleEventId(base.id);
+  const starter = sample ? null : starterSections(isWedding);
+  const story: FeaturesBlock = starter ? starter.story : isWedding
     ? {
         id: 'story', type: 'features', label: 'Our Story', heading: 'Our Story', layout: 'grid',
         items: [
@@ -232,8 +266,8 @@ export function buildDefaultBlocks(base: Event): LandingBlock[] {
   const included: FeaturesBlock = {
     id: 'included', type: 'features', label: '', heading: "What's Included", layout: 'grid',
     items: [
-      { id: 'n1', title: 'Digital QR Pass', subtitle: '', body: 'Cryptographic gate entry', color: '' },
-      { id: 'n2', title: 'AI Photo Wall', subtitle: '', body: 'Upload & share memories', color: '' },
+      { id: 'n1', title: 'Digital QR Pass', subtitle: '', body: 'Fast check-in at the door', color: '' },
+      { id: 'n2', title: 'Photo Wall', subtitle: '', body: 'Upload & share memories', color: '' },
       { id: 'n3', title: 'Live Trivia', subtitle: '', body: 'Kahoot-style real-time quiz', color: '' },
       { id: 'n4', title: 'Door Prize Raffle', subtitle: '', body: '3D animated prize draws', color: '' },
       { id: 'n5', title: 'Stage Display', subtitle: '', body: 'LED room module controller', color: '' },
@@ -247,7 +281,9 @@ export function buildDefaultBlocks(base: Event): LandingBlock[] {
     story,
     included,
   ];
-  if (isWedding) {
+  if (starter) {
+    if (starter.dress) blocks.push(starter.dress);
+  } else if (isWedding) {
     blocks.push({
       id: 'dress', type: 'facts', label: '', heading: 'Dress Code & Details',
       items: [

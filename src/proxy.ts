@@ -87,12 +87,8 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // 3. Custom Domain Support (Bring Your Own Domain - White Label Add-on)
-  // e.g. wedding.ariadaniel.com -> rewrites to custom domain handler
-  url.pathname = `/custom/${host}${url.pathname === '/' ? '' : url.pathname}`;
-  const response = NextResponse.rewrite(url);
-  response.headers.set('x-custom-domain', host);
-  return response;
+  // 3. Any other host pointed at this app (custom domains are not offered yet): send it to the app.
+  return NextResponse.redirect(new URL(url.pathname + url.search, `https://app.${ROOT_DOMAIN}`), 307);
 }
 
 /**

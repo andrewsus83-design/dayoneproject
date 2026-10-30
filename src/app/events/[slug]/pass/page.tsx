@@ -68,7 +68,7 @@ function Shell({ slug, children }: { slug: string; children: React.ReactNode }) 
       </header>
       <main className="p-5 space-y-6 flex-1 overflow-y-auto hide-scrollbar">{children}</main>
       <footer className="p-4 text-center text-[11px] text-zinc-500 border-t border-premium-borderDark bg-premium-surfaceDark font-mono">
-        dayoneproject.xyz • Verified Cryptographic Token Gate Pass
+        dayoneproject.xyz • Show this QR code at the entrance
       </footer>
     </div>
   );

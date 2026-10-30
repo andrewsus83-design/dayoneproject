@@ -289,8 +289,8 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                 <Sparkles className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-sm font-display font-bold text-white">Event live — ready to manage</h3>
-                <p className="text-xs text-zinc-500 mt-0.5">Use the sidebar to navigate between sections.</p>
+                <h3 className="text-sm font-display font-bold text-white">Event created as a draft</h3>
+                <p className="text-xs text-zinc-500 mt-0.5">Build your pages, then press Publish at the top so guests can open them.</p>
               </div>
             </div>
             <Link

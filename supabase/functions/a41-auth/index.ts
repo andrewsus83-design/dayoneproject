@@ -15,10 +15,12 @@ const ALLOWED_ORIGINS = ['https://app.dayoneproject.xyz', 'http://localhost:3042
 const PREVIEW_ORIGIN = /^https:\/\/all41-u356-[a-z0-9-]+-andrewsus83-5642s-projects\.vercel\.app$/;
 const ISSUER = 'dayoneproject.xyz';
 
-// 10 wrong authenticator or setup codes for one email within a day lock that email out for 24 hours.
+// 10 wrong authenticator or setup codes for one email from one network within a day lock that network out of that
+// email for 24 hours. Keyed by network too, so a stranger guessing can't lock the real owner out for a day; the
+// per-email limit of 6 tries per 15 minutes still caps guessing from many networks.
 const MAX_CODE_FAILURES = 10;
 const DAY_SECONDS = 86_400;
-const LOCKED = 'Too many wrong codes. Sign-in for this email is locked for 24 hours.';
+const LOCKED = 'Too many wrong codes from this network. Try again tomorrow or from another network.';
 const CODE_SENT = 'If this email has an organizer account, a code is on its way.';
 
 function corsHeaders(origin: string | null) {
@@ -128,11 +130,11 @@ Deno.serve(async (req) => {
     const { data } = await admin.rpc('a41_svc_hit', { p_key: key, p_max: max, p_window_seconds: windowSeconds });
     return data === true;
   };
-  /** Authenticator lockout, counted per email whether or not the email has an account. */
+  /** Authenticator lockout, counted per email and network whether or not the email has an account. */
   const lockedOut = async (email: string) =>
-    ((await admin.rpc('a41_svc_attempts', { p_key: `code-lock:${email}`, p_window_seconds: DAY_SECONDS })).data ?? 0) > 0;
+    ((await admin.rpc('a41_svc_attempts', { p_key: `code-lock:${email}:${ip}`, p_window_seconds: DAY_SECONDS })).data ?? 0) > 0;
   const codeFailed = async (email: string) => {
-    if (!(await hit(`code-fail:${email}`, MAX_CODE_FAILURES - 1, DAY_SECONDS))) await hit(`code-lock:${email}`, 1, DAY_SECONDS);
+    if (!(await hit(`code-fail:${email}:${ip}`, MAX_CODE_FAILURES - 1, DAY_SECONDS))) await hit(`code-lock:${email}:${ip}`, 1, DAY_SECONDS);
   };
   const secret = async (name: string) => (await admin.rpc('a41_svc_secret', { p_name: name })).data as string | null;
   const findUser = async (email: string) => {

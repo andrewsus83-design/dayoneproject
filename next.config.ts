@@ -54,6 +54,12 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // The landing page and invitation form can be embedded on the organizer's own website (Overview → embed
+        // code). Browsers obey frame-ancestors over X-Frame-Options, and these pages have no signed-in actions.
+        source: "/events/:slug/:page(invitation)?",
+        headers: [{ key: "Content-Security-Policy", value: contentSecurityPolicy("*") }],
+      },
+      {
         // Signed-in areas are never framed (the later entry wins for the same header).
         source: "/:area(dashboard|admin|desk|login)/:path*",
         headers: [

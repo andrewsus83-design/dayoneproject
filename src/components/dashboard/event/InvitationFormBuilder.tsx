@@ -1150,15 +1150,14 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
           <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-5">
             <div>
               <h3 className="font-display font-bold text-white text-base flex items-center gap-2"><Smartphone className="w-4 h-4 text-premium-gold" /> Register Desk PWA</h3>
-              <p className="text-[11px] text-zinc-400 mt-0.5">Install the door scanner on any phone or tablet. It is locked with a username and passcode.</p>
+              <p className="text-[11px] text-zinc-400 mt-0.5">Install the door scanner on any phone or tablet. Only your team can open it.</p>
             </div>
 
             <div className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-gold/30 flex items-start gap-3">
               <KeyRound className="w-4 h-4 text-premium-gold shrink-0 mt-0.5" />
               <div className="text-xs text-zinc-300 space-y-1">
-                <div className="font-bold text-white">Desk login</div>
-                <div className="font-mono">Username: <span className="text-premium-gold">{config.access.username}</span> · Passcode: <span className="text-premium-gold">{config.access.passcode}</span></div>
-                <div className="text-[10px] text-zinc-500">Change these in Settings → Register Desk Access.</div>
+                <div className="font-bold text-white">Desk sign-in</div>
+                <div>Desk staff sign in with their own email and access code. Add them in Settings → Team.</div>
               </div>
             </div>
 
@@ -1185,7 +1184,7 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
               {[
                 'Open the Register Desk link on the door phone or tablet',
                 'Add it to the home screen (Share → Add to Home Screen)',
-                'Sign in with the desk username and passcode',
+                'Sign in with the desk email and access code from Settings → Team',
                 'Scan guest QR passes or search names to check them in',
               ].map((step, i) => (
                 <div key={step} className="flex items-start gap-3 text-xs text-zinc-300">

@@ -5,12 +5,9 @@ import { KeyRound, Loader2, Lock, Save, Trash2 } from 'lucide-react';
 import { adminApi, type AdminKey } from '@/lib/adminApi';
 
 const PRESETS = [
-  { name: 'RESEND_API_KEY', desc: 'Email sending (invitations, passes, reminders)' },
+  { name: 'RESEND_API_KEY', desc: 'Email sending (sign-in codes, invitations, passes, reminders)' },
+  { name: 'RESEND_FROM', desc: 'Sender for guest emails, e.g. Day One <events@dayoneproject.xyz>' },
   { name: 'FONNTE_TOKEN', desc: 'WhatsApp sending (Fonnte device token)' },
-  { name: 'OPENAI_API_KEY', desc: 'AI features' },
-  { name: 'ANTHROPIC_API_KEY', desc: 'AI features' },
-  { name: 'R2_ACCESS_KEY_ID', desc: 'Cloudflare R2 photo storage' },
-  { name: 'R2_SECRET_ACCESS_KEY', desc: 'Cloudflare R2 photo storage' },
 ];
 
 const input = 'w-full bg-premium-surfaceDark border border-premium-borderDark text-white px-3 py-2.5 rounded-xl text-sm outline-none focus:border-premium-gold placeholder:text-zinc-600';
