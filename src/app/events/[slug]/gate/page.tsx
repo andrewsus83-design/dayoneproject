@@ -2,9 +2,10 @@
 
 import React, { useState, useRef, useEffect, use, Suspense } from 'react';
 import Link from 'next/link';
-import { Guest } from '@/lib/types';
-import { formatGuestNumber, numberDigits, readGuests, useEventConfigBySlug, useGuests, writeGuests } from '@/lib/eventStore';
+import { formatGuestNumber, useEventConfigBySlug } from '@/lib/eventStore';
 import { RegisterDeskLock } from '@/components/events/RegisterDeskLock';
+import { QrScanner } from '@/components/events/QrScanner';
+import { useDesk, type DeskGuest, type ScanResult } from './useDesk';
 import {
   QrCode,
   Users,
@@ -13,165 +14,164 @@ import {
   XCircle,
   AlertCircle,
   ArrowLeft,
-  Camera,
-  Zap,
-  Wifi,
-  RefreshCw,
   Clock,
   UserPlus,
   X,
   Lock,
+  WifiOff,
+  Loader2,
+  RotateCcw,
 } from 'lucide-react';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 type GateTab = 'scan' | 'guests';
-type ScanResult = {
-  status: 'success' | 'duplicate' | 'invalid';
-  guest?: Guest;
-  message: string;
-  timestamp: string;
-};
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => void }) {
-  const { eventId, event } = useEventConfigBySlug(slug);
+  const { eventId, event, config } = useEventConfigBySlug(slug);
   const isWedding = event.event_type === 'wedding';
 
   const [activeTab, setActiveTab] = useState<GateTab>('scan');
-  // Shared with the dashboard guest list and the invitation form, so new RSVPs can be scanned here.
-  const guests = useGuests(eventId);
-  const digits = numberDigits(guests);
-  const setGuests = (fn: (prev: Guest[]) => Guest[]) => writeGuests(eventId, fn(readGuests(eventId)));
+  // Saved events check in on the server, so every desk at the door sees the same list and counts.
+  const desk = useDesk(eventId, activeTab === 'guests');
+  const digits = Math.max(3, String(Math.max(desk.total, config.info.capacity || 0, 1)).length);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchHits, setSearchHits] = useState<{ query: string; guests: DeskGuest[] | null } | null>(null);
 
   // Scan state
   const [tokenInput, setTokenInput] = useState('');
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [scanFlash, setScanFlash] = useState<'idle' | 'success' | 'error'>('idle');
   const [recentScans, setRecentScans] = useState<ScanResult[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const flashTimer = useRef<number | undefined>(undefined);
 
   // Manual add guest
   const [showManualAdd, setShowManualAdd] = useState(false);
   const [manualName, setManualName] = useState('');
   const [manualTable, setManualTable] = useState('');
+  const [manualPhone, setManualPhone] = useState('');
   const [manualCategory, setManualCategory] = useState<'VIP' | 'Regular' | 'Press'>('Regular');
+  const [manualError, setManualError] = useState<string | null>(null);
 
   // Focus the scan input when on scan tab
   useEffect(() => {
-    if (activeTab === 'scan') {
-      setTimeout(() => inputRef.current?.focus(), 100);
-    }
+    if (activeTab !== 'scan') return;
+    const t = window.setTimeout(() => inputRef.current?.focus(), 100);
+    return () => window.clearTimeout(t);
   }, [activeTab]);
 
-  const checkedInCount = guests.filter((g) => g.is_checked_in).length;
+  useEffect(() => () => window.clearTimeout(flashTimer.current), []);
 
-  const handleScan = (rawToken: string) => {
-    const token = rawToken.trim();
-    if (!token) return;
+  // Server search (names, guest numbers, phone digits, emails) as the desk types.
+  const query = searchQuery.trim();
+  const { sample: isSampleDesk, search } = desk;
+  useEffect(() => {
+    if (isSampleDesk || !query) return;
+    let alive = true;
+    const t = window.setTimeout(() => {
+      search(query).then((guests) => alive && setSearchHits({ query, guests }));
+    }, 250);
+    return () => {
+      alive = false;
+      window.clearTimeout(t);
+    };
+  }, [isSampleDesk, search, query]);
 
-    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const found = guests.find((g) => g.qr_code_token.toLowerCase() === token.toLowerCase());
-
-    let result: ScanResult;
-
-    if (!found) {
-      result = { status: 'invalid', message: 'Pass not found in roster', timestamp: now };
-      setScanFlash('error');
-    } else if (found.is_checked_in) {
-      result = {
-        status: 'duplicate',
-        message: `Already checked in at ${found.checked_in_at ? new Date(found.checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'earlier'}`,
-        guest: found,
-        timestamp: now,
-      };
-      setScanFlash('error');
-    } else {
-      const updated: Guest = {
-        ...found,
-        is_checked_in: true,
-        checked_in_at: new Date().toISOString(),
-        checked_in_by: 'Gate Register PWA',
-      };
-      setGuests((prev) => prev.map((g) => (g.id === found.id ? updated : g)));
-      result = {
-        status: 'success',
-        message: 'Admission verified',
-        guest: updated,
-        timestamp: now,
-      };
-      setScanFlash('success');
-    }
-
+  const showResult = (result: ScanResult) => {
     setScanResult(result);
     setRecentScans((prev) => [result, ...prev.slice(0, 9)]);
-    setTokenInput('');
-
-    setTimeout(() => {
+    setScanFlash(result.status === 'success' ? 'success' : 'error');
+    window.clearTimeout(flashTimer.current);
+    flashTimer.current = window.setTimeout(() => {
       setScanFlash('idle');
       inputRef.current?.focus();
-    }, 1400);
+    }, result.status === 'success' ? 1400 : 2200);
   };
 
-  const handleManualAddGuest = () => {
-    if (!manualName.trim()) return;
-    const now = new Date().toISOString();
-    const token = `QR-WALK-IN-${Date.now()}`;
-    const newGuest: Guest = {
-      id: `walk-in-${Date.now()}`,
-      event_id: event.id,
-      name: manualName.trim(),
-      email: null,
-      phone: null,
-      table_number: manualTable.trim() || null,
-      category: manualCategory,
-      plus_one_count: 0,
-      rsvp_status: 'attending',
-      rsvp_notes: null,
-      qr_code_token: token,
-      is_checked_in: true,
-      checked_in_at: now,
-      checked_in_by: 'Gate Register — Manual',
-      photos_uploaded_count: 0,
-      emails_sent_count: 0,
-      whatsapp_sent_count: 0,
-      custom_fields: {},
-      created_at: now,
-      updated_at: now,
-    };
-    setGuests((prev) => [newGuest, ...prev]);
-    const scanTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const result: ScanResult = {
-      status: 'success',
-      guest: newGuest,
-      message: 'Walk-in admitted manually',
-      timestamp: scanTime,
-    };
-    setScanResult(result);
-    setRecentScans((prev) => [result, ...prev.slice(0, 9)]);
-    setScanFlash('success');
-    setTimeout(() => { setScanFlash('idle'); inputRef.current?.focus(); }, 1400);
-    setShowManualAdd(false);
-    setManualName('');
-    setManualTable('');
-    setManualCategory('Regular');
+  const handleScan = async (rawToken: string) => {
+    const token = rawToken.trim();
+    if (!token || busy) return;
+    setBusy(true);
+    setTokenInput('');
+    try {
+      showResult(await desk.checkInToken(token));
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const filteredGuests = guests.filter((g) => {
-    const q = searchQuery.toLowerCase();
+  const handleAdmit = async (guest: DeskGuest) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = await desk.checkInById(guest.id);
+      showResult(result);
+      if (result.status !== 'invalid') setActiveTab('scan');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleUndo = async (guest: DeskGuest) => {
+    if (!confirm(`Undo the check-in of ${guest.name}?`)) return;
+    const problem = await desk.undo(guest.id);
+    setNotice(problem ?? `${guest.name} is no longer checked in.`);
+    setRecentScans((prev) => prev.filter((s) => s.guest?.id !== guest.id));
+    if (scanResult?.guest?.id === guest.id) setScanFlash('idle');
+    if (searchHits?.guests) {
+      setSearchHits({ ...searchHits, guests: searchHits.guests.map((g) => (g.id === guest.id ? { ...g, checkedInAt: null } : g)) });
+    }
+  };
+
+  const handleManualAddGuest = async () => {
+    if (!manualName.trim() || busy) return;
+    setBusy(true);
+    setManualError(null);
+    try {
+      const result = await desk.walkIn({ name: manualName, table: manualTable, phone: manualPhone, category: manualCategory });
+      if (result.status === 'invalid') {
+        setManualError(result.message);
+        return;
+      }
+      showResult(result);
+      setShowManualAdd(false);
+      setManualName('');
+      setManualTable('');
+      setManualPhone('');
+      setManualCategory('Regular');
+      setActiveTab('scan');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const matchesLocal = (g: DeskGuest) => {
+    const q = query.toLowerCase();
     return (
       g.name.toLowerCase().includes(q) ||
-      formatGuestNumber(g.guest_number, digits).includes(q) ||
-      (g.table_number || '').toLowerCase().includes(q) ||
-      g.qr_code_token.toLowerCase().includes(q)
+      formatGuestNumber(g.number, digits).includes(q) ||
+      (g.table || '').toLowerCase().includes(q) ||
+      (g.token || '').toLowerCase().includes(q)
     );
-  });
+  };
+  const serverHits = searchHits && searchHits.query === query ? searchHits.guests : undefined;
+  const filteredGuests = !query
+    ? desk.guests
+    : desk.sample
+    ? desk.guests.filter(matchesLocal)
+    : serverHits ?? desk.guests.filter(matchesLocal);
+  const searching = !desk.sample && !!query && serverHits === undefined;
 
   const sortedGuests = [...filteredGuests].sort((a, b) => {
     // Checked-in last
-    if (a.is_checked_in !== b.is_checked_in) return a.is_checked_in ? 1 : -1;
+    if (!!a.checkedInAt !== !!b.checkedInAt) return a.checkedInAt ? 1 : -1;
     return a.name.localeCompare(b.name);
   });
+
+  const checkedInCount = desk.checkedIn;
+  const totalCount = desk.total;
 
   return (
     <div className="min-h-screen bg-premium-black text-zinc-100 flex justify-center font-sans">
@@ -196,12 +196,18 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
             <Link
               href={`/dashboard/events/${event.id}?tab=live`}
               className="w-8 h-8 rounded-full bg-premium-charcoal border border-premium-borderDark flex items-center justify-center text-zinc-400 hover:text-white scale-on-click"
+              aria-label="Back to the event"
             >
               <ArrowLeft className="w-4 h-4" />
             </Link>
             <div>
-              <p className="text-[9px] font-mono font-bold text-premium-gold uppercase tracking-[0.2em] leading-none mb-0.5">
+              <p className="text-[9px] font-mono font-bold text-premium-gold uppercase tracking-[0.2em] leading-none mb-0.5 flex items-center gap-1.5">
                 Gate Register
+                {desk.connection === 'offline' && (
+                  <span className="inline-flex items-center gap-1 text-premium-danger normal-case tracking-normal">
+                    <WifiOff className="w-3 h-3" /> offline
+                  </span>
+                )}
               </p>
               <h3 className="font-display font-bold text-[15px] text-white leading-tight truncate max-w-[180px]">
                 {event.name}
@@ -210,13 +216,13 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Live gate counter */}
+            {/* Live gate counter (all desks) */}
             <div className="text-right">
               <div className="text-xl font-display font-bold text-premium-success leading-none">
                 {checkedInCount}
               </div>
               <div className="text-[9px] font-mono text-zinc-500 leading-tight">
-                / {guests.length} in
+                / {totalCount} in
               </div>
             </div>
             <button
@@ -235,12 +241,21 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
         <div className="h-0.5 bg-premium-surfaceDark flex-shrink-0">
           <div
             className="h-full bg-premium-success transition-all duration-500"
-            style={{ width: `${(checkedInCount / guests.length) * 100}%` }}
+            style={{ width: `${totalCount ? (checkedInCount / totalCount) * 100 : 0}%` }}
           />
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto hide-scrollbar pb-24">
+
+          {notice && (
+            <div className="mx-5 mt-4 p-3 rounded-2xl bg-premium-charcoal border border-premium-gold/40 text-[12px] text-white flex items-center justify-between gap-3">
+              <span>{notice}</span>
+              <button type="button" onClick={() => setNotice(null)} className="text-zinc-500 hover:text-white scale-on-click" aria-label="Dismiss">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
           {/* ── TAB: SCAN ─────────────────────────────────────── */}
           {activeTab === 'scan' && (
@@ -251,7 +266,7 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
                 <span className="text-[11px] font-mono font-bold text-zinc-600 uppercase tracking-wider">QR Scanner</span>
                 <button
                   type="button"
-                  onClick={() => setShowManualAdd(true)}
+                  onClick={() => { setManualError(null); setShowManualAdd(true); }}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-premium-charcoal border border-premium-borderDark text-[11px] font-bold text-zinc-400 hover:text-white hover:border-premium-gold scale-on-click transition-colors"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
@@ -259,100 +274,65 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
                 </button>
               </div>
 
-              {/* Camera viewfinder placeholder */}
-              <div
-                className={`relative aspect-square rounded-[2rem] border-2 overflow-hidden flex flex-col items-center justify-center transition-all duration-300 ${
+              {/* Camera viewfinder */}
+              <QrScanner
+                onScan={(text) => void handleScan(text)}
+                paused={busy || scanFlash !== 'idle' || showManualAdd}
+                className={`aspect-square rounded-[2rem] border-2 transition-all duration-300 ${
                   scanFlash === 'success'
                     ? 'border-premium-success bg-premium-success/10'
                     : scanFlash === 'error'
                     ? 'border-premium-danger bg-premium-danger/10'
                     : 'border-zinc-700 bg-premium-charcoal'
                 }`}
-              >
-                {/* Scan line animation when idle */}
-                {scanFlash === 'idle' && (
-                  <>
-                    {/* Corner brackets */}
-                    {[
-                      'top-6 left-6 border-t-2 border-l-2',
-                      'top-6 right-6 border-t-2 border-r-2',
-                      'bottom-6 left-6 border-b-2 border-l-2',
-                      'bottom-6 right-6 border-b-2 border-r-2',
-                    ].map((cls, i) => (
-                      <div key={i} className={`absolute w-8 h-8 rounded-sm border-premium-gold ${cls}`} />
-                    ))}
-
-                    {/* Scanning line */}
-                    <div className="absolute w-[65%] h-0.5 bg-premium-gold/70 animate-scan-line" />
-
-                    <Camera className="w-12 h-12 text-zinc-600 mb-3" />
-                    <p className="text-[12px] text-zinc-500 font-medium text-center px-8">
-                      Point camera at guest QR pass
-                    </p>
-                    <p className="text-[10px] font-mono text-zinc-600 mt-1">
-                      Or use the scanner field below
-                    </p>
-                  </>
-                )}
-
-                {/* Success state */}
-                {scanFlash === 'success' && scanResult?.guest && (
-                  <div className="flex flex-col items-center gap-3 p-6 text-center">
-                    <CheckCircle2 className="w-16 h-16 text-premium-success" />
-                    <div>
-                      <div className="text-xl font-display font-bold text-white">
-                        {scanResult.guest.name}
-                      </div>
-                      <div className="text-[13px] text-premium-success font-mono mt-1">
-                        {scanResult.guest.guest_number ? `No. ${formatGuestNumber(scanResult.guest.guest_number, digits)} · ` : ''}Table {scanResult.guest.table_number || '—'}
-                      </div>
-                      <div className="text-[11px] font-bold text-premium-success uppercase tracking-wider mt-2">
-                        Admitted ✓
+                overlay={
+                  scanFlash === 'success' && scanResult?.guest ? (
+                    <div className="flex flex-col items-center gap-3 p-6 text-center">
+                      <CheckCircle2 className="w-16 h-16 text-premium-success" />
+                      <div>
+                        <div className="text-xl font-display font-bold text-white">{scanResult.guest.name}</div>
+                        <div className="text-[13px] text-premium-success font-mono mt-1">
+                          {scanResult.guest.number ? `No. ${formatGuestNumber(scanResult.guest.number, digits)} · ` : ''}Table {scanResult.guest.table || '—'}
+                        </div>
+                        {scanResult.guest.tags.length > 0 && (
+                          <div className="text-[11px] text-premium-gold font-bold mt-1">{scanResult.guest.tags.join(' · ')}</div>
+                        )}
+                        <div className="text-[11px] font-bold text-premium-success uppercase tracking-wider mt-2">Admitted ✓</div>
+                        <div className="text-[10px] text-zinc-400 mt-1">{scanResult.message}</div>
                       </div>
                     </div>
-                  </div>
-                )}
-
-                {/* Error / duplicate state */}
-                {scanFlash === 'error' && (
-                  <div className="flex flex-col items-center gap-3 p-6 text-center">
-                    {scanResult?.status === 'duplicate' ? (
-                      <>
-                        <AlertCircle className="w-14 h-14 text-premium-gold" />
-                        <div>
-                          <div className="text-base font-display font-bold text-white">
-                            {scanResult.guest?.name}
+                  ) : scanFlash === 'error' ? (
+                    <div className="flex flex-col items-center gap-3 p-6 text-center">
+                      {scanResult?.status === 'duplicate' ? (
+                        <>
+                          <AlertCircle className="w-14 h-14 text-premium-gold" />
+                          <div>
+                            <div className="text-base font-display font-bold text-white">{scanResult.guest?.name}</div>
+                            <div className="text-[12px] text-premium-gold font-bold mt-1">Already Checked In</div>
+                            <div className="text-[11px] text-zinc-400 mt-1">{scanResult.message}</div>
                           </div>
-                          <div className="text-[12px] text-premium-gold font-bold mt-1">
-                            Already Checked In
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="w-14 h-14 text-premium-danger" />
+                          <div>
+                            <div className="text-base font-display font-bold text-premium-danger">Invalid Pass</div>
+                            <div className="text-[11px] text-zinc-400 mt-1">{scanResult?.message ?? 'Token not found in roster'}</div>
                           </div>
-                          <div className="text-[11px] text-zinc-400 mt-1">
-                            {scanResult.message}
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="w-14 h-14 text-premium-danger" />
-                        <div>
-                          <div className="text-base font-display font-bold text-premium-danger">
-                            Invalid Pass
-                          </div>
-                          <div className="text-[11px] text-zinc-400 mt-1">
-                            Token not found in roster
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
+                        </>
+                      )}
+                    </div>
+                  ) : busy ? (
+                    <Loader2 className="w-10 h-10 text-premium-gold animate-spin" />
+                  ) : undefined
+                }
+              />
 
               {/* Manual token input (USB wedge / paste) */}
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  handleScan(tokenInput);
+                  void handleScan(tokenInput);
                 }}
                 className="flex gap-2"
               >
@@ -370,41 +350,43 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
                 />
                 <button
                   type="submit"
-                  disabled={!tokenInput.trim()}
+                  disabled={!tokenInput.trim() || busy}
                   className="px-5 py-3 rounded-2xl bg-premium-gold text-black font-bold text-[12px] shadow-gold scale-on-click disabled:opacity-40"
                 >
                   Check
                 </button>
               </form>
 
-              {/* Quick test tokens */}
-              <div className="space-y-1.5">
-                <div className="text-[10px] font-mono font-bold text-zinc-600 uppercase tracking-wider">Demo tokens</div>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { token: 'QR-D1-SITI-3309', label: 'Siti', type: 'new' },
-                    { token: 'QR-D1-BUDI-9812', label: 'Budi', type: 'dup' },
-                    { token: 'INVALID-TOKEN', label: 'Invalid', type: 'err' },
-                  ].map(({ token, label, type }) => (
-                    <button
-                      key={token}
-                      type="button"
-                      onClick={() => handleScan(token)}
-                      className={`px-3 py-1.5 rounded-xl text-[11px] font-mono font-bold border scale-on-click ${
-                        type === 'new'
-                          ? 'bg-premium-success/10 text-premium-success border-premium-success/30'
-                          : type === 'dup'
-                          ? 'bg-premium-gold/10 text-premium-gold border-premium-gold/25'
-                          : 'bg-premium-danger/10 text-premium-danger border-premium-danger/25'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
+              {/* Quick test tokens (sample events only) */}
+              {desk.sample && (
+                <div className="space-y-1.5">
+                  <div className="text-[10px] font-mono font-bold text-zinc-600 uppercase tracking-wider">Demo tokens</div>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { token: 'QR-D1-SITI-3309', label: 'Siti', type: 'new' },
+                      { token: 'QR-D1-BUDI-9812', label: 'Budi', type: 'dup' },
+                      { token: 'INVALID-TOKEN', label: 'Invalid', type: 'err' },
+                    ].map(({ token, label, type }) => (
+                      <button
+                        key={token}
+                        type="button"
+                        onClick={() => void handleScan(token)}
+                        className={`px-3 py-1.5 rounded-xl text-[11px] font-mono font-bold border scale-on-click ${
+                          type === 'new'
+                            ? 'bg-premium-success/10 text-premium-success border-premium-success/30'
+                            : type === 'dup'
+                            ? 'bg-premium-gold/10 text-premium-gold border-premium-gold/25'
+                            : 'bg-premium-danger/10 text-premium-danger border-premium-danger/25'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Recent scan log */}
+              {/* Recent scan log (this desk) */}
               {recentScans.length > 0 && (
                 <div className="space-y-2">
                   <div className="text-[10px] font-mono font-bold text-zinc-600 uppercase tracking-wider">
@@ -413,7 +395,7 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
                   <div className="space-y-1.5">
                     {recentScans.map((scan, i) => (
                       <div
-                        key={i}
+                        key={`${scan.timestamp}-${i}`}
                         className={`flex items-center gap-3 p-3 rounded-2xl border text-[12px] ${
                           scan.status === 'success'
                             ? 'bg-premium-success/5 border-premium-success/20'
@@ -431,15 +413,45 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
                         )}
                         <div className="flex-1 min-w-0">
                           <span className="font-bold text-white truncate">
-                            {scan.guest?.name || 'Unknown'}
+                            {scan.guest?.name || scan.message}
                           </span>
-                          {scan.guest?.table_number && (
-                            <span className="text-zinc-500 ml-2">· Table {scan.guest.table_number}</span>
+                          {scan.guest?.table && (
+                            <span className="text-zinc-500 ml-2">· Table {scan.guest.table}</span>
                           )}
                         </div>
+                        {scan.status === 'success' && scan.guest && (
+                          <button
+                            type="button"
+                            onClick={() => void handleUndo(scan.guest!)}
+                            title="Undo this check-in"
+                            aria-label={`Undo the check-in of ${scan.guest.name}`}
+                            className="text-zinc-600 hover:text-premium-danger scale-on-click"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <span className="text-[10px] font-mono text-zinc-600 flex-shrink-0 flex items-center gap-1">
                           <Clock className="w-3 h-3" />
                           {scan.timestamp}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* What every desk at the door checked in last (saved events) */}
+              {!desk.sample && desk.recent.length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-[10px] font-mono font-bold text-zinc-600 uppercase tracking-wider">Latest at all desks</div>
+                  <div className="rounded-2xl border border-premium-borderDark divide-y divide-premium-borderDark/60 overflow-hidden">
+                    {desk.recent.map((r) => (
+                      <div key={r.guest_id} className="flex items-center gap-3 px-3 py-2 text-[12px] bg-premium-charcoal">
+                        <span className="w-1.5 h-1.5 rounded-full bg-premium-success shrink-0" />
+                        <span className="font-mono text-premium-gold text-[11px] shrink-0">{formatGuestNumber(r.guest_number, digits)}</span>
+                        <span className="flex-1 min-w-0 truncate text-zinc-300">{r.name}</span>
+                        <span className="text-[10px] font-mono text-zinc-600">
+                          {new Date(r.checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
                     ))}
@@ -456,9 +468,9 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
               {/* Stats bar */}
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  { label: 'Total', value: guests.length, color: 'text-white' },
+                  { label: 'Total', value: totalCount, color: 'text-white' },
                   { label: 'In', value: checkedInCount, color: 'text-premium-success' },
-                  { label: 'Pending', value: guests.length - checkedInCount, color: 'text-zinc-400' },
+                  { label: 'Pending', value: Math.max(0, totalCount - checkedInCount), color: 'text-zinc-400' },
                 ].map(({ label, value, color }) => (
                   <div key={label} className="p-4 rounded-2xl bg-premium-charcoal border border-premium-borderDark text-center">
                     <div className={`text-2xl font-display font-bold ${color}`}>{value}</div>
@@ -474,14 +486,15 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by name, table, or token..."
-                  className="w-full pl-10 pr-4 py-3 rounded-2xl bg-premium-charcoal border border-premium-borderDark text-[13px] text-white focus:outline-none focus:border-premium-gold placeholder-zinc-600 transition-colors"
+                  placeholder={desk.sample ? 'Search by name, table, or token...' : 'Search name, guest no., phone or email...'}
+                  className="w-full pl-10 pr-10 py-3 rounded-2xl bg-premium-charcoal border border-premium-borderDark text-[13px] text-white focus:outline-none focus:border-premium-gold placeholder-zinc-600 transition-colors"
                 />
                 {searchQuery && (
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white scale-on-click"
+                    aria-label="Clear search"
                   >
                     ×
                   </button>
@@ -490,86 +503,99 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
 
               {/* Guest list */}
               <div className="space-y-2">
-                {sortedGuests.length === 0 ? (
+                {!desk.listLoaded || searching ? (
+                  <div className="py-10 flex items-center justify-center gap-2 text-[13px] text-zinc-500">
+                    <Loader2 className="w-4 h-4 animate-spin text-premium-gold" /> {searching ? 'Searching…' : 'Loading guests…'}
+                  </div>
+                ) : sortedGuests.length === 0 ? (
                   <div className="py-10 text-center">
                     <Users className="w-10 h-10 text-zinc-700 mx-auto mb-2" />
-                    <div className="text-[13px] text-zinc-500">No guests match your search</div>
+                    <div className="text-[13px] text-zinc-500">{query ? 'No guests match your search' : 'No guests on the list yet'}</div>
                   </div>
                 ) : (
-                  sortedGuests.map((guest) => (
-                    <div
-                      key={guest.id}
-                      className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${
-                        guest.is_checked_in
-                          ? 'bg-premium-success/5 border-premium-success/20'
-                          : 'bg-premium-charcoal border-premium-borderDark'
-                      }`}
-                    >
-                      {/* Avatar */}
+                  sortedGuests.map((guest) => {
+                    const category = guest.tags[0];
+                    return (
                       <div
-                        className={`w-9 h-9 rounded-full flex items-center justify-center font-display font-bold text-sm flex-shrink-0 ${
-                          guest.is_checked_in
-                            ? 'bg-premium-success text-black'
-                            : 'bg-premium-surfaceDark text-zinc-400 border border-premium-borderDark'
+                        key={guest.id}
+                        className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${
+                          guest.checkedInAt
+                            ? 'bg-premium-success/5 border-premium-success/20'
+                            : 'bg-premium-charcoal border-premium-borderDark'
                         }`}
                       >
-                        {guest.name.charAt(0)}
-                      </div>
+                        {/* Avatar */}
+                        <div
+                          className={`w-9 h-9 rounded-full flex items-center justify-center font-display font-bold text-sm flex-shrink-0 ${
+                            guest.checkedInAt
+                              ? 'bg-premium-success text-black'
+                              : 'bg-premium-surfaceDark text-zinc-400 border border-premium-borderDark'
+                          }`}
+                        >
+                          {guest.name.charAt(0)}
+                        </div>
 
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          {guest.guest_number && (
-                            <span className="text-[11px] font-mono font-bold text-premium-gold shrink-0">{formatGuestNumber(guest.guest_number, digits)}</span>
-                          )}
-                          <span className={`text-[13px] font-bold truncate ${guest.is_checked_in ? 'text-white' : 'text-zinc-300'}`}>
-                            {guest.name}
-                          </span>
-                          {guest.is_checked_in && (
-                            <CheckCircle2 className="w-3.5 h-3.5 text-premium-success flex-shrink-0" />
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            {guest.number && (
+                              <span className="text-[11px] font-mono font-bold text-premium-gold shrink-0">{formatGuestNumber(guest.number, digits)}</span>
+                            )}
+                            <span className={`text-[13px] font-bold truncate ${guest.checkedInAt ? 'text-white' : 'text-zinc-300'}`}>
+                              {guest.name}
+                            </span>
+                            {guest.checkedInAt && (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-premium-success flex-shrink-0" />
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] mt-0.5">
+                            <span className="text-zinc-500">
+                              {guest.table ? `Table ${guest.table}` : 'No table'}
+                            </span>
+                            {category && (
+                              <>
+                                <span className="text-zinc-700">·</span>
+                                <span
+                                  className={`font-bold ${
+                                    isWedding
+                                      ? 'text-premium-danger'
+                                      : category === 'VIP'
+                                      ? 'text-premium-gold'
+                                      : 'text-premium-neon'
+                                  }`}
+                                >
+                                  {category}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Status badge */}
+                        <div className="flex-shrink-0">
+                          {guest.checkedInAt ? (
+                            <button
+                              type="button"
+                              onClick={() => void handleUndo(guest)}
+                              title="Checked in. Tap to undo."
+                              className="text-[10px] font-mono font-bold text-premium-success bg-premium-success/10 px-2.5 py-1 rounded-full border border-premium-success/20 scale-on-click"
+                            >
+                              IN
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void handleAdmit(guest)}
+                              className="text-[10px] font-mono font-bold text-zinc-400 bg-premium-surfaceDark px-2.5 py-1 rounded-full border border-premium-borderDark hover:border-premium-gold hover:text-premium-gold scale-on-click transition-colors disabled:opacity-50"
+                            >
+                              Admit
+                            </button>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 text-[11px] mt-0.5">
-                          <span className="text-zinc-500">
-                            {guest.table_number ? `Table ${guest.table_number}` : 'No table'}
-                          </span>
-                          {guest.category && (
-                            <>
-                              <span className="text-zinc-700">·</span>
-                              <span
-                                className={`font-bold ${
-                                  isWedding
-                                    ? 'text-premium-danger'
-                                    : guest.category === 'VIP'
-                                    ? 'text-premium-gold'
-                                    : 'text-premium-neon'
-                                }`}
-                              >
-                                {guest.category}
-                              </span>
-                            </>
-                          )}
-                        </div>
                       </div>
-
-                      {/* Status badge */}
-                      <div className="flex-shrink-0">
-                        {guest.is_checked_in ? (
-                          <span className="text-[10px] font-mono font-bold text-premium-success bg-premium-success/10 px-2.5 py-1 rounded-full border border-premium-success/20">
-                            IN
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleScan(guest.qr_code_token)}
-                            className="text-[10px] font-mono font-bold text-zinc-400 bg-premium-surfaceDark px-2.5 py-1 rounded-full border border-premium-borderDark hover:border-premium-gold hover:text-premium-gold scale-on-click transition-colors"
-                          >
-                            Admit
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -591,6 +617,7 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
                   type="button"
                   onClick={() => setShowManualAdd(false)}
                   className="w-9 h-9 rounded-full bg-premium-surfaceDark border border-premium-borderDark flex items-center justify-center text-zinc-400 hover:text-white scale-on-click"
+                  aria-label="Close"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -609,16 +636,29 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
                 />
               </div>
 
-              {/* Table field */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Table Number</label>
-                <input
-                  type="text"
-                  value={manualTable}
-                  onChange={(e) => setManualTable(e.target.value)}
-                  placeholder="e.g. A7"
-                  className="w-full px-4 py-3 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-[14px] text-white focus:outline-none focus:border-premium-gold placeholder-zinc-600 transition-colors"
-                />
+              {/* Table and phone */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Table Number</label>
+                  <input
+                    type="text"
+                    value={manualTable}
+                    onChange={(e) => setManualTable(e.target.value)}
+                    placeholder="e.g. A7"
+                    className="w-full px-4 py-3 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-[14px] text-white focus:outline-none focus:border-premium-gold placeholder-zinc-600 transition-colors"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Phone</label>
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    value={manualPhone}
+                    onChange={(e) => setManualPhone(e.target.value)}
+                    placeholder="0812…"
+                    className="w-full px-4 py-3 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-[14px] text-white font-mono focus:outline-none focus:border-premium-gold placeholder-zinc-600 transition-colors"
+                  />
+                </div>
               </div>
 
               {/* Category */}
@@ -646,14 +686,16 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
                 </div>
               </div>
 
+              {manualError && <p className="text-[12px] font-bold text-premium-danger">{manualError}</p>}
+
               {/* Admit button */}
               <button
                 type="button"
-                onClick={handleManualAddGuest}
-                disabled={!manualName.trim()}
+                onClick={() => void handleManualAddGuest()}
+                disabled={!manualName.trim() || busy}
                 className="w-full py-4 rounded-2xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-[15px] shadow-gold scale-on-click disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
               >
-                <UserPlus className="w-5 h-5" />
+                {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserPlus className="w-5 h-5" />}
                 Add &amp; Admit Guest
               </button>
             </div>
@@ -665,7 +707,7 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
           <div className="mx-4 mb-5 glass-panel rounded-[2rem] flex overflow-hidden border border-zinc-700/80">
             {[
               { id: 'scan' as GateTab, icon: QrCode, label: 'Scan' },
-              { id: 'guests' as GateTab, icon: Users, label: `Guests (${guests.length})` },
+              { id: 'guests' as GateTab, icon: Users, label: `Guests (${totalCount})` },
             ].map(({ id, icon: Icon, label }) => {
               const isActive = activeTab === id;
               return (
