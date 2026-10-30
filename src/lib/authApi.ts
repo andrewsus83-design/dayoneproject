@@ -26,7 +26,7 @@ async function openSession(session: ServerSession) {
 }
 
 export const authApi = {
-  /** Organizers/admins: email a 6-digit code (sent through Resend). The reply is the same whether or not the email has an account. */
+  /** Organizers/admins: email a one-time code (6 to 10 digits, sent through Resend). The reply is the same whether or not the email has an account. */
   sendEmailCode: (email: string) => call<{ ok: true; message?: string }>({ action: 'email-code', email }),
   verifyEmailCode: async (email: string, code: string) => {
     const { error } = await createClient().auth.verifyOtp({ email, token: code, type: 'email' });

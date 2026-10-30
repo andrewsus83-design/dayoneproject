@@ -1,7 +1,7 @@
 // dayoneproject.xyz sign-in helpers. Deployed to Supabase project dayoneproject (pmuryumfyekjwqntcypo)
 // as `a41-auth` with verify_jwt OFF: callers are signed out, so every action checks its own rules.
 //
-// - email-code:   organizers/admins get a 6-digit code by email (sent with Resend, not Supabase SMTP).
+// - email-code:   organizers/admins get a one-time code by email (6 to 10 digits, the project setting) (sent with Resend, not Supabase SMTP).
 // - totp-login:   platform admins sign in with email + authenticator code.
 // - totp-setup / totp-confirm / totp-status: a platform admin signed in with their authenticator manages it.
 // - totp-bootstrap-start / -finish: first authenticator for a platform admin, proven by the one-time

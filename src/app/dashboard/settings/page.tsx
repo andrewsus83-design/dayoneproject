@@ -221,7 +221,7 @@ export default function TeamSettingsPage() {
                             ? 'We emailed them a welcome message with the sign-in link. '
                             : "We couldn't email them a welcome message, so let them know: "}
                           they open <span className="font-mono text-premium-neon">{LOGIN_URL}</span>, choose <strong className="text-white">Organizer</strong>, and enter their email.
-                          A 6-digit sign-in code is emailed to them each time.
+                          A sign-in code is emailed to them each time.
                         </>
                       )}
                     </p>

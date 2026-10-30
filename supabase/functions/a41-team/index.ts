@@ -46,7 +46,7 @@ async function sendWelcome(admin: any, to: string, name: string, orgName: string
 <h1 style="font-size:22px;margin:24px 0 8px">${first ? `Hi ${esc(first)}, you're` : "You're"} on the team</h1>
 <p style="color:#A1A1AA;font-size:14px;line-height:1.6;margin:0 0 24px">${esc(team)} added you as an admin organizer on dayoneproject.xyz. You can create and run the team's events.</p>
 <a href="${link}" style="display:inline-block;background:#C5A059;color:#09090B;font-weight:700;font-size:14px;text-decoration:none;padding:14px 28px;border-radius:12px">Sign in</a>
-<p style="color:#71717A;font-size:12px;line-height:1.6;margin:24px 0 0">Open app.dayoneproject.xyz/login, choose Organizer and enter this email address. We email you a 6-digit code each time; there is no password.</p>
+<p style="color:#71717A;font-size:12px;line-height:1.6;margin:24px 0 0">Open app.dayoneproject.xyz/login, choose Organizer and enter this email address. We email you a sign-in code each time; there is no password.</p>
 </div></body></html>`;
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -56,7 +56,7 @@ async function sendWelcome(admin: any, to: string, name: string, orgName: string
         to: [to],
         subject: `${team} added you on dayoneproject.xyz`,
         html,
-        text: `${team} added you as an admin organizer on dayoneproject.xyz.\n\nSign in: ${link}\n\nChoose Organizer and enter this email address. We email you a 6-digit code each time; there is no password.`,
+        text: `${team} added you as an admin organizer on dayoneproject.xyz.\n\nSign in: ${link}\n\nChoose Organizer and enter this email address. We email you a sign-in code each time; there is no password.`,
       }),
     });
     return res.ok;

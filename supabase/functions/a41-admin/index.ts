@@ -39,7 +39,7 @@ async function sendWelcome(admin: any, to: string, name: string): Promise<boolea
 <h1 style="font-size:22px;margin:24px 0 8px">${first ? `Welcome, ${esc(first)}` : 'Welcome'}</h1>
 <p style="color:#A1A1AA;font-size:14px;line-height:1.6;margin:0 0 24px">You now have an organizer account on dayoneproject.xyz. You can create events and add your own team.</p>
 <a href="${link}" style="display:inline-block;background:#C5A059;color:#09090B;font-weight:700;font-size:14px;text-decoration:none;padding:14px 28px;border-radius:12px">Sign in</a>
-<p style="color:#71717A;font-size:12px;line-height:1.6;margin:24px 0 0">Open app.dayoneproject.xyz/login, choose Organizer and enter this email address. We email you a 6-digit code each time; there is no password.</p>
+<p style="color:#71717A;font-size:12px;line-height:1.6;margin:24px 0 0">Open app.dayoneproject.xyz/login, choose Organizer and enter this email address. We email you a sign-in code each time; there is no password.</p>
 </div></body></html>`;
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -49,7 +49,7 @@ async function sendWelcome(admin: any, to: string, name: string): Promise<boolea
         to: [to],
         subject: 'Your dayoneproject.xyz organizer account is ready',
         html,
-        text: `You now have an organizer account on dayoneproject.xyz.\n\nSign in: ${link}\n\nChoose Organizer and enter this email address. We email you a 6-digit code each time; there is no password.`,
+        text: `You now have an organizer account on dayoneproject.xyz.\n\nSign in: ${link}\n\nChoose Organizer and enter this email address. We email you a sign-in code each time; there is no password.`,
       }),
     });
     return res.ok;
