@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Manrope, Outfit } from 'next/font/google';
 import './globals.css';
 
@@ -19,6 +19,11 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: 'dayoneproject.xyz | The Ultimate Event Platform',
   description: 'Multi-tenant event experience platform for corporate summits and luxury galas across Southeast Asia',
+  icons: { apple: '/apple-touch-icon.png' },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#09090B',
 };
 
 export default function RootLayout({
