@@ -4,6 +4,7 @@ import { getBaseEvent, resolveEventIdFromSlug, SLUG_INDEX_KEY, ORG_EVENTS_KEY, t
 import { MOCK_GUESTS, POPVERSE_QUIZ_QUESTIONS } from './mockData';
 import { buildDefaultBlocks, legacyToBlocks, type LandingBlock } from './landingBlocks';
 import { defaultBroadcast } from './broadcastTemplates';
+import { cachedGuests, isServerEventId, useServerGuestList } from './guestsApi';
 
 /* ───────────────────────── Types ───────────────────────── */
 
@@ -909,13 +910,43 @@ export function useAssetUrl(ref: string | undefined): string {
 }
 
 /* ───────────────────────── Responses & guests ───────────────────────── */
+// Saved events keep guests, replies and check-ins on the server (lib/guestsApi.ts). Only the built-in sample events
+// keep them on this device, so demos work without an account; they never fall back to each other.
 
 const EMPTY_RESPONSES: FormResponse[] = [];
 
-export function useResponses(eventId: string): FormResponse[] {
-  return useStoredJSON<FormResponse[]>(responsesKey(eventId)) ?? EMPTY_RESPONSES;
+/** An invitation-form reply as the builder lists it, from a server guest who replied. */
+function replyFromGuest(g: Guest): FormResponse {
+  const attending = g.rsvp_status === 'attending';
+  return {
+    id: g.id,
+    submittedAt: g.responded_at ?? g.updated_at,
+    answers: Object.fromEntries(Object.entries(g.custom_fields).map(([k, v]) => [k, String(v ?? '')])),
+    name: g.name,
+    email: g.email ?? '',
+    phone: g.phone ?? '',
+    attending,
+    party: attending ? g.party_size || 1 : 0,
+    token: g.qr_code_token,
+    number: g.guest_number,
+  };
 }
 
+/** Replies to the invitation form, newest first (server replies for saved events). */
+export function useResponses(eventId: string): FormResponse[] {
+  const server = isServerEventId(eventId);
+  const local = useStoredJSON<FormResponse[]>(responsesKey(eventId));
+  const { guests } = useServerGuestList(server ? eventId : null);
+  return useMemo(() => {
+    if (!server) return local ?? EMPTY_RESPONSES;
+    return guests
+      .filter((g) => g.rsvp_status !== 'pending')
+      .map(replyFromGuest)
+      .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+  }, [server, local, guests]);
+}
+
+/** Sample events only: saved events store replies on the server (registerGuest). */
 export function addResponse(eventId: string, response: FormResponse): WriteResult {
   const current = readJSON<FormResponse[]>(responsesKey(eventId)) ?? [];
   return writeJSON(responsesKey(eventId), [response, ...current]);
@@ -958,14 +989,34 @@ function numbered(list: Guest[]): Guest[] {
   return out;
 }
 
+/**
+ * The event's guests. Saved events: the server list (empty while it loads, or for accounts that may not read it),
+ * shared by every screen and refreshed after each change. Sample events: this device's copy of the sample list.
+ */
 export function useGuests(eventId: string): Guest[] {
+  return useGuestList(eventId).guests;
+}
+
+/** useGuests plus the load state, the package limit and refresh. pollMs reloads a saved event's list. */
+export function useGuestList(eventId: string, pollMs = 0) {
+  const server = isServerEventId(eventId);
+  const sampleGuests = useSampleGuests(eventId);
+  const remote = useServerGuestList(server ? eventId : null, pollMs);
+  if (server) return { ...remote, isSample: false };
+  return { ...remote, guests: sampleGuests, status: 'ready' as const, error: null, capacity: null, isSample: true };
+}
+
+/** This device's copy of a sample event's guests, without asking the server (for guest-facing pages). */
+export function useSampleGuests(eventId: string): Guest[] {
   return numbered(useStoredJSON<Guest[]>(guestsKey(eventId)) ?? MOCK_GUESTS);
 }
 
 export function readGuests(eventId: string): Guest[] {
+  if (isServerEventId(eventId)) return cachedGuests(eventId);
   return numbered(readJSON<Guest[]>(guestsKey(eventId)) ?? MOCK_GUESTS);
 }
 
+/** Sample events only: a saved event's guests are changed through lib/guestsApi.ts. */
 export function writeGuests(eventId: string, guests: Guest[]): WriteResult {
   return writeJSON(guestsKey(eventId), numberGuests(guests));
 }
@@ -994,11 +1045,12 @@ export function newId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
+/** A pass code for the sample events' local guests. Saved events get their pass token from the server. */
 export function makePassToken() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let s = '';
-  for (let i = 0; i < 8; i++) s += alphabet[Math.floor(Math.random() * alphabet.length)];
-  return `D1-${s}`;
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return `D1-${Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('')}`;
 }
 
 export function findQuestion(questions: FormQuestion[], role: QuestionRole): FormQuestion | undefined {

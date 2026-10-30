@@ -128,6 +128,11 @@ export interface Event {
   updated_at: string;
 }
 
+/**
+ * A guest as the screens use it. Saved events load it from the server (a41_guests + a41_rsvps + a41_checkins,
+ * mapped in lib/guestsApi.ts): category is the first tag, table_number is table_no, qr_code_token is the pass
+ * token, the RSVP fields come from the guest's reply and is_checked_in from the check-in. Phones are +62….
+ */
 export interface Guest {
   id: string;
   event_id: string;
@@ -150,6 +155,12 @@ export interface Guest {
   whatsapp_sent_count: number;
   created_at: string;
   updated_at: string;
+  /** All tags (category is the first one). */
+  tags?: string[];
+  /** People in the reply, including the guest (0 when there is no attending reply). */
+  party_size?: number;
+  /** When the guest last sent the invitation form. */
+  responded_at?: string | null;
 }
 
 export interface PhotoWallUpload {
