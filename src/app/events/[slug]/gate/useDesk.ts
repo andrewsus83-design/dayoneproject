@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { makePassToken, readGuests, useSampleGuests, writeGuests } from '@/lib/eventStore';
 import {
   addWalkIn, checkInByToken, checkInGuest, checkInStats, deskGuests, isServerEventId, parsePassToken, searchDeskGuests,
@@ -21,7 +21,8 @@ export interface DeskGuest {
 }
 
 export interface ScanResult {
-  status: 'success' | 'duplicate' | 'invalid';
+  /** queued: scanned with no internet; the server checks the pass once the desk is back online. */
+  status: 'success' | 'duplicate' | 'invalid' | 'queued';
   guest?: DeskGuest;
   message: string;
   timestamp: string;
@@ -80,6 +81,39 @@ function fromCard(card: CheckInCard): ScanResult {
   }
 }
 
+/* ── Working without internet ── */
+
+/** A check-in made while the desk was offline, sent to the server in order once it is back. */
+type Pending =
+  | { kind: 'token'; token: string; at: string }
+  | { kind: 'guest'; id: string; name: string; at: string }
+  | { kind: 'walkin'; id: string; input: { name: string; phone: string; table_no: string; tags: string[] }; at: string };
+
+const queueKey = (eventId: string) => `d1-desk-queue-${eventId}`;
+const listKey = (eventId: string) => `d1-desk-list-${eventId}`;
+
+function readStored<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStored(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+}
+
+/** No internet (as opposed to the server saying no). */
+function isNetworkError(e: unknown): boolean {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+  const msg = e instanceof Error ? e.message : String(e ?? '');
+  return /no connection|failed to fetch|networkerror|network|load failed/i.test(msg);
+}
+
 const offline = (e: unknown): ScanResult => ({
   status: 'invalid',
   message: e instanceof Error && e.message ? e.message : 'Could not reach the server. Try again.',
@@ -96,6 +130,32 @@ export function useDesk(eventId: string, listOpen: boolean) {
   const [stats, setStats] = useState<CheckInStats | null>(null);
   const [list, setList] = useState<DoorGuest[] | null>(null);
   const [connection, setConnection] = useState<'ok' | 'offline'>('ok');
+  // Check-ins waiting for the internet, and what happened to the ones sent since (problems first).
+  const [queue, setQueueState] = useState<Pending[]>([]);
+  const [synced, setSynced] = useState<ScanResult[]>([]);
+  const queueRef = useRef<Pending[]>([]);
+  const flushing = useRef(false);
+
+  const setQueue = useCallback(
+    (next: Pending[]) => {
+      queueRef.current = next;
+      setQueueState(next);
+      writeStored(queueKey(eventId), next);
+    },
+    [eventId],
+  );
+
+  // The queue and the last guest list survive a reload, so the desk keeps working through an outage.
+  useEffect(() => {
+    if (sample) return;
+    // Restores what this device saved before the reload.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    const saved = readStored<Pending[]>(queueKey(eventId)) ?? [];
+    queueRef.current = saved;
+    setQueueState(saved);
+    setList((prev) => prev ?? readStored<DoorGuest[]>(listKey(eventId)));
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [sample, eventId]);
 
   const refreshStats = useCallback(async () => {
     if (sample) return;
@@ -110,7 +170,9 @@ export function useDesk(eventId: string, listOpen: boolean) {
   const refreshList = useCallback(async () => {
     if (sample) return;
     try {
-      setList(await deskGuests(eventId));
+      const next = await deskGuests(eventId);
+      setList(next);
+      writeStored(listKey(eventId), next);
       setConnection('ok');
     } catch {
       setConnection('offline');
@@ -130,6 +192,13 @@ export function useDesk(eventId: string, listOpen: boolean) {
     };
   }, [sample, refreshStats]);
 
+  // Keep a copy of the guest list on this device from the start, for searching and checking in offline.
+  useEffect(() => {
+    if (sample) return;
+    const t = window.setTimeout(() => void refreshList(), 0);
+    return () => window.clearTimeout(t);
+  }, [sample, refreshList]);
+
   useEffect(() => {
     if (sample || !listOpen) return;
     const tick = () => document.visibilityState === 'visible' && void refreshList();
@@ -142,9 +211,16 @@ export function useDesk(eventId: string, listOpen: boolean) {
   }, [sample, listOpen, refreshList]);
 
   /** Shows a check-in at once, before the next poll. */
-  const markLocal = useCallback((id: string, at: string | null) => {
-    setList((prev) => prev && prev.map((g) => (g.id === id ? { ...g, checked_in_at: at } : g)));
-  }, []);
+  const markLocal = useCallback(
+    (id: string, at: string | null) => {
+      setList((prev) => {
+        const next = prev && prev.map((g) => (g.id === id ? { ...g, checked_in_at: at } : g));
+        if (next) writeStored(listKey(eventId), next);
+        return next;
+      });
+    },
+    [eventId],
+  );
 
   const afterCard = useCallback(
     (card: CheckInCard) => {
@@ -155,6 +231,69 @@ export function useDesk(eventId: string, listOpen: boolean) {
     },
     [markLocal, refreshStats],
   );
+
+  /* ── Offline queue ── */
+
+  const enqueue = useCallback((item: Pending) => setQueue([...queueRef.current, item]), [setQueue]);
+
+  const queueToken = useCallback(
+    (token: string): ScanResult => {
+      const timestamp = clock();
+      const earlier = queueRef.current.find((p) => p.kind === 'token' && p.token.toLowerCase() === token.toLowerCase());
+      if (earlier) return { status: 'duplicate', message: `Already scanned offline at ${hhmm(earlier.at)}`, timestamp };
+      enqueue({ kind: 'token', token, at: new Date().toISOString() });
+      return { status: 'queued', message: 'No internet: saved on this device. The pass is checked as soon as the desk is back online.', timestamp };
+    },
+    [enqueue],
+  );
+
+  /** Sends the saved check-ins in order. Stops at the first sign the internet is still down. */
+  const flush = useCallback(async () => {
+    if (sample || flushing.current || queueRef.current.length === 0) return;
+    flushing.current = true;
+    const results: ScanResult[] = [];
+    try {
+      while (queueRef.current.length > 0) {
+        const item = queueRef.current[0];
+        let result: ScanResult;
+        try {
+          const card =
+            item.kind === 'token' ? await checkInByToken(eventId, item.token)
+            : item.kind === 'guest' ? await checkInGuest(eventId, item.id)
+            : await addWalkIn(eventId, item.input);
+          result = fromCard(card);
+          if (item.kind === 'walkin' && result.status === 'success') result.message = 'Walk-in added';
+        } catch (e) {
+          if (isNetworkError(e)) break;
+          result = { ...offline(e), guest: item.kind === 'guest' ? { id: item.id, name: item.name, table: null, tags: [], checkedInAt: null } : undefined };
+        }
+        results.push({ ...result, message: `Synced (${hhmm(item.at)}): ${result.message}` });
+        setQueue(queueRef.current.slice(1));
+      }
+    } finally {
+      flushing.current = false;
+    }
+    if (results.length) {
+      setConnection('ok');
+      // Problems first, so the desk sees which offline scans were not valid.
+      const order = { invalid: 0, duplicate: 1, queued: 2, success: 3 } as const;
+      setSynced((prev) => [...results.sort((a, b) => order[a.status] - order[b.status]), ...prev].slice(0, 30));
+      void refreshList();
+    }
+  }, [sample, eventId, setQueue, refreshList]);
+
+  // Send the queue when the internet comes back.
+  useEffect(() => {
+    if (sample) return;
+    const onOnline = () => void flush();
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, [sample, flush]);
+  useEffect(() => {
+    // Sends the queue once the server answers again; setState happens after the requests resolve.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (connection === 'ok' && queue.length > 0) void flush();
+  }, [connection, queue.length, flush]);
 
   /* ── Sample events (this device) ── */
 
@@ -183,10 +322,12 @@ export function useDesk(eventId: string, listOpen: boolean) {
       try {
         return afterCard(await checkInByToken(eventId, token));
       } catch (e) {
-        return offline(e);
+        if (!isNetworkError(e)) return offline(e);
+        setConnection('offline');
+        return queueToken(token);
       }
     },
-    [sample, eventId, sampleCheckIn, afterCard],
+    [sample, eventId, sampleCheckIn, afterCard, queueToken],
   );
 
   const checkInById = useCallback(
@@ -195,10 +336,20 @@ export function useDesk(eventId: string, listOpen: boolean) {
       try {
         return afterCard(await checkInGuest(eventId, id));
       } catch (e) {
-        return offline(e);
+        if (!isNetworkError(e)) return offline(e);
+        setConnection('offline');
+        // The guest is on the list this desk saved, so they can come in now; the server hears about it later.
+        const found = list?.find((g) => g.id === id);
+        const timestamp = clock();
+        if (!found) return { status: 'invalid', message: 'No internet, and this guest is not in the list saved on this device.', timestamp };
+        if (found.checked_in_at) return { status: 'duplicate', guest: fromDoor(found), message: `Already checked in at ${hhmm(found.checked_in_at)}`, timestamp };
+        const at = new Date().toISOString();
+        enqueue({ kind: 'guest', id, name: found.name, at });
+        markLocal(id, at);
+        return { status: 'success', guest: { ...fromDoor(found), checkedInAt: at }, message: 'Admitted offline: syncs when the desk is back online', timestamp };
       }
     },
-    [sample, eventId, sampleCheckIn, afterCard],
+    [sample, eventId, sampleCheckIn, afterCard, list, enqueue, markLocal],
   );
 
   const undo = useCallback(
@@ -207,16 +358,24 @@ export function useDesk(eventId: string, listOpen: boolean) {
         writeGuests(eventId, readGuests(eventId).map((g) => (g.id === id ? { ...g, is_checked_in: false, checked_in_at: null, checked_in_by: null } : g)));
         return null;
       }
+      // A check-in still waiting for the internet is simply dropped.
+      const waiting = queueRef.current.find((p) => p.kind !== 'token' && p.id === id);
+      if (waiting) {
+        setQueue(queueRef.current.filter((p) => p !== waiting));
+        markLocal(id, null);
+        return null;
+      }
       try {
         const res = await undoCheckIn(eventId, id);
         markLocal(id, null);
         void refreshStats();
         return res.ok ? null : 'That guest was not checked in.';
       } catch (e) {
+        if (isNetworkError(e)) return 'Undo needs the internet. Try again when the desk is back online.';
         return e instanceof Error ? e.message : 'Could not undo. Try again.';
       }
     },
-    [sample, eventId, markLocal, refreshStats],
+    [sample, eventId, markLocal, refreshStats, setQueue],
   );
 
   const walkIn = useCallback(
@@ -249,8 +408,9 @@ export function useDesk(eventId: string, listOpen: boolean) {
         writeGuests(eventId, [guest, ...readGuests(eventId)]);
         return { status: 'success', guest: fromSample(guest), message: 'Walk-in admitted manually', timestamp: clock() };
       }
+      const payload = { name: input.name.trim(), phone: input.phone.trim(), table_no: input.table.trim(), tags };
       try {
-        const card = await addWalkIn(eventId, { name: input.name.trim(), phone: input.phone.trim(), table_no: input.table.trim(), tags });
+        const card = await addWalkIn(eventId, payload);
         const result = afterCard(card);
         if (result.status === 'success' && !card.matched) {
           result.message = 'Walk-in admitted manually';
@@ -258,10 +418,20 @@ export function useDesk(eventId: string, listOpen: boolean) {
         }
         return result;
       } catch (e) {
-        return offline(e);
+        if (!isNetworkError(e)) return offline(e);
+        setConnection('offline');
+        const id = `offline-${Date.now().toString(36)}`;
+        const at = new Date().toISOString();
+        enqueue({ kind: 'walkin', id, input: payload, at });
+        return {
+          status: 'success',
+          guest: { id, name: payload.name, table: payload.table_no || null, tags, checkedInAt: at },
+          message: 'Walk-in saved offline: added to the list when the desk is back online',
+          timestamp: clock(),
+        };
       }
     },
-    [sample, eventId, afterCard, refreshList],
+    [sample, eventId, afterCard, refreshList, enqueue],
   );
 
   const search = useCallback(
@@ -269,11 +439,17 @@ export function useDesk(eventId: string, listOpen: boolean) {
       if (sample) return null;
       try {
         return (await searchDeskGuests(eventId, query)).map(fromDoor);
-      } catch {
-        return null;
+      } catch (e) {
+        if (!isNetworkError(e) || !list) return null;
+        // Offline: search the list saved on this device.
+        const q = query.trim().toLowerCase().replace(/^#/, '');
+        return list
+          .filter((g) => g.name.toLowerCase().includes(q) || String(g.guest_number) === q)
+          .slice(0, 20)
+          .map(fromDoor);
       }
     },
-    [sample, eventId],
+    [sample, eventId, list],
   );
 
   const guests = useMemo(() => (sample ? sampleGuests.map(fromSample) : (list ?? []).map(fromDoor)), [sample, sampleGuests, list]);
@@ -289,6 +465,11 @@ export function useDesk(eventId: string, listOpen: boolean) {
     /** Latest check-ins at every desk (saved events). */
     recent: stats?.recent ?? [],
     connection,
+    /** Check-ins saved on this device while offline, not yet on the server. */
+    pending: queue.length,
+    /** What happened to offline check-ins once they were sent (problems first). */
+    synced,
+    syncNow: flush,
     checkInToken,
     checkInById,
     undo,

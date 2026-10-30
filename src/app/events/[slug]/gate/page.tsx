@@ -21,6 +21,7 @@ import {
   WifiOff,
   Loader2,
   RotateCcw,
+  RefreshCw,
 } from 'lucide-react';
 
 type GateTab = 'scan' | 'guests';
@@ -82,12 +83,13 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
   const showResult = (result: ScanResult) => {
     setScanResult(result);
     setRecentScans((prev) => [result, ...prev.slice(0, 9)]);
-    setScanFlash(result.status === 'success' ? 'success' : 'error');
+    const ok = result.status === 'success' || result.status === 'queued';
+    setScanFlash(ok ? 'success' : 'error');
     window.clearTimeout(flashTimer.current);
     flashTimer.current = window.setTimeout(() => {
       setScanFlash('idle');
       inputRef.current?.focus();
-    }, result.status === 'success' ? 1400 : 2200);
+    }, ok ? 1400 : 2200);
   };
 
   const handleScan = async (rawToken: string) => {
@@ -208,6 +210,9 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
                     <WifiOff className="w-3 h-3" /> offline
                   </span>
                 )}
+                {desk.pending > 0 && (
+                  <span className="inline-flex items-center gap-1 text-premium-gold normal-case tracking-normal">· {desk.pending} to sync</span>
+                )}
               </p>
               <h3 className="font-display font-bold text-[15px] text-white leading-tight truncate max-w-[180px]">
                 {event.name}
@@ -286,7 +291,15 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
                     : 'border-zinc-700 bg-premium-charcoal'
                 }`}
                 overlay={
-                  scanFlash === 'success' && scanResult?.guest ? (
+                  scanFlash === 'success' && scanResult?.status === 'queued' ? (
+                    <div className="flex flex-col items-center gap-3 p-6 text-center">
+                      <WifiOff className="w-14 h-14 text-premium-gold" />
+                      <div>
+                        <div className="text-base font-display font-bold text-white">Saved offline</div>
+                        <div className="text-[11px] text-zinc-400 mt-1 max-w-[240px]">{scanResult.message}</div>
+                      </div>
+                    </div>
+                  ) : scanFlash === 'success' && scanResult?.guest ? (
                     <div className="flex flex-col items-center gap-3 p-6 text-center">
                       <CheckCircle2 className="w-16 h-16 text-premium-success" />
                       <div>
@@ -386,6 +399,34 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
                 </div>
               )}
 
+              {/* Offline check-ins: waiting for the internet, then what the server said */}
+              {desk.pending > 0 && (
+                <div className="flex items-center gap-3 p-3 rounded-2xl bg-premium-gold/10 border border-premium-gold/30 text-[12px]">
+                  <WifiOff className="w-4 h-4 text-premium-gold flex-shrink-0" />
+                  <span className="flex-1 text-zinc-200">
+                    <strong className="text-white">{desk.pending}</strong> check-in{desk.pending === 1 ? '' : 's'} saved on this device. They sync by themselves when the internet is back.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void desk.syncNow()}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-premium-charcoal border border-premium-borderDark text-[11px] font-bold text-zinc-300 hover:text-white scale-on-click"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> Sync now
+                  </button>
+                </div>
+              )}
+              {desk.synced.some((r) => r.status !== 'success') && (
+                <div className="space-y-1.5">
+                  <div className="text-[10px] font-mono font-bold text-premium-danger uppercase tracking-wider">Offline scans to check</div>
+                  {desk.synced.filter((r) => r.status !== 'success').map((r, i) => (
+                    <div key={`${r.timestamp}-${i}`} className="flex items-start gap-2 p-3 rounded-2xl border bg-premium-danger/5 border-premium-danger/20 text-[12px]">
+                      <AlertCircle className="w-4 h-4 text-premium-danger flex-shrink-0 mt-0.5" />
+                      <span className="text-zinc-200">{r.guest?.name ? <strong className="text-white">{r.guest.name}: </strong> : null}{r.message}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Recent scan log (this desk) */}
               {recentScans.length > 0 && (
                 <div className="space-y-2">
@@ -399,13 +440,15 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
                         className={`flex items-center gap-3 p-3 rounded-2xl border text-[12px] ${
                           scan.status === 'success'
                             ? 'bg-premium-success/5 border-premium-success/20'
-                            : scan.status === 'duplicate'
+                            : scan.status === 'duplicate' || scan.status === 'queued'
                             ? 'bg-premium-gold/5 border-premium-gold/20'
                             : 'bg-premium-danger/5 border-premium-danger/20'
                         }`}
                       >
                         {scan.status === 'success' ? (
                           <CheckCircle2 className="w-4 h-4 text-premium-success flex-shrink-0" />
+                        ) : scan.status === 'queued' ? (
+                          <WifiOff className="w-4 h-4 text-premium-gold flex-shrink-0" />
                         ) : scan.status === 'duplicate' ? (
                           <AlertCircle className="w-4 h-4 text-premium-gold flex-shrink-0" />
                         ) : (

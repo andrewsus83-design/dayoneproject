@@ -247,7 +247,7 @@ function readable(error: PostgrestError): string {
   if (error.code === '42501' || /forbidden|permission denied/i.test(error.message)) {
     return "Your account can't do that for this event.";
   }
-  if (/Failed to fetch|NetworkError|network/i.test(error.message)) return 'No connection. Check the internet and try again.';
+  if (/Failed to fetch|NetworkError|network|Load failed/i.test(error.message)) return 'No connection. Check the internet and try again.';
   return error.details || error.message;
 }
 
