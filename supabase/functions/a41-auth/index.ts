@@ -1,7 +1,9 @@
 // dayoneproject.xyz sign-in helpers. Deployed to Supabase project dayoneproject (pmuryumfyekjwqntcypo)
 // as `a41-auth` with verify_jwt OFF: callers are signed out, so every action checks its own rules.
 //
-// - email-code:   organizers/admins get a one-time code by email (6 to 10 digits, the project setting) (sent with Resend, not Supabase SMTP).
+// - email-code:   organizers/admins get our own 6-digit code by email (sent with Resend, not Supabase SMTP); only a
+//                 salted hash is kept (a41_private.email_codes), for 10 minutes and 5 wrong tries.
+// - email-verify: checks that code and opens the session (the project's own OTP length is shared and longer).
 // - totp-login:   platform admins sign in with email + authenticator code.
 // - totp-setup / totp-confirm / totp-status: a platform admin signed in with their authenticator manages it.
 // - totp-bootstrap-start / -finish: first authenticator for a platform admin, proven by the one-time
@@ -87,6 +89,27 @@ async function matchTotp(secret: string, code: string): Promise<number | null> {
   return null;
 }
 
+/* ── Emailed sign-in codes ── */
+const EMAIL_CODE_TTL_SECONDS = 600;
+
+/** A random 6-digit code (no bias worth caring about at this size). */
+function newEmailCode(): string {
+  const n = new Uint32Array(1);
+  crypto.getRandomValues(n);
+  return String(n[0] % 1_000_000).padStart(6, '0');
+}
+
+function randomHex(bytes: number): string {
+  const b = new Uint8Array(bytes);
+  crypto.getRandomValues(b);
+  return Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+}
+
+async function sha256Hex(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest), (x) => x.toString(16).padStart(2, '0')).join('');
+}
+
 /** The claims inside a JWT (not verified: the token comes straight from Supabase Auth in this function). */
 function jwtClaims(token: string): Record<string, unknown> | null {
   try {
@@ -105,7 +128,7 @@ function emailHtml(code: string) {
 <h1 style="font-size:22px;margin:24px 0 8px">Your sign-in code</h1>
 <p style="color:#A1A1AA;font-size:14px;margin:0 0 24px">Enter this code on dayoneproject.xyz to sign in.</p>
 <div style="font-family:monospace;font-size:34px;letter-spacing:10px;font-weight:700;color:#C5A059;background:#18181B;border:1px solid #27272A;border-radius:16px;padding:18px 0">${code}</div>
-<p style="color:#71717A;font-size:12px;margin:24px 0 0">The code works once and expires shortly. If you didn't ask for it, you can ignore this email.</p>
+<p style="color:#71717A;font-size:12px;margin:24px 0 0">The code works once and expires in 10 minutes. If you didn't ask for it, you can ignore this email.</p>
 </div></body></html>`;
 }
 
@@ -196,8 +219,13 @@ Deno.serve(async (req) => {
         if (!user || !organizer) return json({ ok: true, message: CODE_SENT });
         const from = (await secret('a41_RESEND_FROM')) || 'dayoneproject.xyz <login@dayoneproject.xyz>';
 
-        const props = await tokenHashFor(user.email);
-        const code = props.email_otp;
+        // Our own 6 digits; only a salted hash is stored. A new code replaces the last one.
+        const code = newEmailCode();
+        const salt = randomHex(16);
+        const { error: storeError } = await admin.rpc('a41_svc_email_code_set', {
+          p_email: user.email, p_salt: salt, p_hash: await sha256Hex(`${salt}:${code}`), p_ttl_seconds: EMAIL_CODE_TTL_SECONDS,
+        });
+        if (storeError) return json({ error: 'Could not prepare a code. Try again.' }, 500);
         const res = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
@@ -206,7 +234,7 @@ Deno.serve(async (req) => {
             to: [user.email],
             subject: `${code} is your dayoneproject.xyz sign-in code`,
             html: emailHtml(code),
-            text: `Your dayoneproject.xyz sign-in code is ${code}. It works once and expires shortly.`,
+            text: `Your dayoneproject.xyz sign-in code is ${code}. It works once and expires in 10 minutes.`,
           }),
         });
         if (!res.ok) {
@@ -214,6 +242,24 @@ Deno.serve(async (req) => {
           return json({ error: `The email could not be sent: ${detail?.message ?? res.statusText}` }, 502);
         }
         return json({ ok: true, message: CODE_SENT });
+      }
+
+      case 'email-verify': {
+        const code = String(body.code ?? '').trim();
+        const wrong = () => json({ error: 'That code is wrong or has expired.' }, 401);
+        if (!(await hit(`ip:${ip}`, 30, 900)) || !(await hit(`email-verify:${email}`, 10, 900))) {
+          return json({ error: 'Too many tries. Wait 15 minutes and try again.' }, 429);
+        }
+        if (!/^\d{6}$/.test(code)) return wrong();
+        const { data: salt } = await admin.rpc('a41_svc_email_code_salt', { p_email: email });
+        if (typeof salt !== 'string') return wrong();
+        const { data: ok } = await admin.rpc('a41_svc_email_code_check', { p_email: email, p_hash: await sha256Hex(`${salt}:${code}`) });
+        if (ok !== true) return wrong();
+        // The code was right: open the session for this organizer (never a platform-admin session).
+        const user = await findUser(email);
+        if (!user || user.banned || !(user.role === 'organizer' || user.role === 'admin')) return wrong();
+        const props = await tokenHashFor(user.email);
+        return json({ tokenHash: props.hashed_token });
       }
 
       case 'totp-login': {

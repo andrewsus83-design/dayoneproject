@@ -18,10 +18,8 @@ const primary =
   'w-full py-3.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-sm shadow-gold scale-on-click flex items-center justify-center gap-2 disabled:opacity-60';
 const quiet = 'w-full text-xs font-bold text-zinc-400 hover:text-white flex items-center justify-center gap-1.5 pt-1';
 
-const AUTHENTICATOR_DIGITS = 6;
-/** Supabase emails 6 to 10 digits, depending on the project's OTP length setting. */
-const EMAIL_CODE_MIN_DIGITS = 6;
-const EMAIL_CODE_MAX_DIGITS = 10;
+/** Authenticator apps and our emailed sign-in codes both use 6 digits. */
+const CODE_DIGITS = 6;
 
 const METHODS: { id: Method; label: string; icon: typeof Mail }[] = [
   { id: 'organizer', label: 'Organizer', icon: Briefcase },
@@ -166,8 +164,7 @@ function LoginForm() {
       <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" className={input} />
     </label>
   );
-  // Authenticator apps always show 6 digits; emailed codes follow the project's setting (6 to 10 digits).
-  const codeField = (label: string, maxDigits: number) => (
+  const codeField = (label: string) => (
     <label className="block space-y-1.5">
       <Label>{label}</Label>
       <input
@@ -175,8 +172,8 @@ function LoginForm() {
         autoComplete="one-time-code"
         required
         value={code}
-        onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, maxDigits))}
-        placeholder={maxDigits === AUTHENTICATOR_DIGITS ? '123456' : 'Code from the email'}
+        onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, CODE_DIGITS))}
+        placeholder="123456"
         className={codeInput}
       />
     </label>
@@ -222,8 +219,8 @@ function LoginForm() {
 
           {method === 'organizer' && step === 'code' && (
             <>
-              {codeField('Code from your email', EMAIL_CODE_MAX_DIGITS)}
-              <button type="submit" disabled={busy || code.length < EMAIL_CODE_MIN_DIGITS} className={primary}>
+              {codeField('6-digit code from your email')}
+              <button type="submit" disabled={busy || code.length < CODE_DIGITS} className={primary}>
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />} Sign in
               </button>
               <button type="button" onClick={() => { setStep('start'); setCode(''); setNotice(null); }} className={quiet}>
@@ -249,8 +246,8 @@ function LoginForm() {
           {method === 'owner' && step === 'start' && (
             <>
               {emailField}
-              {codeField('Authenticator code', AUTHENTICATOR_DIGITS)}
-              <button type="submit" disabled={busy || code.length < AUTHENTICATOR_DIGITS} className={primary}>
+              {codeField('Authenticator code')}
+              <button type="submit" disabled={busy || code.length < CODE_DIGITS} className={primary}>
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Smartphone className="w-4 h-4" />} Sign in
               </button>
               <button type="button" onClick={() => { setStep('setup'); setCode(''); setError(null); }} className={quiet}>
@@ -281,8 +278,8 @@ function LoginForm() {
           {method === 'owner' && step === 'setup-scan' && enroll && (
             <>
               <AuthenticatorQr uri={enroll.uri} secret={enroll.secret} />
-              {codeField('Code shown in the app', AUTHENTICATOR_DIGITS)}
-              <button type="submit" disabled={busy || code.length < AUTHENTICATOR_DIGITS} className={primary}>
+              {codeField('Code shown in the app')}
+              <button type="submit" disabled={busy || code.length < CODE_DIGITS} className={primary}>
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />} Confirm and sign in
               </button>
             </>

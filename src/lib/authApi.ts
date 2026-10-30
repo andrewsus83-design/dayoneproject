@@ -26,11 +26,11 @@ async function openSession(session: ServerSession) {
 }
 
 export const authApi = {
-  /** Organizers/admins: email a one-time code (6 to 10 digits, sent through Resend). The reply is the same whether or not the email has an account. */
+  /** Organizers/admins: email our own 6-digit code (sent through Resend). The reply is the same whether or not the email has an account. */
   sendEmailCode: (email: string) => call<{ ok: true; message?: string }>({ action: 'email-code', email }),
+  /** The server checks the code and opens the session. */
   verifyEmailCode: async (email: string, code: string) => {
-    const { error } = await createClient().auth.verifyOtp({ email, token: code, type: 'email' });
-    if (error) throw new Error('That code is wrong or has expired.');
+    await openSession(await call<ServerSession>({ action: 'email-verify', email, code }));
   },
 
   /** Register desk: email + access code (the desk account's password). */
