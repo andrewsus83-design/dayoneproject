@@ -6,7 +6,7 @@ import { adminApi, type AdminKey } from '@/lib/adminApi';
 
 const PRESETS = [
   { name: 'RESEND_API_KEY', desc: 'Email sending (invitations, passes, reminders)' },
-  { name: 'FONNTE_TOKEN', desc: 'WhatsApp sending through Fonnte' },
+  { name: 'FONNTE_TOKEN', desc: 'WhatsApp sending (Fonnte device token)' },
   { name: 'OPENAI_API_KEY', desc: 'AI features' },
   { name: 'ANTHROPIC_API_KEY', desc: 'AI features' },
   { name: 'R2_ACCESS_KEY_ID', desc: 'Cloudflare R2 photo storage' },

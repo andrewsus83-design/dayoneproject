@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Check, Copy, Download, ExternalLink, Image as ImageIcon, Info, Mail, MessageSquare, RotateCcw, Search, Star, Trash2, Upload, X,
+  Check, Copy, Download, ExternalLink, Image as ImageIcon, Info, Loader2, Mail, MessageSquare, RotateCcw, Search, Send, Star, Trash2, Upload, X,
 } from 'lucide-react';
 import {
-  deleteAsset, deleteFeedback, formatGuestNumber, numberDigits, saveAsset, useAssetUrl, useEventConfig, useFeedback, useGuests,
+  deleteAsset, deleteFeedback, formatGuestNumber, numberDigits, saveAsset, useAssetUrl, useEventConfig, useFeedback, useGuests, useOrgEventsCache,
   type BroadcastKind, type BroadcastTemplate, type FeedbackConfig,
 } from '@/lib/eventStore';
+import { whatsappApi, WA_PER_MINUTE, type WaStats } from '@/lib/whatsappApi';
 import { BROADCAST_KINDS, BROADCAST_VARIABLES, defaultBroadcastTemplates } from '@/lib/broadcastTemplates';
 import { emailBody, renderBroadcast, waPhone, whatsappHref } from '@/lib/broadcast';
 import { resolveTheme } from '@/lib/eventTheme';
@@ -31,6 +32,148 @@ const input = 'w-full bg-premium-surfaceDark border border-premium-borderDark te
 interface Recipient {
   guest: Guest;
   prize?: string;
+}
+
+function minutesText(minutes: number) {
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m ? `${h} h ${m} min` : `${h} h`;
+}
+
+/** Sends one message per guest from the server, paced to keep the WhatsApp number safe. */
+function WhatsAppSendAll({ eventId, saved, count, onSend }: {
+  eventId: string;
+  /** Only events saved to the organization can send from the server. */
+  saved: boolean;
+  /** Guests in the current list who have a phone number. */
+  count: number;
+  onSend: () => Promise<{ queued: number; skipped: number; minutes: number }>;
+}) {
+  const [stats, setStats] = useState<WaStats | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!saved) return;
+    try {
+      setStats(await whatsappApi.stats(eventId));
+    } catch {
+      // Progress is a nice-to-have; sending carries on without it.
+    }
+  }, [eventId, saved]);
+
+  useEffect(() => {
+    // Loads once on open; setState happens after the request resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    refresh();
+  }, [refresh]);
+
+  // Follow progress while messages are still going out.
+  useEffect(() => {
+    if (!stats?.waiting) return;
+    const t = setInterval(refresh, 15_000);
+    return () => clearInterval(t);
+  }, [stats?.waiting, refresh]);
+
+  if (!saved) {
+    return (
+      <div className="p-3 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-[11px] text-zinc-400 flex gap-2">
+        <Info className="w-4 h-4 text-premium-neon shrink-0 mt-px" />
+        <span>Sending to everyone at once works for events saved to your organization. Sample events can still send one by one below.</span>
+      </div>
+    );
+  }
+
+  const send = async () => {
+    const minutes = Math.max(1, Math.ceil(count / WA_PER_MINUTE));
+    const ok = confirm(
+      `Send this message to ${count} guest${count === 1 ? '' : 's'} on WhatsApp?\n\n` +
+        `Messages go out one by one, about ${WA_PER_MINUTE} a minute, so this takes about ${minutesText(minutes)}. ` +
+        'You can close this page; sending carries on.',
+    );
+    if (!ok) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const r = await onSend();
+      setNotice(
+        `${r.queued} message${r.queued === 1 ? '' : 's'} queued` +
+          (r.skipped ? `, ${r.skipped} skipped (no usable number, or the same number twice)` : '') +
+          `. All sent in about ${minutesText(r.minutes)}.`,
+      );
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not send. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const cancel = async () => {
+    if (!confirm('Stop the messages that have not gone out yet?')) return;
+    setError(null);
+    try {
+      const r = await whatsappApi.cancel(eventId);
+      setNotice(`${r.cancelled} waiting message${r.cancelled === 1 ? '' : 's'} stopped.`);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not stop the messages.');
+    }
+  };
+
+  const total = stats ? stats.waiting + stats.sent + stats.failed + stats.cancelled : 0;
+  const finishIn = stats?.waiting ? Math.max(1, Math.ceil((stats.ahead ?? stats.waiting) / WA_PER_MINUTE)) : 0;
+
+  return (
+    <div className="p-4 rounded-2xl bg-premium-charcoal border border-premium-success/30 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-display font-bold text-white flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-premium-success" /> Send to everyone on WhatsApp
+          </div>
+          <p className="text-[11px] text-zinc-500 mt-0.5">
+            {count} guest{count === 1 ? '' : 's'} in this list {count === 1 ? 'has' : 'have'} a phone number. Each gets their own message from our WhatsApp number.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={send}
+          disabled={busy || count === 0}
+          className="px-4 py-2.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-xs shadow-gold scale-on-click disabled:opacity-40 flex items-center gap-1.5"
+        >
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Send to {count}
+        </button>
+      </div>
+
+      {error && <p className="text-[11px] font-bold text-premium-danger">{error}</p>}
+      {notice && !error && <p className="text-[11px] font-bold text-premium-success">{notice}</p>}
+
+      {stats && total > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2 border-t border-premium-borderDark text-[11px]">
+          <span className="text-zinc-400">Waiting <strong className="text-white font-mono">{stats.waiting}</strong></span>
+          <span className="text-zinc-400">Sent <strong className="text-premium-success font-mono">{stats.sent}</strong></span>
+          <span className="text-zinc-400">Failed <strong className={`font-mono ${stats.failed ? 'text-premium-danger' : 'text-white'}`}>{stats.failed}</strong></span>
+          {stats.waiting > 0 && !stats.held && <span className="text-zinc-500">All sent in about {minutesText(finishIn)}</span>}
+          {stats.waiting > 0 && (
+            <button type="button" onClick={cancel} className="ml-auto px-2.5 py-1 rounded-lg border border-premium-borderDark text-zinc-400 hover:text-premium-danger hover:border-premium-danger/40 font-bold scale-on-click">
+              Stop waiting messages
+            </button>
+          )}
+        </div>
+      )}
+      {stats?.held && stats.waiting > 0 && (
+        <p className="text-[11px] text-premium-danger">
+          Sending is paused until the dayoneproject.xyz team checks the WhatsApp number. Your waiting messages are kept and go out after that.
+        </p>
+      )}
+      {stats && stats.failed > 0 && stats.lastFailure && (
+        <p className="text-[11px] text-zinc-500">Some numbers could not receive WhatsApp messages. Check them in your guest list.</p>
+      )}
+    </div>
+  );
 }
 
 function FeedbackPanel({ eventId }: { eventId: string }) {
@@ -195,6 +338,22 @@ export function BroadcastStudio({ eventId }: { eventId: string }) {
     const q = query.trim().toLowerCase();
     return !q || `${formatGuestNumber(g.guest_number, digits)} ${g.name} ${g.email ?? ''} ${g.phone ?? ''}`.toLowerCase().includes(q);
   });
+
+  const savedEvents = useOrgEventsCache();
+  const sendable = shown.filter(({ guest: g }) => waPhone(g.phone, bc.countryCode));
+  /** Queues this template for every guest shown, then marks them as sent. */
+  const sendAllWhatsApp = async () => {
+    const label = BROADCAST_KINDS.find((k) => k.id === kind)?.label ?? kind;
+    const messages = sendable.map(({ guest: g, prize }) => ({
+      phone: waPhone(g.phone, bc.countryCode),
+      name: g.name,
+      text: renderBroadcast(kind, tpl, config, g, { origin, digits, prize }).whatsapp,
+    }));
+    const result = await whatsappApi.enqueue(eventId, label, messages);
+    const ids = new Set([...(bc.sent[kind] ?? []), ...sendable.map(({ guest: g }) => g.id)]);
+    update('broadcast', { sent: { ...bc.sent, [kind]: [...ids] } });
+    return result;
+  };
 
   const previewRecipient = recipients.find((r) => r.guest.id === previewId) ?? shown[0] ?? recipients[0];
   const preview = renderBroadcast(kind, tpl, config, previewRecipient?.guest, { origin, digits, prize: previewRecipient?.prize ?? 'Apple MacBook Pro' });
@@ -476,6 +635,10 @@ export function BroadcastStudio({ eventId }: { eventId: string }) {
           </div>
         </div>
 
+        {bc.channel === 'whatsapp' && (
+          <WhatsAppSendAll eventId={eventId} saved={!!savedEvents?.[eventId]} count={sendable.length} onSend={sendAllWhatsApp} />
+        )}
+
         <div className="relative">
           <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name, number, phone or email" className={`${input} pl-8`} />
@@ -503,7 +666,7 @@ export function BroadcastStudio({ eventId }: { eventId: string }) {
           <Info className="w-4 h-4 text-premium-neon shrink-0 mt-px" />
           <span>
             Each button opens the message ready to send from your own WhatsApp or email app.
-            Sending to everyone at once in one click is coming soon.
+            {bc.channel === 'whatsapp' && ' To reach everyone at once, use Send to everyone above.'}
             Phone numbers starting with 0 get country code
             <input
               value={bc.countryCode}
