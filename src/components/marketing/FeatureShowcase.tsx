@@ -253,7 +253,7 @@ export function FeatureShowcase() {
               { value: '6 – 8', label: 'Tools replaced', sub: 'Luma · Canva · Kahoot · Kululu · more' },
               { value: '< 60s', label: 'Event creation time', sub: 'Typeform-style 6-step studio' },
               { value: '2,500+', label: 'Max guests per event', sub: 'Enterprise & stadium scale' },
-              { value: '30 days', label: 'Media retention', sub: 'Cloudflare R2 auto-purge lifecycle' },
+              { value: '30 days', label: 'Media retention', sub: 'Photos deleted within 30 days after the event' },
             ].map(({ value, label, sub }) => (
               <div key={label} className="md:px-10 first:pl-0 last:pr-0">
                 <div className="text-3xl sm:text-4xl font-display font-bold text-white tracking-tight">{value}</div>

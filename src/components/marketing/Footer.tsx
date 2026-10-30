@@ -21,8 +21,8 @@ const LINKS = {
   'Legal': [
     ['Terms of Service', '/terms'],
     ['Privacy Policy', '/privacy'],
-    ['WhatsApp Disclosure', '/terms'],
-    ['UU PDP Compliance', '/privacy'],
+    ['WhatsApp Disclosure', '/terms#whatsapp'],
+    ['UU PDP Rights', '/privacy#rights'],
   ],
 };
 
@@ -90,7 +90,7 @@ export function Footer() {
             © 2026 dayoneproject.xyz — All rights reserved. Built for Southeast Asia.
           </p>
           <p className="text-[12px] text-zinc-600 font-mono">
-            Next.js · Supabase · Cloudflare R2 · Vercel
+            Next.js · Supabase · Vercel
           </p>
         </div>
 
