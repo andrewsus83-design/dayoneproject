@@ -65,7 +65,7 @@ function FeedbackContent({ slug }: { slug: string }) {
   return (
     <div className="guest-app min-h-screen flex flex-col" style={{ ...theme.vars, background: theme.bg, color: theme.text, fontFamily: theme.bodyFamily }}>
       <EventFonts href={theme.fontsHref} />
-      <div className="w-full max-w-md mx-auto flex-1 flex flex-col px-5 py-6" style={{ gap: theme.space.stack }}>
+      <div className="w-full max-w-md mx-auto flex-1 flex flex-col px-[5%] py-6" style={{ gap: theme.space.stack }}>
         <Link href={guestAppPath(slug, 'setting')} className="inline-flex items-center gap-1.5 text-xs font-bold self-start scale-on-click" style={{ color: theme.muted }}>
           <ArrowLeft className="w-4 h-4" /> Back
         </Link>

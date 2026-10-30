@@ -35,7 +35,7 @@ function Shell({ slug, score, children }: { slug: string; score?: number | null;
           {typeof score === 'number' && <span className="text-xs font-mono font-bold text-premium-gold">{score.toLocaleString()} pts</span>}
         </div>
       </header>
-      <main className="flex-1 p-4 flex flex-col justify-center">{children}</main>
+      <main className="flex-1 py-4 px-[5%] flex flex-col justify-center">{children}</main>
     </div>
   );
 }

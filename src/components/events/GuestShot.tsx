@@ -681,7 +681,7 @@ export function GuestShot({ slug, token, eventName, dateLabel, primary, logoRef,
     <div className="space-y-4">
       <span ref={fontRef} className="font-display hidden" aria-hidden />
 
-      <div className="relative overflow-hidden rounded-[2.5rem] border border-premium-gold/30 bg-premium-charcoal p-8 text-center space-y-4 shadow-gold">
+      <div className="relative overflow-hidden rounded-[2.5rem] border border-premium-gold/30 bg-premium-charcoal py-8 px-5 text-center space-y-4 shadow-gold">
         <div className="absolute -top-16 -right-10 w-48 h-48 rounded-full bg-premium-gold/15 blur-3xl pointer-events-none" />
         <div className="absolute -bottom-16 -left-10 w-48 h-48 rounded-full bg-premium-neon/10 blur-3xl pointer-events-none" />
         <h2 className="relative text-2xl font-display font-bold text-white">Shot</h2>

@@ -71,7 +71,7 @@ function useQr(token: string) {
 
 function Notice({ title, children, tone = 'gold' }: { title: string; children: React.ReactNode; tone?: 'gold' | 'danger' }) {
   return (
-    <div className="bg-premium-charcoal rounded-[2.5rem] border border-premium-borderDark p-8 text-center space-y-4 shadow-2xl">
+    <div className="bg-premium-charcoal rounded-[2.5rem] border border-premium-borderDark py-8 px-5 text-center space-y-4 shadow-2xl">
       <div className={`w-14 h-14 mx-auto rounded-full flex items-center justify-center border ${tone === 'danger' ? 'bg-premium-danger/10 border-premium-danger/30 text-premium-danger' : 'bg-premium-gold/10 border-premium-gold/30 text-premium-gold'}`}>
         {tone === 'danger' ? <XCircle className="w-7 h-7" /> : <Ticket className="w-7 h-7" />}
       </div>
@@ -88,7 +88,7 @@ function PassCard({ view }: { view: PassView }) {
   const hydrated = useHydrated();
   return (
     <div className="bg-premium-charcoal rounded-[2.5rem] border border-premium-borderDark flex flex-col ticket-cutout shadow-2xl relative overflow-hidden">
-      <div className="p-8 flex-1 flex flex-col items-center justify-center text-center border-b-2 border-dashed border-zinc-800">
+      <div className="py-8 px-5 flex-1 flex flex-col items-center justify-center text-center border-b-2 border-dashed border-zinc-800">
         <div className="w-16 h-16 rounded-full bg-premium-gold/10 border border-premium-gold/30 flex items-center justify-center text-premium-gold mb-4 shadow-gold">
           <Ticket className="w-8 h-8" />
         </div>
@@ -110,7 +110,7 @@ function PassCard({ view }: { view: PassView }) {
         </p>
       </div>
 
-      <div className="p-8 bg-premium-surfaceDark rounded-b-[2.5rem] flex flex-col items-center justify-center text-center space-y-3">
+      <div className="py-8 px-5 bg-premium-surfaceDark rounded-b-[2.5rem] flex flex-col items-center justify-center text-center space-y-3">
         <div className="w-48 h-48 bg-white rounded-2xl p-3 shadow-2xl flex items-center justify-center">
           {qr ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -137,7 +137,7 @@ function PassCard({ view }: { view: PassView }) {
 /** Shown on Activity and Prize until the guest's QR has been scanned at the door. */
 function Locked({ title, onShowQr }: { title: string; onShowQr: () => void }) {
   return (
-    <div className="p-8 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark text-center space-y-4">
+    <div className="py-8 px-5 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark text-center space-y-4">
       <div className="w-14 h-14 mx-auto rounded-full bg-premium-surfaceDark border border-premium-borderDark text-zinc-400 flex items-center justify-center">
         <Lock className="w-6 h-6" />
       </div>
@@ -324,7 +324,7 @@ function GuestAppContent({ slug }: { slug: string }) {
     <div className="guest-app min-h-screen bg-premium-black text-zinc-100 flex justify-center font-sans selection:bg-premium-gold selection:text-premium-black">
       <div className="w-full max-w-[420px] min-h-screen bg-premium-black relative flex flex-col sm:border-x sm:border-premium-borderDark">
         {/* Top app bar */}
-        <header className="px-5 pt-6 pb-4 flex justify-between items-center gap-3 bg-premium-black/90 backdrop-blur border-b border-premium-borderDark sticky top-0 z-20">
+        <header className="px-[5%] pt-6 pb-4 flex justify-between items-center gap-3 bg-premium-black/90 backdrop-blur border-b border-premium-borderDark sticky top-0 z-20">
           <div className="flex items-center gap-3 min-w-0">
             <BrandMark size={40} />
             <div className="min-w-0">
@@ -339,7 +339,7 @@ function GuestAppContent({ slug }: { slug: string }) {
           )}
         </header>
 
-        <main className="flex-1 px-5 py-5 pb-32 space-y-5">
+        <main className="flex-1 px-[5%] py-5 pb-32 space-y-5">
           {/* ── QR (until check-in) ── */}
           {shown === 'qr' && qrBody}
 
@@ -503,7 +503,7 @@ function GuestAppContent({ slug }: { slug: string }) {
 
         {/* Bottom navigation */}
         <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[420px] z-30 pb-[env(safe-area-inset-bottom)]">
-          <div className="mx-3 mb-4 glass-panel rounded-[2rem] px-1 py-1.5 flex items-center shadow-2xl border border-zinc-700/80">
+          <div className="mx-[5%] mb-4 glass-panel rounded-[2rem] px-1 py-1.5 flex items-center shadow-2xl border border-zinc-700/80">
             {NAV.map(({ id, icon: Icon, label, central, locked }) => {
               const active = shown === id;
               if (central) {

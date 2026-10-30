@@ -67,7 +67,7 @@ function Shell({ slug, title, subtitle, children }: { slug: string; title: strin
           </div>
           <BrandMark size={32} />
         </header>
-        <main className="p-4 space-y-4 flex-1">{children}</main>
+        <main className="py-4 px-[5%] space-y-4 flex-1">{children}</main>
       </div>
     </div>
   );
