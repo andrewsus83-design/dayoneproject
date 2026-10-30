@@ -6,7 +6,9 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle2, Clock, Crown, EyeOff, MapPin, RotateCcw, Search, Users } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { formatGuestNumber, guestPool, numberDigits, quizPointsAt, useEventConfigBySlug, useGuests, type Activity, type QuizItem } from '@/lib/eventStore';
+import { isServerEventId } from '@/lib/guestsApi';
 import { StageFrameShell } from '@/components/stage/StageFrameShell';
+import { LiveQuizHost } from '@/components/events/LiveQuizHost';
 
 export interface Player {
   id: string;
@@ -172,7 +174,10 @@ function HuntBoard({ activity }: { activity: Activity }) {
   );
 }
 
-/** Big-screen games view. Games live at /events/[slug]/games, separate from door prizes. */
+/**
+ * Big-screen games view. Games live at /events/[slug]/games, separate from door prizes. Trivia on a saved event
+ * runs live on the server (LiveQuizHost: guests join on their phones); the sample events keep the local demo.
+ */
 export function GamesScreen({ slug, initialId }: { slug: string; initialId?: string | null }) {
   const router = useRouter();
   const { eventId, hydrated, config, event } = useEventConfigBySlug(slug);
@@ -193,6 +198,7 @@ export function GamesScreen({ slug, initialId }: { slug: string; initialId?: str
   if (!hydrated || !activity) {
     return <div className="min-h-screen bg-premium-black flex items-center justify-center text-zinc-500 text-sm">Loading activity…</div>;
   }
+  const live = activity.kind === 'quiz' && isServerEventId(eventId);
 
   // Left sits beside the back button; center and right get their own line under the controls.
   const nameAlign = activity.nameAlign;
@@ -205,7 +211,7 @@ export function GamesScreen({ slug, initialId }: { slug: string; initialId?: str
       </h1>
       <p className={`text-xs text-zinc-400 font-mono truncate flex items-center gap-2 ${justify}`}>
         {event.name}
-        <span className="inline-flex items-center gap-1 text-premium-success"><Users className="w-3 h-3" /> {players.length} player{players.length === 1 ? '' : 's'}</span>
+        <span className="inline-flex items-center gap-1 text-premium-success"><Users className="w-3 h-3" /> {players.length} {live ? 'checked in' : `player${players.length === 1 ? '' : 's'}`}</span>
         {activity.anonymous && <span className="inline-flex items-center gap-1 text-premium-gold"><EyeOff className="w-3 h-3" /> Anonymous</span>}
       </p>
     </div>
@@ -235,7 +241,7 @@ export function GamesScreen({ slug, initialId }: { slug: string; initialId?: str
                   {a.name}
                 </button>
               ))}
-              {activity.kind === 'quiz' && (
+              {activity.kind === 'quiz' && !live && (
                 <span className="text-xs font-mono ml-2 whitespace-nowrap"><span className="text-zinc-500">Score </span><strong className="text-premium-neon font-display text-base">{score}</strong></span>
               )}
             </div>
@@ -243,7 +249,13 @@ export function GamesScreen({ slug, initialId }: { slug: string; initialId?: str
           {nameAlign !== 'left' && title}
         </header>
         <main className="flex-1 p-6 sm:p-8 max-w-4xl mx-auto w-full flex flex-col justify-center items-center z-10">
-          {activity.kind === 'quiz' ? <QuizRunner key={activity.id} questions={activity.questions} players={players} onScore={setScore} /> : <HuntBoard activity={activity} />}
+          {live ? (
+            <LiveQuizHost key={activity.id} eventId={eventId} slug={slug} activity={activity} />
+          ) : activity.kind === 'quiz' ? (
+            <QuizRunner key={activity.id} questions={activity.questions} players={players} onScore={setScore} />
+          ) : (
+            <HuntBoard activity={activity} />
+          )}
         </main>
       </StageFrameShell>
     </div>
