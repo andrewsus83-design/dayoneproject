@@ -137,6 +137,8 @@ export default function TeamSettingsPage() {
   };
 
   const canManage = !!team?.canManage;
+  /** Admin organizers can manage the register desk too. */
+  const canManageDesk = canManage || !!team?.canManageDesk;
 
   return (
     <div className="flex-1 flex flex-col font-sans">
@@ -242,20 +244,26 @@ export default function TeamSettingsPage() {
                     <p className="text-xs text-zinc-500">{team.members.length} {team.members.length === 1 ? 'person' : 'people'}</p>
                   </div>
                 </div>
-                {canManage && !adding && (
+                {canManageDesk && !adding && (
                   <button
                     type="button"
-                    onClick={() => { setAdding(true); setHandover(null); }}
+                    onClick={() => {
+                      setAdding(true);
+                      setHandover(null);
+                      if (!canManage) setPerson((p) => ({ ...p, role: 'desk' }));
+                    }}
                     className="px-5 py-2.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-sm shadow-gold scale-on-click flex items-center gap-2"
                   >
-                    <Plus className="w-4 h-4" /> Add person
+                    <Plus className="w-4 h-4" /> {canManage ? 'Add person' : 'Add register desk'}
                   </button>
                 )}
               </div>
 
               {!canManage && (
                 <p className="text-xs text-zinc-500 px-4 py-3 rounded-xl bg-premium-surfaceDark border border-premium-borderDark">
-                  Only the account owner can add or remove people.
+                  {canManageDesk
+                    ? 'You can add and remove register desk staff. Only the account owner can add or remove admin organizers.'
+                    : 'Only the account owner can add or remove people.'}
                 </p>
               )}
 
@@ -265,7 +273,7 @@ export default function TeamSettingsPage() {
                     {([
                       { role: 'organizer', icon: Briefcase, title: 'Admin organizer', desc: 'Creates and runs events. Signs in with a code sent to their email.' },
                       { role: 'desk', icon: ScanLine, title: 'Register desk', desc: 'Checks guests in at the door. Signs in with email and an access code.' },
-                    ] as const).map(({ role, icon: Icon, title, desc }) => {
+                    ] as const).filter(({ role }) => canManage || role === 'desk').map(({ role, icon: Icon, title, desc }) => {
                       const active = person.role === role;
                       return (
                         <button
@@ -359,7 +367,7 @@ export default function TeamSettingsPage() {
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${ROLE_STYLE[m.role]}`}>
                         {TEAM_ROLE_LABELS[m.role]}
                       </span>
-                      {canManage && m.role !== 'owner' && !isMe && (
+                      {m.role !== 'owner' && !isMe && (canManage || (canManageDesk && m.role === 'desk')) && (
                         <div className="flex items-center gap-2">
                           {m.role === 'desk' && (
                             <button type="button" onClick={() => newCode(m)} disabled={busyId === m.id} className={quietButton}>

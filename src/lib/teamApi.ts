@@ -16,8 +16,10 @@ export interface TeamMember {
 
 export interface Team {
   org: { id: string; name: string };
-  /** Only the account owner can add, remove or rename. */
+  /** Only the account owner can add or remove admin organizers and rename the organization. */
   canManage: boolean;
+  /** Admin organizers can also add, remove and re-code register desk staff. */
+  canManageDesk?: boolean;
   members: TeamMember[];
 }
 

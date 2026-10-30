@@ -4,7 +4,8 @@
 // The organization's owner (a41_organizations.created_by) adds people to their organization:
 // - Admin organizer: membership role 'owner' (runs the organization's events), signs in with an emailed code.
 // - Register desk:   membership role 'staff' (check-in only), signs in with email + an access code.
-// Every owner-member can see the team; only the creator can change it.
+// Every owner-member can see the team and manage the register desk; only the creator adds or removes
+// admin organizers and renames the organization.
 // Logins are shared with other products, so an existing account is only linked when it is already an
 // event-platform organizer, or has no role and no password; anything else gets one generic refusal.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
@@ -114,11 +115,15 @@ Deno.serve(async (req) => {
     });
 
     const body = await req.json().catch(() => ({}));
-    if (body.action !== 'list' && !isCreator) return json({ error: 'Only the account owner can change the team.' }, 403);
+    // The account owner manages the whole team; admin organizers may also add, remove and re-code the register desk.
+    const deskAction = (body.action === 'add' && body.role === 'desk') || body.action === 'remove' || body.action === 'reset-code';
+    if (body.action !== 'list' && !isCreator && !deskAction) {
+      return json({ error: 'Only the account owner can change admin organizers or the organization name.' }, 403);
+    }
 
     switch (body.action) {
       case 'list':
-        return json({ org: { id: orgId, name: org?.name ?? '' }, canManage: isCreator, members: (await members()).map(view) });
+        return json({ org: { id: orgId, name: org?.name ?? '' }, canManage: isCreator, canManageDesk: true, members: (await members()).map(view) });
 
       case 'rename': {
         const name = String(body.name ?? '').trim().slice(0, 120);
@@ -182,6 +187,7 @@ Deno.serve(async (req) => {
         if (id === me.id) return json({ error: 'You cannot remove yourself.' }, 400);
         const target = (await members()).find((m) => m.user_id === id);
         if (!target) return json({ error: 'Not on your team.' }, 404);
+        if (!isCreator && target.membership_role !== 'staff') return json({ error: 'Only the account owner can remove admin organizers.' }, 403);
         await admin.from('a41_memberships').delete().eq('org_id', orgId).eq('user_id', id);
         // Desk accounts exist only for this team, so switch them off too.
         if (target.membership_role === 'staff' && target.app_role === 'desk') {
