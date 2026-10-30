@@ -3,6 +3,7 @@ import { Event, Guest } from './types';
 import { getBaseEvent, resolveEventIdFromSlug, SLUG_INDEX_KEY } from './events';
 import { MOCK_GUESTS, POPVERSE_QUIZ_QUESTIONS } from './mockData';
 import { buildDefaultBlocks, legacyToBlocks, type LandingBlock } from './landingBlocks';
+import { defaultBroadcast } from './broadcastTemplates';
 
 /* ───────────────────────── Types ───────────────────────── */
 
@@ -101,6 +102,11 @@ export interface DesignConfig {
   cardStyle: CardStyleId;
   radius: RadiusId;
   spacing: SpacingId;
+  /** Per-area overrides of `spacing`; '' follows it. */
+  spacingPadding: SpacingId | '';
+  spacingGaps: SpacingId | '';
+  spacingCards: SpacingId | '';
+  spacingLetters: SpacingId | '';
   logoUrl: string;
   logoSize: 's' | 'm' | 'l';
 }
@@ -180,7 +186,9 @@ export interface StageFrame {
   footerOn: boolean;
   footerText: string;
   footerLogo: boolean;
-  footerStyle: 'dark' | 'gold' | 'glass';
+  footerStyle: 'dark' | 'gold' | 'glass' | 'image';
+  /** Your own footer banner (used when footerStyle is 'image'). */
+  footerImageUrl?: string;
 }
 
 export interface QuizItem {
@@ -210,6 +218,15 @@ export interface Activity {
   audience: Audience;
   pickedGuestIds: string[];
   anonymous: boolean;
+  /** What winners of this activity get, e.g. "Bluetooth speaker". */
+  prize: string;
+  winners: GameWinner[];
+}
+
+export interface GameWinner {
+  id: string;
+  guestId: string;
+  at: string;
 }
 
 export type DrawStyle = 'slot' | 'wheel' | 'picker' | 'claw';
@@ -251,6 +268,48 @@ export interface DoorPrizesConfig {
   activeId: string;
 }
 
+export type BroadcastKind = 'invitation' | 'pass' | 'reminder' | 'thankyou' | 'winner';
+
+export interface BroadcastTemplate {
+  subject: string;
+  heading: string;
+  /** Email body. */
+  message: string;
+  whatsapp: string;
+  buttonLabel: string;
+  imageUrl: string;
+}
+
+export interface BroadcastConfig {
+  channel: 'whatsapp' | 'email';
+  /** Added to local phone numbers that start with 0. */
+  countryCode: string;
+  templates: Record<BroadcastKind, BroadcastTemplate>;
+  /** Guest ids already messaged, per template. */
+  sent: Partial<Record<BroadcastKind, string[]>>;
+  feedback: FeedbackConfig;
+}
+
+/** Feedback form linked from the Thank You message. */
+export interface FeedbackConfig {
+  on: boolean;
+  title: string;
+  question: string;
+  askComment: boolean;
+  /** Text before the link in the Thank You message, and the email button label. */
+  prompt: string;
+  thanks: string;
+}
+
+export interface FeedbackEntry {
+  id: string;
+  at: string;
+  rating: number;
+  comment: string;
+  guestId?: string;
+  name?: string;
+}
+
 export interface EventConfig {
   info: EventInfo;
   landing: LandingConfig;
@@ -261,6 +320,7 @@ export interface EventConfig {
   raffle: RaffleConfig;
   games: GamesConfig;
   doorprizes: DoorPrizesConfig;
+  broadcast: BroadcastConfig;
 }
 
 export type EventSection = keyof EventConfig;
@@ -284,6 +344,7 @@ export interface FormResponse {
 export const eventKey = (id: string) => `all41-event-${id}`;
 export const responsesKey = (id: string) => `all41-responses-${id}`;
 export const guestsKey = (id: string) => `all41-guests-${id}`;
+export const feedbackKey = (id: string) => `all41-feedback-${id}`;
 const assetKey = (id: string) => `all41-asset-${id}`;
 
 /* ───────────────────────── Defaults ───────────────────────── */
@@ -351,6 +412,10 @@ export function buildDefaults(base: Event): EventConfig {
       cardStyle: isPopverse ? 'glass' : 'elevated',
       radius: 'medium',
       spacing: 'normal',
+      spacingPadding: '',
+      spacingGaps: '',
+      spacingCards: '',
+      spacingLetters: '',
       logoUrl: '',
       logoSize: 'm',
     },
@@ -421,6 +486,7 @@ export function buildDefaults(base: Event): EventConfig {
     raffle: { slotMode: 'number', totalNumbers: 0, drawnNumbers: [], drawnGuestIds: [] },
     games: defaultGames(base),
     doorprizes: defaultDoorPrizes(base),
+    broadcast: defaultBroadcast(base),
   };
 }
 
@@ -569,12 +635,18 @@ function defaultDoorPrizes(base: Event): DoorPrizesConfig {
   return { items, activeId: items[0].id };
 }
 
-const ACTIVITY_EXTRAS = { audience: 'all' as Audience, pickedGuestIds: [] as string[], anonymous: false };
+const ACTIVITY_EXTRAS = { audience: 'all' as Audience, pickedGuestIds: [] as string[], anonymous: false, prize: '', winners: [] as GameWinner[] };
 const DRAW_EXTRAS = { audience: 'all' as Audience, pickedGuestIds: [] as string[], anonymous: false, numberSource: 'guests' as const };
 
 function normalizeGames(defaults: GamesConfig, stored: Partial<GamesConfig> | undefined): GamesConfig {
   const merged = { ...defaults, ...stored };
   return { ...merged, activities: merged.activities.map((a) => ({ ...ACTIVITY_EXTRAS, ...a })) };
+}
+
+function normalizeBroadcast(defaults: BroadcastConfig, stored: Partial<BroadcastConfig> | undefined): BroadcastConfig {
+  const templates = { ...defaults.templates };
+  for (const k of Object.keys(templates) as BroadcastKind[]) templates[k] = { ...templates[k], ...stored?.templates?.[k] };
+  return { ...defaults, ...stored, templates, sent: { ...stored?.sent }, feedback: { ...defaults.feedback, ...stored?.feedback } };
 }
 
 function normalizeDoorPrizes(defaults: DoorPrizesConfig, stored: Partial<DoorPrizesConfig> | undefined): DoorPrizesConfig {
@@ -594,6 +666,7 @@ function mergeConfig(defaults: EventConfig, stored: StoredConfig | null): EventC
     raffle: { ...defaults.raffle, ...stored.raffle },
     games: normalizeGames(defaults.games, stored.games),
     doorprizes: normalizeDoorPrizes(defaults.doorprizes, stored.doorprizes),
+    broadcast: normalizeBroadcast(defaults.broadcast, stored.broadcast),
   };
 }
 
@@ -785,6 +858,21 @@ export function useResponses(eventId: string): FormResponse[] {
 export function addResponse(eventId: string, response: FormResponse): WriteResult {
   const current = readJSON<FormResponse[]>(responsesKey(eventId)) ?? [];
   return writeJSON(responsesKey(eventId), [response, ...current]);
+}
+
+const EMPTY_FEEDBACK: FeedbackEntry[] = [];
+export function useFeedback(eventId: string): FeedbackEntry[] {
+  return useStoredJSON<FeedbackEntry[]>(feedbackKey(eventId)) ?? EMPTY_FEEDBACK;
+}
+
+export function addFeedback(eventId: string, entry: FeedbackEntry): WriteResult {
+  const current = readJSON<FeedbackEntry[]>(feedbackKey(eventId)) ?? [];
+  return writeJSON(feedbackKey(eventId), [entry, ...current]);
+}
+
+export function deleteFeedback(eventId: string, id: string): WriteResult {
+  const current = readJSON<FeedbackEntry[]>(feedbackKey(eventId)) ?? [];
+  return writeJSON(feedbackKey(eventId), current.filter((f) => f.id !== id));
 }
 
 export function deleteResponse(eventId: string, id: string): WriteResult {

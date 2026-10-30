@@ -12,7 +12,7 @@ import {
   useAssetUrl, useEventConfig, useGuests, useResponses, withPageBreaks, numberDigits, formatGuestNumber, ESSENTIALS_CORPORATE, ESSENTIALS_WEDDING,
   type FormItem, type FormQuestion, type InvitationConfig, type QuestionType, type ClosingCopy, type EventInfo,
 } from '@/lib/eventStore';
-import { INVITATION_THEMES, resolveInvitationTheme, resolveTheme } from '@/lib/eventTheme';
+import { DARK_BACKGROUNDS, INVITATION_THEMES, LIGHT_BACKGROUNDS, resolveInvitationTheme, resolveTheme } from '@/lib/eventTheme';
 import { compressImage, downloadBlob, downloadDataUrl, toCsv } from '@/lib/image';
 import { InvitationFormView, type PreviewScreen } from '@/components/events/InvitationFormView';
 import { EventFonts } from '@/components/events/EventFonts';
@@ -438,14 +438,37 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
                   >
                     <span className="flex gap-0.5 items-center">
                       <span className="w-3.5 h-3.5 rounded-full border border-white/10" style={{ backgroundColor: th.c1 }} />
-                      <span className="w-3.5 h-3.5 rounded-full border border-white/10" style={{ backgroundColor: th.c2 }} />
+                      <span className="w-3.5 h-3.5 rounded-full border border-white/10" style={{ backgroundColor: eventTheme.bg }} />
                       <span className="w-2.5 h-2.5 rounded-full opacity-70" style={{ backgroundColor: th.c3 }} />
                     </span>
                     {th.name}
                   </button>
                 ))}
               </div>
-              <p className="text-[10px] text-zinc-600 mt-1.5">“Event Design” follows the light/dark mode and colors set in Design Studio.</p>
+              <p className="text-[10px] text-zinc-600 mt-1.5">Every theme follows the light/dark mode and background from Design Studio. “Event Design” also uses its colors.</p>
+              <div className="flex flex-wrap items-center justify-between gap-3 mt-3 p-3 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark">
+                <div>
+                  <div className="text-xs font-bold text-white">Page mode</div>
+                  <div className="text-[10px] text-zinc-500 mt-0.5">Shared with Design Studio, so the landing page changes too.</div>
+                </div>
+                <div className="flex items-center gap-1 bg-premium-black p-1 rounded-xl border border-premium-borderDark">
+                  {(['dark', 'light'] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => {
+                        if (config.design.mode === m) return;
+                        const list = m === 'light' ? LIGHT_BACKGROUNDS : DARK_BACKGROUNDS;
+                        const keep = list.some((b) => b.hex.toLowerCase() === config.design.background.toLowerCase());
+                        update('design', { mode: m, background: keep ? config.design.background : list[0].hex });
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold scale-on-click transition-all ${config.design.mode === m ? 'bg-premium-gold text-black shadow-gold' : 'text-zinc-400 hover:text-white'}`}
+                    >
+                      {m === 'dark' ? 'Dark' : 'Light'}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div>

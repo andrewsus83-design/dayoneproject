@@ -222,7 +222,7 @@ export function InvitationFormView({
 
   const sp = theme.space;
   const accentIsScript = theme.accentFamily !== theme.headingFamily;
-  const headingStyle: CSSProperties = { fontFamily: theme.headingFamily, letterSpacing: '-0.02em' };
+  const headingStyle: CSSProperties = { fontFamily: theme.headingFamily, letterSpacing: theme.space.headingTracking };
   const primaryBtn: CSSProperties = { background: theme.primary, color: theme.onPrimary, borderRadius: theme.buttonRadius };
   const secondaryBtn: CSSProperties = { background: theme.surface, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: theme.buttonRadius };
   const inputCls =

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Copy, Download, ExternalLink, Gift, Plus, Trash2, Trophy, Tv, Palette, Settings2, Sparkles, Check, Users, X } from 'lucide-react';
 import { formatGuestNumber, guestPool, newDoorPrize, numberDigits, useEventConfig, useGuests, type DoorPrize } from '@/lib/eventStore';
 import { AudiencePicker } from '@/components/raffle/AudiencePicker';
+import { SendButtons } from './SendButtons';
 import { DrawMachine, DRAW_STYLES } from '@/components/raffle/DrawMachine';
 import { SlotSettings } from '@/components/raffle/SlotSettings';
 import { FrameDesigner } from '@/components/stage/FrameDesigner';
@@ -179,7 +180,10 @@ export function RaffleEngine({ eventId }: { eventId: string }) {
           {tab === 'winners' && (
             <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-bold text-white">{draw.winners.length} of {draw.quantity} winners drawn</p>
+                <div>
+                  <p className="text-sm font-bold text-white">{draw.winners.length} of {draw.quantity} winners drawn</p>
+                  <p className="text-[11px] text-zinc-500 mt-0.5">Tell each winner with one tap. Edit the message in Broadcast → Winner.</p>
+                </div>
                 <button
                   type="button"
                   disabled={!draw.winners.length}
@@ -194,7 +198,7 @@ export function RaffleEngine({ eventId }: { eventId: string }) {
               ) : (
                 <div className="divide-y divide-premium-borderDark/60 rounded-2xl border border-premium-borderDark overflow-hidden">
                   {draw.winners.map((w, i) => (
-                    <div key={w.id} className="flex items-center gap-3 px-4 py-3 text-xs">
+                    <div key={w.id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-xs">
                       <span className="w-6 h-6 rounded-full bg-premium-gold/15 text-premium-gold font-bold flex items-center justify-center">{draw.winners.length - i}</span>
                       <span className="flex-1 min-w-0 truncate">
                         <span className="font-bold text-white">{w.number ? `No. ${w.label}` : w.label}</span>
@@ -202,6 +206,7 @@ export function RaffleEngine({ eventId }: { eventId: string }) {
                           <span className="text-zinc-400 ml-2">· {winnerName(w.guestId)?.name}</span>
                         )}
                       </span>
+                      {winnerName(w.guestId) && <SendButtons eventId={eventId} kind="winner" guest={winnerName(w.guestId)!} prize={draw.prize || draw.name} size="sm" />}
                       <span className="font-mono text-zinc-500">{new Date(w.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       <button type="button" onClick={() => patch({ winners: draw.winners.filter((x) => x.id !== w.id) })} className="text-zinc-600 hover:text-premium-danger scale-on-click" aria-label="Remove winner"><X className="w-3.5 h-3.5" /></button>
                     </div>

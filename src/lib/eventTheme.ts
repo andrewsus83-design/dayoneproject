@@ -153,6 +153,28 @@ export interface ResolvedSpace {
   card: number;
   gap: number;
   stack: number;
+  /** Letter spacing for headings and body text. */
+  headingTracking: string;
+  bodyTracking: string;
+}
+
+const TRACKING: Record<SpacingId, { heading: string; body: string }> = {
+  tight: { heading: '-0.045em', body: '-0.015em' },
+  normal: { heading: '-0.02em', body: '0em' },
+  spacious: { heading: '0.02em', body: '0.03em' },
+};
+
+export function resolveSpace(design: Pick<DesignConfig, 'spacing' | 'spacingPadding' | 'spacingGaps' | 'spacingCards' | 'spacingLetters'>): ResolvedSpace {
+  const scaleOf = (id?: SpacingId | '') => SPACING_OPTIONS.find((s) => s.id === (id || design.spacing))?.scale ?? 1;
+  const letters = (design.spacingLetters || design.spacing || 'normal') as SpacingId;
+  return {
+    section: Math.round(80 * scaleOf(design.spacingPadding)),
+    card: Math.round(24 * scaleOf(design.spacingCards)),
+    gap: Math.round(16 * scaleOf(design.spacingGaps)),
+    stack: Math.round(20 * scaleOf(design.spacingGaps)),
+    headingTracking: TRACKING[letters]?.heading ?? TRACKING.normal.heading,
+    bodyTracking: TRACKING[letters]?.body ?? TRACKING.normal.body,
+  };
 }
 
 export interface ResolvedTheme {
@@ -227,13 +249,7 @@ export function resolveTheme(design: DesignConfig): ResolvedTheme {
 
   const radiusPx = RADIUS_OPTIONS.find((r) => r.id === design.radius)?.px ?? 16;
   const buttonRadius = design.radius === 'pill' ? 999 : design.radius === 'sharp' ? 8 : 14;
-  const scale = SPACING_OPTIONS.find((s) => s.id === design.spacing)?.scale ?? 1;
-  const space: ResolvedSpace = {
-    section: Math.round(80 * scale),
-    card: Math.round(24 * scale),
-    gap: Math.round(16 * scale),
-    stack: Math.round(20 * scale),
-  };
+  const space = resolveSpace(design);
 
   const base: CSSProperties = { background: card, borderRadius: radiusPx };
   const cardStyle: CSSProperties =
@@ -273,6 +289,9 @@ export function resolveTheme(design: DesignConfig): ResolvedTheme {
     '--ev-secondary': secondary,
     '--ev-accent': accent,
     '--ev-accent-text': accentText,
+    '--ev-tracking-heading': space.headingTracking,
+    '--ev-tracking-body': space.bodyTracking,
+    letterSpacing: space.bodyTracking,
   } as CSSProperties;
 
   return {
@@ -306,10 +325,9 @@ export function resolveTheme(design: DesignConfig): ResolvedTheme {
 export function resolveInvitationTheme(design: DesignConfig, themeName: string): ResolvedTheme {
   const preset = INVITATION_THEMES.find((t) => t.name === themeName);
   if (!preset) return resolveTheme(design);
+  // A theme only swaps the colors; light/dark mode and background always come from Design Studio.
   return resolveTheme({
     ...design,
-    background: preset.c2,
-    mode: modeForBackground(preset.c2),
     palette: 'custom',
     customPrimary: preset.c1,
     customSecondary: mix(preset.c1, preset.c3, 0.5),

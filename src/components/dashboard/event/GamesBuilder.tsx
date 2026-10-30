@@ -4,16 +4,17 @@ import React, { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import * as XLSX from 'xlsx';
 import {
-  ArrowDown, ArrowUp, Check, Copy, Download, ExternalLink, Gamepad2, MapPin, Palette, Plus, Search, Trash2, Tv, Upload, Users,
+  ArrowDown, ArrowUp, Check, Copy, Download, ExternalLink, Gamepad2, MapPin, Palette, Plus, Search, Trash2, Trophy, Tv, Upload, Users, X,
 } from 'lucide-react';
 import {
-  guestPool, newActivity, newClue, newId, newQuizItem, numberDigits, useEventConfig, useGuests, type Activity, type ClueItem, type QuizItem,
+  formatGuestNumber, guestPool, newActivity, newClue, newId, newQuizItem, numberDigits, useEventConfig, useGuests, type Activity, type ClueItem, type QuizItem,
 } from '@/lib/eventStore';
 import { AudiencePicker } from '@/components/raffle/AudiencePicker';
+import { SendButtons } from './SendButtons';
 import { FrameDesigner } from '@/components/stage/FrameDesigner';
 import { downloadBlob, downloadDataUrl, toCsv } from '@/lib/image';
 
-type Tab = 'content' | 'guests' | 'design' | 'screen';
+type Tab = 'content' | 'guests' | 'winners' | 'design' | 'screen';
 const input = 'w-full px-3 py-2 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-xs text-white outline-none focus:border-premium-gold/60';
 
 function move<T>(list: T[], i: number, d: -1 | 1): T[] {
@@ -156,6 +157,74 @@ function HuntEditor({ clues, onChange }: { clues: ClueItem[]; onChange: (c: Clue
   );
 }
 
+function GameWinners({ eventId, activity, onChange }: { eventId: string; activity: Activity; onChange: (p: Partial<Activity>) => void }) {
+  const { config } = useEventConfig(eventId);
+  const guests = useGuests(eventId);
+  const [query, setQuery] = useState('');
+  const digits = numberDigits(guests, config.info.capacity);
+  const byId = new Map(guests.map((g) => [g.id, g]));
+  const winnerIds = new Set(activity.winners.map((w) => w.guestId));
+  const q = query.trim().toLowerCase();
+  const candidates = guestPool(guests, activity.audience, activity.pickedGuestIds)
+    .filter((g) => !winnerIds.has(g.id))
+    .filter((g) => !q || `${formatGuestNumber(g.guest_number, digits)} ${g.name} ${g.table_number ?? ''}`.toLowerCase().includes(q));
+  const prize = activity.prize || `a prize in ${activity.name}`;
+
+  return (
+    <div className="space-y-5">
+      <label className="block space-y-1.5">
+        <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">What winners get</span>
+        <input value={activity.prize} onChange={(e) => onChange({ prize: e.target.value })} placeholder="e.g. Bluetooth speaker" className={input} />
+      </label>
+
+      <div className="space-y-2">
+        <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Winners · tell each one with a tap (edit the text in Broadcast → Winner)</div>
+        {activity.winners.length === 0 && <p className="text-xs text-zinc-500">No winners yet. Pick them from the players below.</p>}
+        <div className="rounded-2xl border border-premium-borderDark divide-y divide-premium-borderDark/60 overflow-hidden">
+          {activity.winners.map((w, i) => {
+            const g = byId.get(w.guestId);
+            if (!g) return null;
+            return (
+              <div key={w.id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-xs">
+                <span className="w-6 h-6 rounded-full bg-premium-gold/15 text-premium-gold font-bold flex items-center justify-center">{i + 1}</span>
+                <span className="font-mono font-bold text-premium-gold">{formatGuestNumber(g.guest_number, digits)}</span>
+                <span className="flex-1 min-w-[120px] font-bold text-white truncate">{g.name}</span>
+                <SendButtons eventId={eventId} kind="winner" guest={g} prize={prize} size="sm" />
+                <button type="button" onClick={() => onChange({ winners: activity.winners.filter((x) => x.id !== w.id) })} className="text-zinc-600 hover:text-premium-danger scale-on-click" aria-label="Remove winner">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Pick a winner from the players</div>
+        <div className="relative">
+          <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name, number or table" className={`${input} pl-8`} />
+        </div>
+        <div className="max-h-64 overflow-y-auto rounded-2xl border border-premium-borderDark divide-y divide-premium-borderDark/50">
+          {candidates.length === 0 && <p className="p-4 text-xs text-zinc-500">No checked-in players to pick.</p>}
+          {candidates.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              onClick={() => onChange({ winners: [...activity.winners, { id: newId('gw'), guestId: g.id, at: new Date().toISOString() }] })}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-xs hover:bg-premium-surfaceDark scale-on-click"
+            >
+              <span className="font-mono font-bold text-premium-gold w-12">{formatGuestNumber(g.guest_number, digits)}</span>
+              <span className="flex-1 truncate text-white">{g.name}</span>
+              <span className="text-[11px] font-bold text-premium-gold flex items-center gap-1"><Plus className="w-3 h-3" /> Winner</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function GamesBuilder({ eventId }: { eventId: string }) {
   const { config, base, update } = useEventConfig(eventId);
   const { activities, activeId } = config.games;
@@ -229,6 +298,7 @@ export function GamesBuilder({ eventId }: { eventId: string }) {
             {([
               { id: 'content', label: activity.kind === 'quiz' ? 'Questions' : 'Clues', icon: Gamepad2 },
               { id: 'guests', label: `Players (${guestPool(guests, activity.audience, activity.pickedGuestIds).length})`, icon: Users },
+              { id: 'winners', label: `Winners (${activity.winners.length})`, icon: Trophy },
               { id: 'design', label: 'Frame & Footer', icon: Palette },
               { id: 'screen', label: 'Big Screen', icon: Tv },
             ] as const).map((t) => (
@@ -250,6 +320,7 @@ export function GamesBuilder({ eventId }: { eventId: string }) {
                   : <HuntEditor clues={activity.clues} onChange={(clues) => patch({ clues })} />}
               </>
             )}
+            {tab === 'winners' && <GameWinners eventId={eventId} activity={activity} onChange={patch} />}
             {tab === 'guests' && (
               <AudiencePicker
                 guests={guests}

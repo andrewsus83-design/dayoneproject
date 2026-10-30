@@ -3,7 +3,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
   Type, Palette, Layers, Check, Moon, Sun, Paintbrush, ExternalLink, RotateCcw, Calendar, MapPin, Image as ImageIcon,
-  Upload, Trash2,
+  MoveVertical, Upload, Trash2,
 } from 'lucide-react';
 import { deleteAsset, resetEventSection, saveAsset, useAssetUrl, useEventConfig, type DesignConfig, type ThemeMode } from '@/lib/eventStore';
 import {
@@ -13,14 +13,15 @@ import {
 import { compressImage } from '@/lib/image';
 import { EventFonts } from '@/components/events/EventFonts';
 
-type DesignSubTab = 'mode' | 'colors' | 'fonts' | 'style' | 'logo';
+type DesignSubTab = 'mode' | 'colors' | 'fonts' | 'spacing' | 'style' | 'logo';
 
 function SubNav({ active, onChange }: { active: DesignSubTab; onChange: (t: DesignSubTab) => void }) {
   const tabs: { id: DesignSubTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'mode', label: 'Light / Dark & Background', icon: Paintbrush },
     { id: 'colors', label: 'Colors', icon: Palette },
     { id: 'fonts', label: 'Fonts', icon: Type },
-    { id: 'style', label: 'Style & Spacing', icon: Layers },
+    { id: 'spacing', label: 'Spacing', icon: MoveVertical },
+    { id: 'style', label: 'Cards & Corners', icon: Layers },
     { id: 'logo', label: 'Logo', icon: ImageIcon },
   ];
   return (
@@ -250,25 +251,76 @@ export function EventDesignStudio({ eventId }: { eventId: string }) {
         </div>
       )}
 
-      {subTab === 'style' && (
+      {subTab === 'spacing' && (
         <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-6">
           <div>
-            <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">Spacing · padding, margins and gaps</p>
+            <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-1">Spacing · everything</p>
+            <p className="text-[11px] text-zinc-500 mb-3">Sets padding, margins, cards and letter spacing in one go. Fine-tune each one below.</p>
             <div className="grid grid-cols-3 gap-3">
-              {SPACING_OPTIONS.map((s) => (
-                <button key={s.id} type="button" onClick={() => setDesign({ spacing: s.id })} className={`p-4 rounded-2xl border text-left transition-all scale-on-click ${design.spacing === s.id ? 'border-premium-gold bg-premium-surfaceDark shadow-gold' : 'border-premium-borderDark bg-premium-black/60 hover:border-zinc-600'}`}>
-                  <div className="flex flex-col mb-3" style={{ gap: 4 * s.scale }}>
-                    {[0, 1, 2].map((i) => <span key={i} className="h-2 rounded bg-zinc-600" style={{ width: `${90 - i * 20}%` }} />)}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white">{s.label}</span>
-                    {design.spacing === s.id && <Check className="w-3.5 h-3.5 text-premium-gold" />}
-                  </div>
-                  <div className="text-[10px] text-zinc-500 mt-0.5">{s.desc}</div>
-                </button>
-              ))}
+              {SPACING_OPTIONS.map((s) => {
+                const active = design.spacing === s.id && !design.spacingPadding && !design.spacingGaps && !design.spacingCards && !design.spacingLetters;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setDesign({ spacing: s.id, spacingPadding: '', spacingGaps: '', spacingCards: '', spacingLetters: '' })}
+                    className={`p-4 rounded-2xl border text-left transition-all scale-on-click ${active ? 'border-premium-gold bg-premium-surfaceDark shadow-gold' : 'border-premium-borderDark bg-premium-black/60 hover:border-zinc-600'}`}
+                  >
+                    <div className="flex flex-col mb-3" style={{ gap: 4 * s.scale }}>
+                      {[0, 1, 2].map((i) => <span key={i} className="h-2 rounded bg-zinc-600" style={{ width: `${90 - i * 20}%` }} />)}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white">{s.label}</span>
+                      {active && <Check className="w-3.5 h-3.5 text-premium-gold" />}
+                    </div>
+                    <div className="text-[10px] text-zinc-500 mt-0.5">{s.desc}</div>
+                  </button>
+                );
+              })}
             </div>
           </div>
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">Fine-tune</p>
+            <div className="rounded-2xl border border-premium-borderDark divide-y divide-premium-borderDark/60">
+              {([
+                { key: 'spacingPadding', label: 'Padding', desc: 'Space above and below each section' },
+                { key: 'spacingGaps', label: 'Margins & gaps', desc: 'Space between cards, lines and buttons' },
+                { key: 'spacingCards', label: 'Cards', desc: 'Space inside cards and tickets' },
+                { key: 'spacingLetters', label: 'Letter spacing', desc: 'Space between letters in headings and text' },
+              ] as const).map((row) => {
+                const value = design[row.key] || design.spacing;
+                return (
+                  <div key={row.key} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-white flex items-center gap-2">
+                        {row.label}
+                        {!design[row.key] && <span className="text-[9px] font-mono text-zinc-500 uppercase">same as everything</span>}
+                      </div>
+                      <div className="text-[10px] text-zinc-500 mt-0.5">{row.desc}</div>
+                    </div>
+                    <div className="flex items-center gap-1 bg-premium-surfaceDark p-1 rounded-xl border border-premium-borderDark">
+                      {SPACING_OPTIONS.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setDesign({ [row.key]: s.id } as Partial<DesignConfig>)}
+                          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold scale-on-click transition-all ${value === s.id ? 'bg-premium-gold text-black shadow-gold' : 'text-zinc-400 hover:text-white'}`}
+                          style={row.key === 'spacingLetters' ? { letterSpacing: s.id === 'tight' ? '-0.03em' : s.id === 'spacious' ? '0.08em' : undefined } : undefined}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {subTab === 'style' && (
+        <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-6">
           <div>
             <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">Card Style</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -342,20 +394,20 @@ export function EventDesignStudio({ eventId }: { eventId: string }) {
       )}
 
       {/* Live preview */}
-      <div className="rounded-[2rem] border border-premium-borderDark overflow-hidden" style={{ background: theme.bg, color: theme.text, fontFamily: theme.bodyFamily, padding: theme.space.card * 1.2 }}>
+      <div className="rounded-[2rem] border border-premium-borderDark overflow-hidden" style={{ background: theme.bg, color: theme.text, fontFamily: theme.bodyFamily, letterSpacing: theme.space.bodyTracking, padding: theme.space.section * 0.4 }}>
         <div className="flex items-center justify-between mb-4 gap-3">
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl} alt="" style={{ height: design.logoSize === 's' ? 28 : design.logoSize === 'l' ? 52 : 38 }} className="object-contain" />
           ) : (
-            <p className="text-[10px] font-mono uppercase tracking-widest" style={{ color: theme.subtle }}>Live Preview · {design.mode} · {design.spacing}</p>
+            <p className="text-[10px] font-mono uppercase tracking-widest" style={{ color: theme.subtle }}>Live Preview · {design.mode} · {design.spacingLetters || design.spacing} letters</p>
           )}
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${theme.accent}26`, color: theme.accentText }}>
             {isWedding ? 'Wedding Celebration' : 'Corporate Summit'}
           </span>
         </div>
         <p className="text-sm mb-1" style={{ fontFamily: theme.accentFamily, color: theme.secondaryText, fontSize: design.accentFont === 'none' ? 12 : 22 }}>You’re invited</p>
-        <div className="text-3xl font-bold leading-tight" style={{ fontFamily: theme.headingFamily, letterSpacing: '-0.02em', ...gradientText([theme.primary, theme.secondary, theme.accent]) }}>
+        <div className="text-3xl font-bold leading-tight" style={{ fontFamily: theme.headingFamily, letterSpacing: theme.space.headingTracking, ...gradientText([theme.primary, theme.secondary, theme.accent]) }}>
           {config.info.name}
         </div>
         <p className="text-sm mt-2 leading-relaxed max-w-xl" style={{ color: theme.muted }}>{config.info.description}</p>

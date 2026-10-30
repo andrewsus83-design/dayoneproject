@@ -48,6 +48,7 @@ export function StageFrameShell({
   compact?: boolean;
 }) {
   const image = useAssetUrl(frame.imageUrl);
+  const footerImage = useAssetUrl(frame.footerImageUrl);
   const inset = compact ? 6 : 12;
 
   return (
@@ -130,7 +131,17 @@ export function StageFrameShell({
 
       <div className="relative z-10 flex-1 flex flex-col min-h-0">{children}</div>
 
-      {frame.footerOn && (
+      {frame.footerOn && frame.footerStyle === 'image' && (
+        <footer className="relative z-40 bg-premium-black flex items-center justify-center">
+          {footerImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={footerImage} alt={frame.footerText || 'Footer'} className="w-full h-auto object-contain" style={{ maxHeight: compact ? 28 : '18vh' }} />
+          ) : (
+            <span className={`font-mono text-zinc-600 ${compact ? 'py-1.5 text-[9px]' : 'py-3 text-xs'}`}>Upload a footer image</span>
+          )}
+        </footer>
+      )}
+      {frame.footerOn && frame.footerStyle !== 'image' && (
         <footer
           className={`relative z-40 flex items-center justify-between gap-3 ${compact ? 'px-3 py-1.5 text-[9px]' : 'px-8 py-3 text-xs'} ${
             frame.footerStyle === 'gold'

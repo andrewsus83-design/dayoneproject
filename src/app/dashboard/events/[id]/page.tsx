@@ -11,6 +11,7 @@ import { InvitationFormBuilder } from '@/components/dashboard/event/InvitationFo
 import { GamesBuilder } from '@/components/dashboard/event/GamesBuilder';
 import { PhotoWallManager } from '@/components/dashboard/event/PhotoWallManager';
 import { RaffleEngine } from '@/components/dashboard/event/RaffleEngine';
+import { BroadcastStudio } from '@/components/dashboard/event/BroadcastStudio';
 import { EventDesignStudio } from '@/components/dashboard/event/EventDesignStudio';
 import { CommentsWall } from '@/components/dashboard/event/CommentsWall';
 import {
@@ -236,11 +237,6 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
     MOCK_REGISTRATIONS[eventId] ?? MOCK_REGISTRATIONS['evt-techunite-2026']
   );
 
-  // Broadcast state
-  const [broadcastChannel, setBroadcastChannel] = useState<'whatsapp' | 'email'>('whatsapp');
-  const [broadcastTemplate, setBroadcastTemplate] = useState<'invite' | 'confirm' | 'reminder' | 'thankyou'>('invite');
-  const [broadcastSuccess, setBroadcastSuccess] = useState(false);
-
   // Photos & Moderation state
   const [photosList, setPhotosList] = useState<PhotoWallUpload[]>(MOCK_PHOTO_WALL_UPLOADS);
   const [captionsOn, setCaptionsOn] = useState(true);
@@ -327,11 +323,6 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
     setRegistrations((prev) =>
       prev.map((r) => (r.id === regId ? { ...r, status: 'rejected' } : r))
     );
-  };
-
-  const handleSendBroadcast = () => {
-    setBroadcastSuccess(true);
-    setTimeout(() => setBroadcastSuccess(false), 3000);
   };
 
   return (
@@ -979,104 +970,14 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
             MENU 4: BROADCAST (Email, WhatsApp Fonnte BYON, Embed Tools)
            ========================================================================= */}
         {activeTab === 'broadcast' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in duration-200">
-            {/* Left Column: Multi-Channel Dispatch */}
-            <div className="lg:col-span-8 space-y-6">
-              <div className="p-6 sm:p-8 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark space-y-6 shadow-xl">
-                <div>
-                  <h3 className="text-xl font-display font-bold text-white">Broadcast Campaign Dispatcher</h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">Automated messaging via WhatsApp (Fonnte BYON) & Email (Resend).</p>
-                </div>
-
-                {/* Channel Selector */}
-                <div className="grid grid-cols-2 gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setBroadcastChannel('whatsapp')}
-                    className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all scale-on-click ${
-                      broadcastChannel === 'whatsapp'
-                        ? 'border-premium-success bg-premium-surfaceDark shadow-[0_0_15px_rgba(0,230,118,0.2)]'
-                        : 'border-premium-borderDark bg-premium-black/60'
-                    }`}
-                  >
-                    <MessageSquare className="w-5 h-5 text-premium-success" />
-                    <div className="text-left">
-                      <div className="text-xs font-bold text-white">WhatsApp (Fonnte BYON)</div>
-                      <div className="text-[10px] text-zinc-400">Anti-ban safe queue pacing (5-15s)</div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setBroadcastChannel('email')}
-                    className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all scale-on-click ${
-                      broadcastChannel === 'email'
-                        ? 'border-premium-gold bg-premium-surfaceDark shadow-gold'
-                        : 'border-premium-borderDark bg-premium-black/60'
-                    }`}
-                  >
-                    <Mail className="w-5 h-5 text-premium-gold" />
-                    <div className="text-left">
-                      <div className="text-xs font-bold text-white">Email Blast (Resend)</div>
-                      <div className="text-[10px] text-zinc-400">DKIM / SPF verified delivery</div>
-                    </div>
-                  </button>
-                </div>
-
-                {/* Template Triggers */}
-                <div className="space-y-2 text-xs">
-                  <span className="font-bold text-zinc-400 uppercase tracking-widest text-[10px] block">Trigger Template</span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {[
-                      { id: 'invite', label: 'VIP Invitation' },
-                      { id: 'confirm', label: 'RSVP Pass' },
-                      { id: 'reminder', label: '24h Reminder' },
-                      { id: 'thankyou', label: 'Thank You' },
-                    ].map((tpl) => (
-                      <button
-                        key={tpl.id}
-                        type="button"
-                        onClick={() => setBroadcastTemplate(tpl.id as any)}
-                        className={`p-3 rounded-xl border text-center font-bold transition-all ${
-                          broadcastTemplate === tpl.id
-                            ? 'border-premium-gold bg-premium-gold text-black shadow-gold'
-                            : 'border-premium-borderDark bg-premium-surfaceDark text-zinc-300'
-                        }`}
-                      >
-                        {tpl.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Message Preview Box */}
-                <div className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-xs font-mono text-zinc-300 leading-relaxed">
-                  <div className="text-[10px] uppercase text-zinc-500 font-bold mb-2">Message Template Preview:</div>
-                  Halo <span className="text-premium-gold font-bold">&#123;&#123;name&#125;&#125;</span>, Anda diundang ke <strong>{event.name}</strong>.<br />
-                  Jadwal: {formatDate(event.start_date)} di {event.location_name}.<br />
-                  Buka Pass Digital QR Anda di: <span className="text-premium-neon">https://{event.slug}.all41.app</span>
-                </div>
-
-                {broadcastSuccess && (
-                  <div className="p-3 rounded-xl bg-premium-success/20 border border-premium-success/40 text-premium-success text-xs font-bold flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Broadcast queued! Anti-ban safety pacing active (5-15s per contact).</span>
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleSendBroadcast}
-                  className="w-full py-3.5 rounded-2xl bg-premium-gold text-black font-display font-bold text-sm shadow-gold scale-on-click flex items-center justify-center gap-2"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>Send Broadcast to {guestsList.length} Guests</span>
-                </button>
-              </div>
+          <div className="grid grid-cols-1 2xl:grid-cols-12 gap-8 animate-in fade-in duration-200">
+            {/* Left Column: message templates + one-tap sending */}
+            <div className="2xl:col-span-8 space-y-6">
+              <BroadcastStudio eventId={eventId} />
             </div>
 
             {/* Right Column: Embed Tools (Link, Button, Landing Page) */}
-            <div className="lg:col-span-4 space-y-6">
+            <div className="2xl:col-span-4 space-y-6">
               <div className="p-6 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark space-y-5 shadow-xl">
                 <div>
                   <h3 className="text-lg font-display font-bold text-white flex items-center gap-2">

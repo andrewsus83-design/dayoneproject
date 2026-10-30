@@ -1,6 +1,7 @@
 'use client';
 
-import { useEventConfigBySlug } from '@/lib/eventStore';
+import { useEventConfigBySlug, useGuests } from '@/lib/eventStore';
+import { useSearchParams } from 'next/navigation';
 import React, { useState, useEffect, use, Suspense } from 'react';
 import Link from 'next/link';
 import { MOCK_EVENT, MOCK_WEDDING_EVENT, MOCK_CORPORATE_NEXUS_EVENT, MOCK_WEDDING_BALI_EVENT, MOCK_POPVERSE_EVENT, MOCK_GUESTS } from '@/lib/mockData';
@@ -23,8 +24,11 @@ import {
 import QRCode from 'qrcode';
 
 function GuestMobilePassContent({ slug }: { slug: string }) {
-  const { event } = useEventConfigBySlug(slug);
-  const [guest] = useState<Guest>(MOCK_GUESTS[0] ?? {
+  const { event, eventId } = useEventConfigBySlug(slug);
+  // ?t=<pass code> comes from the links in Broadcast messages.
+  const token = useSearchParams().get('t');
+  const guests = useGuests(eventId);
+  const [preview] = useState<Guest>(MOCK_GUESTS[0] ?? {
     id: 'guest-preview',
     event_id: event.id,
     name: 'Preview Guest',
@@ -46,6 +50,9 @@ function GuestMobilePassContent({ slug }: { slug: string }) {
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   });
+  const guest: Guest = token
+    ? guests.find((g) => g.qr_code_token === token) ?? { ...preview, id: 'guest-token', name: 'Your pass', table_number: null, qr_code_token: token }
+    : preview;
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const clientDomain = getClientDomain(slug);
 
@@ -58,7 +65,7 @@ function GuestMobilePassContent({ slug }: { slug: string }) {
         light: '#FFFFFF',
       },
     }).then(setQrDataUrl);
-  }, [guest]);
+  }, [guest.qr_code_token]);
 
   return (
     <div className="min-h-screen bg-premium-black text-zinc-100 flex flex-col justify-between max-w-md mx-auto border-x border-premium-borderDark selection:bg-premium-gold selection:text-premium-black font-sans">
@@ -98,7 +105,7 @@ function GuestMobilePassContent({ slug }: { slug: string }) {
               {guest.name}
             </h3>
             <p className="text-zinc-400 text-sm font-mono">
-              Table {guest.table_number || '04'} • Seat 12
+              {token ? `Table ${guest.table_number || 'to be announced'}` : `Table ${guest.table_number || '04'} • Seat 12`}
             </p>
           </div>
 

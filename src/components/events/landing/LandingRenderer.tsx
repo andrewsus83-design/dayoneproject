@@ -82,7 +82,7 @@ function SectionHead({ label, heading, theme, center }: { label?: string; headin
         </p>
       )}
       {heading && (
-        <h2 className="font-bold leading-tight" style={{ fontFamily: theme.headingFamily, letterSpacing: '-0.02em', fontSize: 'clamp(24px, 5cqw, 44px)' }}>
+        <h2 className="font-bold leading-tight" style={{ fontFamily: theme.headingFamily, letterSpacing: theme.space.headingTracking, fontSize: 'clamp(24px, 5cqw, 44px)' }}>
           {heading}
         </h2>
       )}
@@ -102,7 +102,7 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
   const [copied, setCopied] = useState(false);
   const light = theme.mode === 'light';
   const center = b.layout === 'center';
-  const heading: CSSProperties = { fontFamily: theme.headingFamily, letterSpacing: '-0.03em' };
+  const heading: CSSProperties = { fontFamily: theme.headingFamily, letterSpacing: `calc(${theme.space.headingTracking} - 0.01em)` };
   const title = b.title || info.name;
   const titleStyle: CSSProperties =
     b.titleStyle === 'prism' ? gradientText(PRISM_COLORS, true)
@@ -327,7 +327,7 @@ function CountdownBand({ label, info, theme }: { label: string; info: EventInfo;
 export function LandingRenderer(p: RendererProps) {
   const { landing, theme, info, slug, embedded, selectedId, onSelect } = p;
   const visible = landing.blocks.filter((b) => !b.hidden);
-  const heading: CSSProperties = { fontFamily: theme.headingFamily, letterSpacing: '-0.02em' };
+  const heading: CSSProperties = { fontFamily: theme.headingFamily, letterSpacing: theme.space.headingTracking };
   const firstIsHero = visible[0]?.type === 'hero';
   const learnMore = (fromId: string) => {
     const idx = visible.findIndex((b) => b.id === fromId);
