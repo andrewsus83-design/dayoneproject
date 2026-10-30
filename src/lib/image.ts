@@ -53,8 +53,11 @@ export function toCsv(rows: (string | number)[][]): string {
     .map((r) =>
       r
         .map((cell) => {
-          const s = String(cell ?? '');
-          return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+          let s = String(cell ?? '');
+          // Guests type these values: a leading = + - @ (or tab / CR) would run as a formula in Excel or Sheets.
+          // Plain numbers and phone numbers (+62 812-…) can't call anything, so they stay as they are.
+          if (typeof cell === 'string' && /^[=+\-@\t\r]/.test(s) && !/^[+-][\d\s().-]*$/.test(s)) s = `'${s}`;
+          return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
         })
         .join(','),
     )
