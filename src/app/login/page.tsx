@@ -4,7 +4,7 @@ import React, { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Briefcase, KeyRound, Loader2, Mail, ScanLine, ShieldCheck, Smartphone } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { appRole, assignedRole, canUseDashboard, isPlatformAdmin } from '@/lib/auth';
+import { appRole, assignedRole, canUseDashboard, homePath, isPlatformAdmin } from '@/lib/auth';
 import { authApi } from '@/lib/authApi';
 import { AuthenticatorQr } from '@/components/auth/AuthenticatorQr';
 
@@ -20,7 +20,7 @@ const quiet = 'w-full text-xs font-bold text-zinc-400 hover:text-white flex item
 
 const METHODS: { id: Method; label: string; icon: typeof Mail }[] = [
   { id: 'organizer', label: 'Organizer', icon: Briefcase },
-  { id: 'desk', label: 'Register desk', icon: ScanLine },
+  { id: 'desk', label: 'Staff', icon: ScanLine },
   { id: 'owner', label: 'Platform admin', icon: ShieldCheck },
 ];
 
@@ -49,7 +49,9 @@ function LoginForm() {
   const router = useRouter();
   const search = useSearchParams();
   const asParam = search.get('as');
-  const [method, setMethod] = useState<Method>(asParam === 'desk' || asParam === 'owner' ? asParam : 'organizer');
+  const [method, setMethod] = useState<Method>(
+    asParam === 'desk' || asParam === 'screen' ? 'desk' : asParam === 'owner' ? 'owner' : 'organizer',
+  );
   const [step, setStep] = useState<Step>('start');
   // The welcome email links here with the address filled in.
   const [email, setEmail] = useState(() => (search.get('email') ?? '').trim().slice(0, 254));
@@ -102,10 +104,16 @@ function LoginForm() {
       router.refresh();
       return;
     }
-    const home = canUseDashboard(data.user) ? '/dashboard' : '/desk';
-    // Desk staff may go back to the desk or to an event's register desk; organizers anywhere on the site.
-    const deskPage = !!next && (next.startsWith('/desk') || /^\/events\/[^/?#]+\/gate(?:[/?#]|$)/.test(next));
-    const allowed = next && (canUseDashboard(data.user) || deskPage) ? next : home;
+    const home = homePath(data.user);
+    // Desk staff may go back to the desk or to an event's register desk, screen managers to the screen switcher;
+    // organizers anywhere on the site.
+    const role = appRole(data.user);
+    const staffPage = !!next && (
+      role === 'screen'
+        ? next.startsWith('/screen')
+        : next.startsWith('/desk') || /^\/events\/[^/?#]+\/gate(?:[/?#]|$)/.test(next)
+    );
+    const allowed = next && (canUseDashboard(data.user) || staffPage) ? next : home;
     router.replace(allowed);
     router.refresh();
   };
@@ -218,8 +226,9 @@ function LoginForm() {
                 <input required autoComplete="current-password" type="password" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Code from your admin" className={`${input} font-mono`} />
               </label>
               <button type="submit" disabled={busy} className={primary}>
-                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanLine className="w-4 h-4" />} Open the register desk
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanLine className="w-4 h-4" />} Sign in
               </button>
+              <p className="text-[11px] text-zinc-500 text-center">For the register desk and screen managers, with the access code from your organizer.</p>
             </>
           )}
 

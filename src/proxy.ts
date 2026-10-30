@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { appRole, assignedRole, canUseDashboard, isPlatformAdmin } from '@/lib/auth';
+import { appRole, assignedRole, canOpenStaffPage, canUseDashboard, homePath, isPlatformAdmin } from '@/lib/auth';
 
 // The dashboard lives on app.<root>; each event on <slug>.<root>. The root itself is the Day One Project website.
 const ROOT_DOMAIN = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'dayoneproject.xyz').toLowerCase();
@@ -49,7 +49,7 @@ export async function proxy(request: NextRequest) {
     host.startsWith('172.');
 
   if (isDirectRoot) {
-    if (url.pathname.startsWith('/dashboard') || url.pathname.startsWith('/admin') || url.pathname.startsWith('/desk')) {
+    if (['/dashboard', '/admin', '/desk', '/screen'].some((p) => url.pathname.startsWith(p))) {
       return guard(request);
     }
     return NextResponse.next();
@@ -92,7 +92,8 @@ export async function proxy(request: NextRequest) {
 }
 
 /**
- * /dashboard needs a signed-in organizer or admin, /desk any app role, /admin a platform admin.
+ * /dashboard needs a signed-in organizer or admin, /desk an organizer or the register desk, /screen an organizer
+ * or a screen manager, /admin a platform admin.
  * Platform-admin rights come from the database (a41_whoami().isAdmin: the admin email signed in with the
  * authenticator), never from the email alone. Also refreshes the Supabase session cookie on the way through.
  */
@@ -132,11 +133,12 @@ async function guard(request: NextRequest) {
     const { data: me } = await supabase.rpc('a41_whoami');
     if (!me?.isAdmin) {
       if (isPlatformAdmin(user)) return redirect(`/login?as=owner&error=authenticator&next=${next}`);
-      return redirect(canUseDashboard(user) ? '/dashboard' : '/desk');
+      return redirect(homePath(user));
     }
   }
-  // Register-desk staff only see the desk; organizers and admins have no reason to land there.
-  if (pathname.startsWith('/dashboard') && !canUseDashboard(user)) return redirect('/desk');
+  // Register-desk staff only see the desk, and screen managers only the screen switcher.
+  if (pathname.startsWith('/dashboard') && !canUseDashboard(user)) return redirect(homePath(user));
+  if ((pathname.startsWith('/desk') || pathname.startsWith('/screen')) && !canOpenStaffPage(user, pathname)) return redirect(homePath(user));
   return response;
 }
 

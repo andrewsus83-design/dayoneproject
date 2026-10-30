@@ -11,15 +11,16 @@ import { useSessionUser } from '@/lib/useSession';
 import { appRole } from '@/lib/auth';
 
 /**
- * The register desk opens only for a signed-in desk, organizer or admin account. For a real (server) event the
- * account must also be on the team that runs it: the event row is only readable by its organization's members.
- * Built-in sample events open for any signed-in account with an app role.
+ * The register desk opens only for a signed-in desk, organizer or admin account (never a screen manager). For a
+ * real (server) event the account must also be on the team that runs it: the event row is only readable by its
+ * organization's members. Built-in sample events open for any of those accounts.
  */
 export function RegisterDeskLock({ slug, children }: { slug: string; children: (lock: () => void) => React.ReactNode }) {
   const router = useRouter();
   const { hydrated, config } = useEventConfigBySlug(slug);
   const { user, ready } = useSessionUser();
-  const hasRole = !!appRole(user);
+  const role = appRole(user);
+  const hasRole = !!role && role !== 'screen';
   const sample = isSampleSlug(slug);
   const accessKey = `${slug}:${user?.id ?? ''}`;
   const [access, setAccess] = useState<{ key: string; member: boolean } | null>(null);

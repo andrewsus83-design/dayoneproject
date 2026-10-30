@@ -79,7 +79,7 @@ export default function AccountPage() {
         <p>
           {owner
             ? 'With your email and the 6-digit code from your authenticator app.'
-            : role === 'desk'
+            : role === 'desk' || role === 'screen'
               ? 'With your email and the access code from your account owner. Ask them for a new code if you lose it.'
               : 'With a one-time code sent to your email. There is no password to remember.'}
         </p>

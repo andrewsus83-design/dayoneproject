@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Briefcase, Building2, Check, Copy, KeyRound, Loader2, LogIn, Plus, RefreshCw, ScanLine, UserMinus, Users, X } from 'lucide-react';
+import { Briefcase, Building2, Check, Copy, KeyRound, Loader2, LogIn, Plus, RefreshCw, ScanLine, Tv, UserMinus, Users, X } from 'lucide-react';
 import { Header } from '@/components/dashboard/Header';
-import { teamApi, TEAM_ROLE_LABELS, type Team, type TeamMember } from '@/lib/teamApi';
+import { teamApi, TEAM_ROLE_LABELS, usesAccessCode, type NewTeamRole, type Team, type TeamMember } from '@/lib/teamApi';
 import { generatePassword } from '@/lib/adminApi';
 import { useSessionUser } from '@/lib/useSession';
 import { APP_HOST } from '@/lib/domain';
@@ -19,8 +19,16 @@ const LOGIN_URL = `${APP_HOST}/login`;
 const ROLE_STYLE: Record<TeamMember['role'], string> = {
   owner: 'bg-premium-gold/15 text-premium-gold border-premium-gold/30',
   organizer: 'bg-premium-neon/10 text-premium-neon border-premium-neon/25',
+  screen: 'bg-premium-danger/10 text-premium-danger border-premium-danger/25',
   desk: 'bg-premium-success/10 text-premium-success border-premium-success/25',
 };
+
+/** The three kinds of people an admin organizer can add. */
+const NEW_ROLES: { role: NewTeamRole; icon: typeof Briefcase; title: string; desc: string }[] = [
+  { role: 'organizer', icon: Briefcase, title: 'Admin organizer', desc: 'Creates and runs events. Signs in with a code sent to their email.' },
+  { role: 'screen', icon: Tv, title: 'Screen manager', desc: 'Only switches what the stage screen shows. Signs in with email and an access code.' },
+  { role: 'desk', icon: ScanLine, title: 'Register desk', desc: 'Checks guests in at the door. Signs in with email and an access code.' },
+];
 
 function lastSeen(iso: string | null) {
   return iso
@@ -28,11 +36,11 @@ function lastSeen(iso: string | null) {
     : 'Has not signed in yet';
 }
 
-type NewPerson = { name: string; email: string; role: 'organizer' | 'desk'; code: string };
+type NewPerson = { name: string; email: string; role: NewTeamRole; code: string };
 const blankPerson = (): NewPerson => ({ name: '', email: '', role: 'organizer', code: generatePassword(10) });
 
 /** What to tell the new person (the access code is shown only once). */
-type Handover = { email: string; role: 'organizer' | 'desk'; code: string | null; welcomeSent?: boolean };
+type Handover = { email: string; role: NewTeamRole; code: string | null; welcomeSent?: boolean };
 
 export default function TeamSettingsPage() {
   const { user } = useSessionUser();
@@ -90,9 +98,9 @@ export default function TeamSettingsPage() {
       setSaving(true);
       try {
         const email = person.email.trim().toLowerCase();
-        const desk = person.role === 'desk';
-        const res = await teamApi.add({ email, name: person.name.trim(), role: person.role, code: desk ? person.code : undefined });
-        setHandover({ email, role: person.role, code: desk ? person.code : null, welcomeSent: res.welcomeSent });
+        const coded = usesAccessCode(person.role);
+        const res = await teamApi.add({ email, name: person.name.trim(), role: person.role, code: coded ? person.code : undefined });
+        setHandover({ email, role: person.role, code: coded ? person.code : null, welcomeSent: res.welcomeSent });
         setPerson(blankPerson());
         setAdding(false);
         await load();
@@ -122,7 +130,7 @@ export default function TeamSettingsPage() {
       try {
         const code = generatePassword(10);
         await teamApi.resetCode(m.id, code);
-        setHandover({ email: m.email, role: 'desk', code });
+        setHandover({ email: m.email, role: m.role === 'screen' ? 'screen' : 'desk', code });
         await load();
       } finally {
         setBusyId(null);
@@ -137,8 +145,8 @@ export default function TeamSettingsPage() {
   };
 
   const canManage = !!team?.canManage;
-  /** Admin organizers can manage the register desk too. */
-  const canManageDesk = canManage || !!team?.canManageDesk;
+  /** Every admin organizer adds all three roles and manages screen managers and the register desk. */
+  const canManageStaff = canManage || !!team?.canManageStaff;
 
   return (
     <div className="flex-1 flex flex-col font-sans">
@@ -196,13 +204,16 @@ export default function TeamSettingsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1">
                     <h3 className="text-base font-display font-bold text-white">
-                      {handover.code ? 'Give this access code to the register desk' : `${handover.email} can sign in now`}
+                      {handover.code
+                        ? `Give this access code to the ${handover.role === 'screen' ? 'screen manager' : 'register desk'}`
+                        : `${handover.email} can sign in now`}
                     </h3>
                     <p className="text-xs text-zinc-400 leading-relaxed">
                       {handover.code ? (
                         <>
-                          They open <span className="font-mono text-premium-neon">{LOGIN_URL}</span>, choose <strong className="text-white">Register desk</strong>, and enter{' '}
+                          They open <span className="font-mono text-premium-neon">{LOGIN_URL}</span>, choose <strong className="text-white">Staff</strong>, and enter{' '}
                           <span className="font-mono text-white">{handover.email}</span> with this code. It is shown only once.
+                          {handover.role === 'screen' ? ' They land on the screen switcher and can do nothing else.' : ''}
                         </>
                       ) : (
                         <>
@@ -244,36 +255,29 @@ export default function TeamSettingsPage() {
                     <p className="text-xs text-zinc-500">{team.members.length} {team.members.length === 1 ? 'person' : 'people'}</p>
                   </div>
                 </div>
-                {canManageDesk && !adding && (
+                {canManageStaff && !adding && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setAdding(true);
-                      setHandover(null);
-                      if (!canManage) setPerson((p) => ({ ...p, role: 'desk' }));
-                    }}
+                    onClick={() => { setAdding(true); setHandover(null); }}
                     className="px-5 py-2.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-sm shadow-gold scale-on-click flex items-center gap-2"
                   >
-                    <Plus className="w-4 h-4" /> {canManage ? 'Add person' : 'Add register desk'}
+                    <Plus className="w-4 h-4" /> Add person
                   </button>
                 )}
               </div>
 
               {!canManage && (
                 <p className="text-xs text-zinc-500 px-4 py-3 rounded-xl bg-premium-surfaceDark border border-premium-borderDark">
-                  {canManageDesk
-                    ? 'You can add and remove register desk staff. Only the account owner can add or remove admin organizers.'
+                  {canManageStaff
+                    ? 'You can add admin organizers, screen managers and the register desk. Only the account owner can remove admin organizers.'
                     : 'Only the account owner can add or remove people.'}
                 </p>
               )}
 
               {adding && (
                 <form onSubmit={addPerson} className="p-5 rounded-2xl bg-premium-surfaceDark border border-premium-gold/40 space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {([
-                      { role: 'organizer', icon: Briefcase, title: 'Admin organizer', desc: 'Creates and runs events. Signs in with a code sent to their email.' },
-                      { role: 'desk', icon: ScanLine, title: 'Register desk', desc: 'Checks guests in at the door. Signs in with email and an access code.' },
-                    ] as const).filter(({ role }) => canManage || role === 'desk').map(({ role, icon: Icon, title, desc }) => {
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {NEW_ROLES.map(({ role, icon: Icon, title, desc }) => {
                       const active = person.role === role;
                       return (
                         <button
@@ -304,13 +308,13 @@ export default function TeamSettingsPage() {
                         required
                         value={person.email}
                         onChange={(e) => setPerson((p) => ({ ...p, email: e.target.value }))}
-                        placeholder={person.role === 'desk' ? 'desk1@yourcompany.com' : 'name@yourcompany.com'}
+                        placeholder={person.role === 'desk' ? 'desk1@yourcompany.com' : person.role === 'screen' ? 'screen1@yourcompany.com' : 'name@yourcompany.com'}
                         className={input}
                       />
                     </label>
                   </div>
 
-                  {person.role === 'desk' && (
+                  {usesAccessCode(person.role) && (
                     <label className="block space-y-1.5">
                       <span className={label}>Access code</span>
                       <div className="flex gap-2">
@@ -325,7 +329,7 @@ export default function TeamSettingsPage() {
                           <RefreshCw className="w-3.5 h-3.5" />
                         </button>
                       </div>
-                      <p className="text-[11px] text-zinc-500">Use a separate email for each desk. You&apos;ll see this code once after saving.</p>
+                      <p className="text-[11px] text-zinc-500">Use a separate email for each person. You&apos;ll see this code once after saving.</p>
                     </label>
                   )}
 
@@ -367,9 +371,9 @@ export default function TeamSettingsPage() {
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${ROLE_STYLE[m.role]}`}>
                         {TEAM_ROLE_LABELS[m.role]}
                       </span>
-                      {m.role !== 'owner' && !isMe && (canManage || (canManageDesk && m.role === 'desk')) && (
+                      {m.role !== 'owner' && !isMe && (canManage || (canManageStaff && usesAccessCode(m.role))) && (
                         <div className="flex items-center gap-2">
-                          {m.role === 'desk' && (
+                          {usesAccessCode(m.role) && (
                             <button type="button" onClick={() => newCode(m)} disabled={busyId === m.id} className={quietButton}>
                               <KeyRound className="w-3.5 h-3.5" /> New code
                             </button>
@@ -386,7 +390,7 @@ export default function TeamSettingsPage() {
             </section>
 
             {/* How people sign in */}
-            <section className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <section className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
               <div className="flex gap-3">
                 <LogIn className="w-4 h-4 text-premium-gold flex-shrink-0 mt-0.5" />
                 <div className="space-y-1">
@@ -397,11 +401,20 @@ export default function TeamSettingsPage() {
                 </div>
               </div>
               <div className="flex gap-3">
+                <Tv className="w-4 h-4 text-premium-danger flex-shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="font-bold text-white">Screen managers</div>
+                  <p className="text-zinc-400 leading-relaxed">
+                    Sign in at <span className="font-mono text-premium-neon">{LOGIN_URL}</span> → Staff, with their email and access code. They only switch the stage screen.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3">
                 <ScanLine className="w-4 h-4 text-premium-success flex-shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   <div className="font-bold text-white">Register desk</div>
                   <p className="text-zinc-400 leading-relaxed">
-                    Sign in at <span className="font-mono text-premium-neon">{LOGIN_URL}</span> → Register desk, with their email and access code. They only see check-in.
+                    Sign in at <span className="font-mono text-premium-neon">{LOGIN_URL}</span> → Staff, with their email and access code. They only see check-in.
                   </p>
                 </div>
               </div>

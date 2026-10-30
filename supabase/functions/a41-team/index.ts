@@ -1,11 +1,12 @@
 // dayoneproject.xyz organization team. Deployed to Supabase project dayoneproject (pmuryumfyekjwqntcypo)
 // as `a41-team` with verify_jwt on.
 //
-// The organization's owner (a41_organizations.created_by) adds people to their organization:
+// Admin organizers add three kinds of people to their organization:
 // - Admin organizer: membership role 'owner' (runs the organization's events), signs in with an emailed code.
+// - Screen manager:  membership role 'screen' (only switches the stage screen), email + an access code.
 // - Register desk:   membership role 'staff' (check-in only), signs in with email + an access code.
-// Every owner-member can see the team and manage the register desk; only the creator adds or removes
-// admin organizers and renames the organization.
+// Every admin organizer can add all three and remove or re-code screen managers and the desk; only the account
+// owner (a41_organizations.created_by) removes admin organizers and renames the organization.
 // Logins are shared with other products, so an existing account is only linked when it is already an
 // event-platform organizer, or has no role and no password; anything else gets one generic refusal.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
@@ -68,7 +69,7 @@ type Member = {
   user_id: string;
   email: string;
   name: string;
-  membership_role: 'owner' | 'staff';
+  membership_role: 'owner' | 'staff' | 'screen';
   app_role: string | null;
   last_sign_in_at: string | null;
   banned: boolean;
@@ -109,21 +110,20 @@ Deno.serve(async (req) => {
       id: m.user_id,
       email: m.email,
       name: m.name,
-      role: m.membership_role === 'staff' ? 'desk' : m.is_creator ? 'owner' : 'organizer',
+      role: m.membership_role === 'staff' ? 'desk' : m.membership_role === 'screen' ? 'screen' : m.is_creator ? 'owner' : 'organizer',
       lastSignInAt: m.last_sign_in_at,
       disabled: m.banned,
     });
 
     const body = await req.json().catch(() => ({}));
-    // The account owner manages the whole team; admin organizers may also add, remove and re-code the register desk.
-    const deskAction = (body.action === 'add' && body.role === 'desk') || body.action === 'remove' || body.action === 'reset-code';
-    if (body.action !== 'list' && !isCreator && !deskAction) {
-      return json({ error: 'Only the account owner can change admin organizers or the organization name.' }, 403);
+    // Renaming the organization is the account owner's; so is removing an admin organizer (checked in "remove").
+    if (body.action === 'rename' && !isCreator) {
+      return json({ error: 'Only the account owner can rename the organization.' }, 403);
     }
 
     switch (body.action) {
       case 'list':
-        return json({ org: { id: orgId, name: org?.name ?? '' }, canManage: isCreator, canManageDesk: true, members: (await members()).map(view) });
+        return json({ org: { id: orgId, name: org?.name ?? '' }, canManage: isCreator, canManageStaff: true, members: (await members()).map(view) });
 
       case 'rename': {
         const name = String(body.name ?? '').trim().slice(0, 120);
@@ -135,7 +135,9 @@ Deno.serve(async (req) => {
       case 'add': {
         const email = String(body.email ?? '').trim().toLowerCase();
         const name = String(body.name ?? '').trim().slice(0, 120);
-        const desk = body.role === 'desk';
+        const role: 'organizer' | 'screen' | 'desk' = body.role === 'desk' ? 'desk' : body.role === 'screen' ? 'screen' : 'organizer';
+        // Screen managers and the register desk sign in with an access code (their password).
+        const desk = role !== 'organizer';
         const code = String(body.code ?? '');
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'Enter a valid email address.' }, 400);
         if ((await members()).some((m) => m.email.toLowerCase() === email)) return json({ error: 'This person is already on your team.' }, 409);
@@ -161,7 +163,7 @@ Deno.serve(async (req) => {
           userId = existing.id;
         } else if (desk) {
           const { data, error } = await admin.auth.admin.createUser({
-            email, password: code, email_confirm: true, user_metadata: { name }, app_metadata: { a41_role: 'desk' },
+            email, password: code, email_confirm: true, user_metadata: { name }, app_metadata: { a41_role: role },
           });
           if (error) return json({ error: error.message }, 400);
           userId = data.user.id;
@@ -174,9 +176,10 @@ Deno.serve(async (req) => {
           userId = data.user.id;
         }
 
-        const { error: memberError } = await admin.from('a41_memberships').insert({ org_id: orgId, user_id: userId, role: desk ? 'staff' : 'owner' });
+        const membership = role === 'desk' ? 'staff' : role === 'screen' ? 'screen' : 'owner';
+        const { error: memberError } = await admin.from('a41_memberships').insert({ org_id: orgId, user_id: userId, role: membership });
         if (memberError) return json({ error: memberError.message }, 400);
-        // Admin organizers get a welcome email with the sign-in link; desk staff get their code from the owner.
+        // Admin organizers get a welcome email with the sign-in link; code-based staff get their code from the organizer.
         const welcomeSent = desk ? false : await sendWelcome(admin, email, name, org?.name ?? '');
         // The same answer for new and linked accounts.
         return json({ ok: true, welcomeSent });
@@ -187,10 +190,10 @@ Deno.serve(async (req) => {
         if (id === me.id) return json({ error: 'You cannot remove yourself.' }, 400);
         const target = (await members()).find((m) => m.user_id === id);
         if (!target) return json({ error: 'Not on your team.' }, 404);
-        if (!isCreator && target.membership_role !== 'staff') return json({ error: 'Only the account owner can remove admin organizers.' }, 403);
+        if (!isCreator && target.membership_role === 'owner') return json({ error: 'Only the account owner can remove admin organizers.' }, 403);
         await admin.from('a41_memberships').delete().eq('org_id', orgId).eq('user_id', id);
-        // Desk accounts exist only for this team, so switch them off too.
-        if (target.membership_role === 'staff' && target.app_role === 'desk') {
+        // Desk and screen accounts exist only for this team, so switch them off too.
+        if ((target.membership_role === 'staff' && target.app_role === 'desk') || (target.membership_role === 'screen' && target.app_role === 'screen')) {
           await admin.auth.admin.updateUserById(id, { ban_duration: '876000h' });
         }
         // Someone on no team any more keeps their login (it may serve another app) but loses event-platform access.
@@ -210,7 +213,9 @@ Deno.serve(async (req) => {
         const id = String(body.id ?? '');
         const code = String(body.code ?? '');
         const target = (await members()).find((m) => m.user_id === id);
-        if (!target || target.app_role !== 'desk') return json({ error: 'Only register desk accounts have an access code.' }, 400);
+        if (!target || (target.app_role !== 'desk' && target.app_role !== 'screen')) {
+          return json({ error: 'Only screen managers and the register desk have an access code.' }, 400);
+        }
         if (code.length < 8) return json({ error: 'The access code needs at least 8 characters.' }, 400);
         const { error } = await admin.auth.admin.updateUserById(id, { password: code, ban_duration: 'none' });
         if (error) return json({ error: error.message }, 400);
