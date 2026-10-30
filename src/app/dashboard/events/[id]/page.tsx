@@ -29,6 +29,8 @@ import {
 } from '@/lib/eventStore';
 import { BASE_EVENTS, isSlugTaken } from '@/lib/events';
 import { slugProblem, updateOrgEvent, venueTimestamp } from '@/lib/orgEvents';
+import { isServerEventId } from '@/lib/guestsApi';
+import { organizerPhotoApi } from '@/lib/photoWallApi';
 import {
   LayoutDashboard,
   Users,
@@ -108,6 +110,17 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
   const [overviewSubTab, setOverviewSubTab] = useState<'info' | 'landing' | 'invitation'>('info');
   const [infoSaved, setInfoSaved] = useState(false);
   const [slugError, setSlugError] = useState<string | null>(null);
+
+  // The live photo wall only opens with its key, so the LIVE launcher fetches it for saved events.
+  const [wallKey, setWallKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (activeTab !== 'live' || !isServerEventId(eventId)) return;
+    let alive = true;
+    organizerPhotoApi.settings(eventId).then((s) => alive && setWallKey(s?.wall_key ?? null)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [activeTab, eventId]);
 
   const setInfo = (patch: Partial<EventInfo>) => update('info', patch);
   const handleSlugChange = (raw: string) => {
@@ -776,7 +789,7 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                 },
                 {
                   title: 'Live Photo Wall Stage',
-                  url: `/events/${event.slug}/photowall/live`,
+                  url: `/events/${event.slug}/photowall/live${wallKey ? `?key=${wallKey}` : ''}`,
                   desc: 'Live animated Pinterest-style wall showcasing guest uploads and video clips.',
                   badge: 'LED Photowall',
                   color: 'text-premium-gold',
