@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { RotateCcw, Sparkles } from 'lucide-react';
-import type { SlotEntry, SlotResult } from './SlotMachine';
+import { askForPick, type PickResolver, type SlotEntry, type SlotResult } from './SlotMachine';
 
 const COLORS = ['#C5A059', '#00F0FF', '#FF3366', '#00E676', '#CC88FF', '#FF8C00', '#7B1D5A', '#0099DD', '#FFD700', '#1B3FA0'];
 const MAX_SLICES = 24;
@@ -13,8 +13,32 @@ export interface MachineProps {
   trigger?: number;
   size?: 'md' | 'lg';
   showButton?: boolean;
+  /** Saved events: the server picks the winner, the machine lands on it. */
+  resolve?: PickResolver;
   onSpinStart?: () => void;
   onResult?: (r: SlotResult) => void;
+}
+
+/**
+ * The winner of one spin: the server's pick when the machine has a resolver, else a random entry not yet excluded.
+ * Null when there is none (setError says why).
+ */
+export async function chooseWinner(
+  entries: SlotEntry[], excludeIds: string[], resolve: PickResolver | undefined, setError: (message: string | null) => void,
+): Promise<SlotEntry | null> {
+  setError(null);
+  const forced = await askForPick(resolve, setError);
+  if (forced === null) return null;
+  if (forced) {
+    if (!forced.entry) setError('The draw did not return a guest. Try again.');
+    return forced.entry ?? null;
+  }
+  const pool = entries.filter((e) => !excludeIds.includes(e.id));
+  if (!pool.length) {
+    setError(entries.length ? 'Everyone in the pool has already won.' : 'No guests to draw from yet.');
+    return null;
+  }
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 function shuffle<T>(list: T[]): T[] {
@@ -26,11 +50,12 @@ function shuffle<T>(list: T[]): T[] {
   return a;
 }
 
-export function WheelSpinner({ entries, excludeIds = [], trigger, size = 'md', showButton = true, onSpinStart, onResult }: MachineProps) {
+export function WheelSpinner({ entries, excludeIds = [], trigger, size = 'md', showButton = true, resolve, onSpinStart, onResult }: MachineProps) {
   const px = size === 'lg' ? 520 : 300;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rotRef = useRef(0);
   const animRef = useRef(0);
+  const askingRef = useRef(false);
   const [slices, setSlices] = useState<SlotEntry[]>(() => entries.slice(0, MAX_SLICES));
   const [spinning, setSpinning] = useState(false);
   const [winner, setWinner] = useState<SlotEntry | null>(null);
@@ -98,15 +123,12 @@ export function WheelSpinner({ entries, excludeIds = [], trigger, size = 'md', s
 
   useEffect(() => () => cancelAnimationFrame(animRef.current), []);
 
-  const spin = () => {
-    if (spinning) return;
-    const pool = entries.filter((e) => !excludeIds.includes(e.id));
-    if (!pool.length) {
-      setError(entries.length ? 'Everyone in the pool has already won.' : 'No guests to draw from yet.');
-      return;
-    }
-    setError(null);
-    const win = pool[Math.floor(Math.random() * pool.length)];
+  const spin = async () => {
+    if (spinning || askingRef.current) return;
+    askingRef.current = true;
+    const win = await chooseWinner(entries, excludeIds, resolve, setError);
+    askingRef.current = false;
+    if (!win) return;
     const others = shuffle(entries.filter((e) => e.id !== win.id)).slice(0, MAX_SLICES - 1);
     const list = shuffle([...others, win]);
     const w = list.findIndex((e) => e.id === win.id);
@@ -146,7 +168,7 @@ export function WheelSpinner({ entries, excludeIds = [], trigger, size = 'md', s
   useEffect(() => {
     if (trigger === undefined || trigger === lastTrigger.current) return;
     lastTrigger.current = trigger;
-    spinRef.current();
+    void spinRef.current();
   }, [trigger]);
 
   return (
@@ -163,7 +185,7 @@ export function WheelSpinner({ entries, excludeIds = [], trigger, size = 'md', s
         </div>
       )}
       {showButton && (
-        <button type="button" onClick={spin} disabled={spinning} className={`px-8 py-3.5 rounded-2xl font-display font-bold text-sm scale-on-click flex items-center gap-2 ${spinning ? 'bg-zinc-700 text-zinc-400 cursor-not-allowed' : 'bg-premium-gold hover:bg-premium-goldHover text-black shadow-gold'}`}>
+        <button type="button" onClick={() => void spin()} disabled={spinning} className={`px-8 py-3.5 rounded-2xl font-display font-bold text-sm scale-on-click flex items-center gap-2 ${spinning ? 'bg-zinc-700 text-zinc-400 cursor-not-allowed' : 'bg-premium-gold hover:bg-premium-goldHover text-black shadow-gold'}`}>
           {spinning ? <><RotateCcw className="w-4 h-4 animate-spin" /> Spinning…</> : <><Sparkles className="w-4 h-4" /> Spin the wheel</>}
         </button>
       )}

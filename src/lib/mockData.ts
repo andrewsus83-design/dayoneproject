@@ -14,8 +14,8 @@ export const DEFAULT_STAGE_CONFIG: StageConfig = {
   activeMode: 'welcome',
   autoRotateIntervalSeconds: 20,
   showSubdomainQr: true,
-  tickerText:
-    '★ Welcome to TechUnite APAC Summit 2026 • Wi-Fi: DAYONE_GUEST / tech2026 • Post selfies to stage wall at app.dayoneproject.xyz/events/techunite ★',
+  // Empty: the stage builds its ticker from the event's own name, date, venue and photo wall link (stageApi defaultTicker).
+  tickerText: '',
   modules: [
     {
       id: 'welcome',
