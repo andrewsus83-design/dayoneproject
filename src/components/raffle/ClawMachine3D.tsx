@@ -2,7 +2,7 @@
 
 import React, { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Gift, Sparkles } from 'lucide-react';
-import type { MachineProps } from './WheelSpinner';
+import { chooseWinner, type MachineProps } from './WheelSpinner';
 import type { SlotEntry } from './SlotMachine';
 
 /*
@@ -62,7 +62,7 @@ function GiftCube({ size, color, label, style }: { size: number; color: string; 
   );
 }
 
-export function ClawMachine3D({ entries, excludeIds = [], trigger, size = 'md', showButton = true, onSpinStart, onResult }: MachineProps) {
+export function ClawMachine3D({ entries, excludeIds = [], trigger, size = 'md', showButton = true, resolve, onSpinStart, onResult }: MachineProps) {
   const scale = size === 'lg' ? 1.55 : 1;
   const maxBoxes = 12;
   const [boxes, setBoxes] = useState<Box[]>([]);
@@ -75,6 +75,7 @@ export function ClawMachine3D({ entries, excludeIds = [], trigger, size = 'md', 
   const [winner, setWinner] = useState<SlotEntry | null>(null);
   const [error, setError] = useState<string | null>(null);
   const timers = useRef<number[]>([]);
+  const askingRef = useRef(false);
 
   const layout = (list: SlotEntry[]) =>
     list.slice(0, maxBoxes).map((e, i) => ({ id: e.id, name: e.name, color: GIFT_COLORS[i % GIFT_COLORS.length], ...randomSpot() }));
@@ -89,17 +90,14 @@ export function ClawMachine3D({ entries, excludeIds = [], trigger, size = 'md', 
 
   const at = (ms: number, fn: () => void) => timers.current.push(window.setTimeout(fn, ms));
 
-  const start = () => {
-    if (phase !== 'idle' && phase !== 'done') return;
-    const pool = entries.filter((e) => !excludeIds.includes(e.id));
-    if (!pool.length) {
-      setError(entries.length ? 'Everyone in the pool has already won.' : 'No guests to draw from yet.');
-      return;
-    }
-    setError(null);
+  const start = async () => {
+    if ((phase !== 'idle' && phase !== 'done') || askingRef.current) return;
+    askingRef.current = true;
+    const win = await chooseWinner(entries, excludeIds, resolve, setError);
+    askingRef.current = false;
+    if (!win) return;
     timers.current.forEach(clearTimeout);
     timers.current = [];
-    const win = pool[Math.floor(Math.random() * pool.length)];
     const others = entries.filter((e) => e.id !== win.id).sort(() => Math.random() - 0.5).slice(0, maxBoxes - 1);
     const fresh = layout([win, ...others].sort(() => Math.random() - 0.5));
     setBoxes(fresh);
@@ -175,7 +173,7 @@ export function ClawMachine3D({ entries, excludeIds = [], trigger, size = 'md', 
   useEffect(() => {
     if (trigger === undefined || trigger === lastTrigger.current) return;
     lastTrigger.current = trigger;
-    startRef.current();
+    void startRef.current();
   }, [trigger]);
 
   const busy = phase !== 'idle' && phase !== 'done';
@@ -288,7 +286,7 @@ export function ClawMachine3D({ entries, excludeIds = [], trigger, size = 'md', 
             </div>
             <button
               type="button"
-              onClick={start}
+              onClick={() => void start()}
               disabled={busy}
               className={`w-16 h-16 rounded-full border-4 font-display font-black text-[11px] scale-on-click ${busy ? 'bg-zinc-700 border-zinc-600 text-zinc-400' : 'bg-premium-danger border-[#ff8fab] text-white shadow-[0_0_24px_rgba(255,51,102,0.6)]'}`}
               aria-label="Grab a gift"
@@ -324,7 +322,7 @@ export function ClawMachine3D({ entries, excludeIds = [], trigger, size = 'md', 
         </div>
       )}
       {showButton && (
-        <button type="button" onClick={start} disabled={busy} className={`px-8 py-3 rounded-2xl font-display font-bold text-sm scale-on-click flex items-center gap-2 ${busy ? 'bg-zinc-700 text-zinc-400' : 'bg-premium-gold hover:bg-premium-goldHover text-black shadow-gold'}`}>
+        <button type="button" onClick={() => void start()} disabled={busy} className={`px-8 py-3 rounded-2xl font-display font-bold text-sm scale-on-click flex items-center gap-2 ${busy ? 'bg-zinc-700 text-zinc-400' : 'bg-premium-gold hover:bg-premium-goldHover text-black shadow-gold'}`}>
           <Gift className="w-4 h-4" /> {busy ? 'Grabbing…' : phase === 'done' ? 'Grab another gift' : 'Grab a gift'}
         </button>
       )}

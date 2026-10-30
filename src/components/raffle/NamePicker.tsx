@@ -2,37 +2,36 @@
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Sparkles, Trophy } from 'lucide-react';
-import type { MachineProps } from './WheelSpinner';
+import { chooseWinner, type MachineProps } from './WheelSpinner';
 import type { SlotEntry } from './SlotMachine';
 
-export function NamePicker({ entries, excludeIds = [], trigger, size = 'md', showButton = true, onSpinStart, onResult }: MachineProps) {
+export function NamePicker({ entries, excludeIds = [], trigger, size = 'md', showButton = true, resolve, onSpinStart, onResult }: MachineProps) {
   const [current, setCurrent] = useState<string>(entries[0]?.name ?? '—');
   const [running, setRunning] = useState(false);
   const [winner, setWinner] = useState<SlotEntry | null>(null);
   const [error, setError] = useState<string | null>(null);
   const timers = useRef<number[]>([]);
+  const askingRef = useRef(false);
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
-  const start = () => {
-    if (running) return;
-    const pool = entries.filter((e) => !excludeIds.includes(e.id));
-    if (!pool.length) {
-      setError(entries.length ? 'Everyone in the pool has already won.' : 'No guests to draw from yet.');
-      return;
-    }
-    setError(null);
+  const start = async () => {
+    if (running || askingRef.current) return;
+    askingRef.current = true;
+    const win = await chooseWinner(entries, excludeIds, resolve, setError);
+    askingRef.current = false;
+    if (!win) return;
     setWinner(null);
     setRunning(true);
     onSpinStart?.();
-    const win = pool[Math.floor(Math.random() * pool.length)];
+    const names = entries.length ? entries : [win];
     // Fast flicker that slows down, ending on the pre-picked winner.
     const steps = 34;
     let at = 0;
     for (let i = 0; i < steps; i++) {
       at += 50 + Math.pow(i / steps, 3) * 420;
       const last = i === steps - 1;
-      const name = last ? win.name : entries[Math.floor(Math.random() * entries.length)].name;
+      const name = last ? win.name : names[Math.floor(Math.random() * names.length)].name;
       timers.current.push(window.setTimeout(() => {
         setCurrent(name);
         if (last) {
@@ -52,7 +51,7 @@ export function NamePicker({ entries, excludeIds = [], trigger, size = 'md', sho
   useEffect(() => {
     if (trigger === undefined || trigger === lastTrigger.current) return;
     lastTrigger.current = trigger;
-    startRef.current();
+    void startRef.current();
   }, [trigger]);
 
   return (
@@ -80,7 +79,7 @@ export function NamePicker({ entries, excludeIds = [], trigger, size = 'md', sho
       </div>
       {error && <p className="text-sm font-bold text-premium-danger">{error}</p>}
       {showButton && (
-        <button type="button" onClick={start} disabled={running} className={`px-8 py-3 rounded-2xl font-display font-bold text-sm scale-on-click flex items-center gap-2 ${running ? 'bg-zinc-700 text-zinc-400' : 'bg-premium-gold hover:bg-premium-goldHover text-black shadow-gold'}`}>
+        <button type="button" onClick={() => void start()} disabled={running} className={`px-8 py-3 rounded-2xl font-display font-bold text-sm scale-on-click flex items-center gap-2 ${running ? 'bg-zinc-700 text-zinc-400' : 'bg-premium-gold hover:bg-premium-goldHover text-black shadow-gold'}`}>
           <Sparkles className="w-4 h-4" /> {running ? 'Picking…' : 'Pick a name'}
         </button>
       )}

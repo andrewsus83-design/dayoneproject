@@ -15,6 +15,25 @@ export interface SlotResult {
   entry?: SlotEntry;
 }
 
+/** A winner picked elsewhere (the server): the machine only animates onto it. */
+export interface ForcedPick {
+  entry?: SlotEntry;
+  number?: number;
+}
+
+export type PickResolver = () => Promise<ForcedPick>;
+
+/** Asks for the server's pick. Undefined: no resolver, the machine picks itself. Null: it failed (onError says why). */
+export async function askForPick(resolve: PickResolver | undefined, onError: (message: string) => void): Promise<ForcedPick | null | undefined> {
+  if (!resolve) return undefined;
+  try {
+    return await resolve();
+  } catch (e) {
+    onError(e instanceof Error ? e.message : 'The draw did not go through. Try again.');
+    return null;
+  }
+}
+
 interface SlotMachineProps {
   mode: SlotMode;
   totalNumbers: number;
@@ -33,6 +52,8 @@ interface SlotMachineProps {
   trigger?: number;
   showLever?: boolean;
   showResult?: boolean;
+  /** Saved events: the server picks the winner, the reels land on it. */
+  resolve?: PickResolver;
   onSpinStart?: () => void;
   onResult?: (result: SlotResult) => void;
 }
@@ -178,7 +199,7 @@ function Lever({ onPull, disabled, height }: { onPull: () => void; disabled: boo
 
 export function SlotMachine({
   mode, totalNumbers, numbers, numberEntries, digits: digitsOverride, revealName = false, excludeNumbers = [], entries = [], excludeIds = [],
-  size = 'md', trigger, showLever = true, showResult = true, onSpinStart, onResult,
+  size = 'md', trigger, showLever = true, showResult = true, resolve, onSpinStart, onResult,
 }: SlotMachineProps) {
   const s = SIZES[size];
   const maxNumber = numbers ? numbers.reduce((m, n) => Math.max(m, n), 1) : totalNumbers;
@@ -191,6 +212,8 @@ export function SlotMachine({
   const [phase, setPhase] = useState<'idle' | 'spinning' | 'done'>('idle');
   const [result, setResult] = useState<SlotResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
+  const askingRef = useRef(false);
   const restingRef = useRef<{ key: string; values: string[] }>({ key: '', values: [] });
   const pendingRef = useRef<SlotResult | null>(null);
   const stoppedRef = useRef(0);
@@ -201,8 +224,16 @@ export function SlotMachine({
   const strips = active ? active.strips : idleStrips(mode, reelCount);
   const durations = Array.from({ length: reelCount }, (_, i) => (mode === 'number' ? 2200 + i * 850 : 4800));
 
-  const start = () => {
-    if (phase === 'spinning') return;
+  const start = async () => {
+    if (phase === 'spinning' || askingRef.current) return;
+    askingRef.current = true;
+    setAsking(true);
+    setError(null);
+    const forced = await askForPick(resolve, setError);
+    askingRef.current = false;
+    setAsking(false);
+    if (forced === null) return;
+
     const resting = restingRef.current.key === layoutKey
       ? restingRef.current.values
       : mode === 'number' ? Array(reelCount).fill('0') : [NAME_IDLE];
@@ -212,11 +243,11 @@ export function SlotMachine({
 
     if (mode === 'number') {
       const excluded = new Set(excludeNumbers);
-      let n = 0;
-      if (numbers) {
+      let n = forced?.number ?? 0;
+      if (!forced && numbers) {
         const open = numbers.filter((c) => !excluded.has(c));
         if (open.length) n = pick(open);
-      } else {
+      } else if (!forced) {
         const total = Math.max(1, Math.floor(totalNumbers));
         for (let i = 0; i < 400 && !n; i++) {
           const c = 1 + Math.floor(Math.random() * total);
@@ -225,13 +256,15 @@ export function SlotMachine({
         for (let c = 1; c <= total && !n; c++) if (!excluded.has(c)) n = c;
       }
       if (!n) {
-        setError(numbers && numbers.length === 0
-          ? 'No checked-in guests to draw from yet.'
-          : 'Every number has already been drawn. Reset the draws to start again.');
+        setError(forced
+          ? 'The draw did not return a number. Try again.'
+          : numbers && numbers.length === 0
+            ? 'No checked-in guests to draw from yet.'
+            : 'Every number has already been drawn. Reset the draws to start again.');
         return;
       }
       const label = String(n).padStart(digits, '0');
-      res = { mode, label, number: n, entry: numberEntries?.[n] };
+      res = { mode, label, number: n, entry: forced?.entry ?? numberEntries?.[n] };
       nextStrips = label.split('').map((t, i) => {
         const cur = Number(resting[i] ?? 0) || 0;
         const target = Number(t);
@@ -244,13 +277,15 @@ export function SlotMachine({
       restingRef.current = { key: layoutKey, values: label.split('') };
     } else {
       const pool = entries.filter((e) => !excludeIds.includes(e.id));
-      if (pool.length === 0) {
-        setError(entries.length ? 'Every guest in the pool has already won. Reset the draws to start again.' : 'No checked-in guests to draw from yet.');
+      if (!forced?.entry && pool.length === 0) {
+        setError(forced
+          ? 'The draw did not return a guest. Try again.'
+          : entries.length ? 'Every guest in the pool has already won. Reset the draws to start again.' : 'No checked-in guests to draw from yet.');
         return;
       }
-      const winner = pick(pool);
+      const winner = forced?.entry ?? pick(pool);
       res = { mode, label: winner.name, entry: winner };
-      const names = entries.map((e) => e.name);
+      const names = entries.length ? entries.map((e) => e.name) : [winner.name];
       const fill = Array.from({ length: 30 }, () => pick(names));
       nextStrips = [[pick(names), resting[0] ?? NAME_IDLE, ...fill, winner.name, pick(names)]];
       restingRef.current = { key: layoutKey, values: [winner.name] };
@@ -274,7 +309,7 @@ export function SlotMachine({
   useEffect(() => {
     if (trigger === undefined || trigger === lastTrigger.current) return;
     lastTrigger.current = trigger;
-    startRef.current();
+    void startRef.current();
   }, [trigger]);
 
   const handleStopped = (i: number) => {
@@ -331,7 +366,7 @@ export function SlotMachine({
         {showLever && (
           <>
             <span className="w-px self-stretch bg-premium-borderDark" />
-            <Lever onPull={start} disabled={phase === 'spinning'} height={Math.min(reelHeight, 240)} />
+            <Lever onPull={() => void start()} disabled={phase === 'spinning' || asking} height={Math.min(reelHeight, 240)} />
           </>
         )}
       </div>
@@ -340,6 +375,8 @@ export function SlotMachine({
         <div className="text-center space-y-1 min-h-[3.5rem]">
           {error ? (
             <p className="text-sm font-bold text-premium-danger">{error}</p>
+          ) : asking ? (
+            <p className="text-sm font-mono text-premium-gold animate-pulse">Drawing…</p>
           ) : shownPhase === 'spinning' ? (
             <p className="text-sm font-mono text-premium-gold animate-pulse">Spinning…</p>
           ) : shownPhase === 'done' && shownResult ? (

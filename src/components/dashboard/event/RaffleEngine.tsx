@@ -1,8 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Copy, Download, ExternalLink, Gift, Plus, Trash2, Trophy, Tv, Palette, Settings2, Sparkles, Check, Users, X } from 'lucide-react';
-import { formatGuestNumber, guestPool, newDoorPrize, numberDigits, updateDrawWinners, useEventConfig, useGuests, type DoorPrize } from '@/lib/eventStore';
+import { Copy, Download, ExternalLink, Gift, Plus, Trash2, Trophy, Tv, Palette, Settings2, Sparkles, Check, Users, UserX, X } from 'lucide-react';
+import {
+  formatGuestNumber, guestPool, newDoorPrize, newId, numberDigits, updateDrawWinners, useEventConfig, useGuests, type DoorPrize, type DrawWinner,
+} from '@/lib/eventStore';
+import { forfeitDraw, serverPrize, toDrawWinner, useDoorPrizeBoard, useDoorPrizeSync } from '@/lib/doorPrizeApi';
+import { isServerEventId } from '@/lib/guestsApi';
+import { saveStageState } from '@/lib/stageApi';
 import { AudiencePicker } from '@/components/raffle/AudiencePicker';
 import { SendButtons } from './SendButtons';
 import { DrawMachine, DRAW_STYLES } from '@/components/raffle/DrawMachine';
@@ -24,7 +29,32 @@ export function RaffleEngine({ eventId }: { eventId: string }) {
   const [tab, setTab] = useState<Tab>('machine');
   const [saveWinners, setSaveWinners] = useState(false);
   const [copied, setCopied] = useState('');
+  const [winnerError, setWinnerError] = useState<string | null>(null);
   const draw = items.find((d) => d.id === selectedId) ?? items[0];
+
+  // Saved events: winners live on the server (drawn on any screen); the setup is kept in step with it.
+  const server = isServerEventId(eventId);
+  const { board } = useDoorPrizeBoard(server ? eventId : null, server && tab === 'winners' ? 5000 : 0);
+  useDoorPrizeSync(server ? eventId : null, items);
+  const awardedOf = (d: DoorPrize) => (server ? serverPrize(board, d.id)?.awarded ?? 0 : d.winners.length);
+  const winnersOf = (d: DoorPrize): (DrawWinner & { forfeited?: boolean })[] => {
+    if (!server) return d.winners;
+    const p = serverPrize(board, d.id);
+    return (p?.winners ?? []).map((w) => ({ ...toDrawWinner(p!, w, digits), forfeited: w.status === 'forfeited' }));
+  };
+  const forfeit = async (w: DrawWinner) => {
+    if (!confirm(`Forfeit ${w.number ? `No. ${w.label}` : w.label}? They stay out of the draw, and you can draw this prize again.`)) return;
+    setWinnerError(null);
+    try {
+      await forfeitDraw(eventId, w.id);
+    } catch (e) {
+      setWinnerError(e instanceof Error ? e.message : 'Could not forfeit that winner.');
+    }
+  };
+  const putOnStage = (id: string) => {
+    update('doorprizes', { activeId: id });
+    if (server) saveStageState(eventId, { doorprize_id: id }).catch(() => {});
+  };
 
   const setItems = (next: DoorPrize[], patch: Partial<typeof config.doorprizes> = {}) => update('doorprizes', { items: next, ...patch });
   const patch = (p: Partial<DoorPrize>) => draw && setItems(items.map((d) => (d.id === draw.id ? { ...d, ...p } : d)));
@@ -36,13 +66,18 @@ export function RaffleEngine({ eventId }: { eventId: string }) {
     setTab('prize');
   };
   const duplicate = (d: DoorPrize) => {
-    const copy: DoorPrize = { ...structuredClone(d), id: `${d.id}-copy-${Date.now().toString(36)}`, name: `${d.name} (copy)`, winners: [] };
+    // A fresh id: the server keys each door prize's winners by it.
+    const copy: DoorPrize = { ...structuredClone(d), id: newId('dp'), name: `${d.name} (copy)`, winners: [] };
     setItems([...items, copy]);
     setSelectedId(copy.id);
   };
   const remove = (d: DoorPrize) => {
     if (items.length === 1) return alert('Keep at least one door prize.');
-    if (!confirm(`Delete “${d.name}” and its ${d.winners.length} winner(s)?`)) return;
+    const n = awardedOf(d);
+    const question = server && n
+      ? `Delete “${d.name}”? Its ${n} winner(s) stay on record and won't be drawn again.`
+      : `Delete “${d.name}” and its ${n} winner(s)?`;
+    if (!confirm(question)) return;
     const next = items.filter((x) => x.id !== d.id);
     setItems(next, activeId === d.id ? { activeId: next[0].id } : {});
     if (selectedId === d.id) setSelectedId(next[0].id);
@@ -74,7 +109,7 @@ export function RaffleEngine({ eventId }: { eventId: string }) {
               <div className="text-sm font-display font-bold text-white mt-1 truncate">{d.name}</div>
               <div className="text-[11px] text-zinc-400 truncate">{d.prize} · ×{d.quantity}</div>
               <div className="flex items-center justify-between mt-3">
-                <span className="text-[10px] font-mono text-zinc-500">{d.winners.length}/{d.quantity} drawn</span>
+                <span className="text-[10px] font-mono text-zinc-500">{awardedOf(d)}/{d.quantity} drawn</span>
                 <span className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                   <button type="button" onClick={() => duplicate(d)} className="text-zinc-500 hover:text-white scale-on-click" aria-label="Duplicate"><Copy className="w-3.5 h-3.5" /></button>
                   <button type="button" onClick={() => remove(d)} className="text-zinc-600 hover:text-premium-danger scale-on-click" aria-label="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
@@ -97,7 +132,7 @@ export function RaffleEngine({ eventId }: { eventId: string }) {
               { id: 'prize', label: 'Prize', icon: Gift },
               { id: 'guests', label: `Guests (${guestPool(guests, draw.audience, draw.pickedGuestIds).length})`, icon: Users },
               { id: 'design', label: 'Frame & Footer', icon: Palette },
-              { id: 'winners', label: `Winners (${draw.winners.length})`, icon: Trophy },
+              { id: 'winners', label: `Winners (${awardedOf(draw)})`, icon: Trophy },
               { id: 'screen', label: 'Big Screen', icon: Tv },
             ] as const).map((t) => (
               <button
@@ -177,44 +212,65 @@ export function RaffleEngine({ eventId }: { eventId: string }) {
             </div>
           )}
 
-          {tab === 'winners' && (
-            <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-bold text-white">{draw.winners.length} of {draw.quantity} winners drawn</p>
-                  <p className="text-[11px] text-zinc-500 mt-0.5">Tell each winner with one tap. Edit the message in Broadcast → Winner.</p>
+          {tab === 'winners' && (() => {
+            const rows = winnersOf(draw);
+            const won = rows.filter((w) => !w.forfeited);
+            return (
+              <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-white">{awardedOf(draw)} of {draw.quantity} winners drawn</p>
+                    <p className="text-[11px] text-zinc-500 mt-0.5">
+                      Tell each winner with one tap. Edit the message in Broadcast → Winner.
+                      {server && ' A winner who doesn’t come forward can be forfeited, then draw again.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!won.length}
+                    onClick={() => downloadBlob(`${draw.name}-winners.csv`, new Blob([toCsv([['Winner', 'Guest No.', 'Guest', 'Drawn at'], ...won.map((w) => { const g = winnerName(w.guestId); return [w.label, formatGuestNumber(g?.guest_number ?? w.number, digits), g?.name ?? '', new Date(w.at).toLocaleString()]; })])], { type: 'text/csv;charset=utf-8' }))}
+                    className="px-3 py-2 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-white text-xs font-bold scale-on-click flex items-center gap-1.5 disabled:opacity-40"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Export CSV
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  disabled={!draw.winners.length}
-                  onClick={() => downloadBlob(`${draw.name}-winners.csv`, new Blob([toCsv([['Winner', 'Guest No.', 'Guest', 'Drawn at'], ...draw.winners.map((w) => { const g = winnerName(w.guestId); return [w.label, formatGuestNumber(g?.guest_number ?? w.number, digits), g?.name ?? '', new Date(w.at).toLocaleString()]; })])], { type: 'text/csv;charset=utf-8' }))}
-                  className="px-3 py-2 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-white text-xs font-bold scale-on-click flex items-center gap-1.5 disabled:opacity-40"
-                >
-                  <Download className="w-3.5 h-3.5" /> Export CSV
-                </button>
+                {winnerError && <p className="text-[11px] text-premium-danger">{winnerError}</p>}
+                {rows.length === 0 ? (
+                  <p className="text-xs text-zinc-500">No winners yet. Draw on the big screen, or tick “Save winners” on the Machine tab.</p>
+                ) : (
+                  <div className="divide-y divide-premium-borderDark/60 rounded-2xl border border-premium-borderDark overflow-hidden">
+                    {rows.map((w, i) => {
+                      const guest = winnerName(w.guestId);
+                      return (
+                        <div key={w.id} className={`flex flex-wrap items-center gap-3 px-4 py-3 text-xs ${w.forfeited ? 'opacity-50' : ''}`}>
+                          <span className="w-6 h-6 rounded-full bg-premium-gold/15 text-premium-gold font-bold flex items-center justify-center">{rows.length - i}</span>
+                          <span className={`flex-1 min-w-0 truncate ${w.forfeited ? 'line-through' : ''}`}>
+                            <span className="font-bold text-white">{w.number ? `No. ${w.label}` : w.label}</span>
+                            {guest && guest.name !== w.label && <span className="text-zinc-400 ml-2">· {guest.name}</span>}
+                          </span>
+                          {w.forfeited ? (
+                            <span className="text-[10px] font-bold uppercase text-zinc-500">Forfeited</span>
+                          ) : (
+                            guest && <SendButtons eventId={eventId} kind="winner" guest={guest} prize={draw.prize || draw.name} size="sm" />
+                          )}
+                          <span className="font-mono text-zinc-500">{new Date(w.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          {server ? (
+                            !w.forfeited && (
+                              <button type="button" onClick={() => void forfeit(w)} className="text-zinc-600 hover:text-premium-danger scale-on-click" aria-label="Forfeit winner" title="Did not come forward: forfeit, then draw again">
+                                <UserX className="w-3.5 h-3.5" />
+                              </button>
+                            )
+                          ) : (
+                            <button type="button" onClick={() => updateDrawWinners(eventId, draw.id, (ws) => ws.filter((x) => x.id !== w.id))} className="text-zinc-600 hover:text-premium-danger scale-on-click" aria-label="Remove winner"><X className="w-3.5 h-3.5" /></button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-              {draw.winners.length === 0 ? (
-                <p className="text-xs text-zinc-500">No winners yet. Draw on the big screen, or tick “Save winners” on the Machine tab.</p>
-              ) : (
-                <div className="divide-y divide-premium-borderDark/60 rounded-2xl border border-premium-borderDark overflow-hidden">
-                  {draw.winners.map((w, i) => (
-                    <div key={w.id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-xs">
-                      <span className="w-6 h-6 rounded-full bg-premium-gold/15 text-premium-gold font-bold flex items-center justify-center">{draw.winners.length - i}</span>
-                      <span className="flex-1 min-w-0 truncate">
-                        <span className="font-bold text-white">{w.number ? `No. ${w.label}` : w.label}</span>
-                        {winnerName(w.guestId) && winnerName(w.guestId)?.name !== w.label && (
-                          <span className="text-zinc-400 ml-2">· {winnerName(w.guestId)?.name}</span>
-                        )}
-                      </span>
-                      {winnerName(w.guestId) && <SendButtons eventId={eventId} kind="winner" guest={winnerName(w.guestId)!} prize={draw.prize || draw.name} size="sm" />}
-                      <span className="font-mono text-zinc-500">{new Date(w.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      <button type="button" onClick={() => updateDrawWinners(eventId, draw.id, (ws) => ws.filter((x) => x.id !== w.id))} className="text-zinc-600 hover:text-premium-danger scale-on-click" aria-label="Remove winner"><X className="w-3.5 h-3.5" /></button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+            );
+          })()}
 
           {tab === 'screen' && (
             <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4">
@@ -234,7 +290,7 @@ export function RaffleEngine({ eventId }: { eventId: string }) {
               ))}
               <button
                 type="button"
-                onClick={() => update('doorprizes', { activeId: draw.id })}
+                onClick={() => putOnStage(draw.id)}
                 disabled={config.doorprizes.activeId === draw.id}
                 className="px-4 py-2.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black text-xs font-bold scale-on-click shadow-gold flex items-center gap-1.5 disabled:opacity-50"
               >

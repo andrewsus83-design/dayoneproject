@@ -3,31 +3,75 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, EyeOff, Play, RefreshCw, Settings2, Trophy } from 'lucide-react';
-import { guestPool, updateDrawWinners, useEventConfigBySlug, useGuests } from '@/lib/eventStore';
+import { ArrowLeft, EyeOff, Play, RefreshCw, Settings2, Trophy, UserX } from 'lucide-react';
+import {
+  drawExclusions, formatGuestNumber, guestPool, numberDigits, updateDrawWinners, useEventConfigBySlug, useGuestList, type DrawWinner,
+} from '@/lib/eventStore';
+import { isServerEventId } from '@/lib/guestsApi';
+import { boardExclusions, forfeitDraw, serverPrize, toDrawWinner, useDoorPrizeBoard, useDoorPrizeSync } from '@/lib/doorPrizeApi';
+import { stageBusName } from '@/lib/stageApi';
 import { DrawMachine, DRAW_STYLES } from '@/components/raffle/DrawMachine';
 import { SlotSettings } from '@/components/raffle/SlotSettings';
 import { StageFrameShell } from '@/components/stage/StageFrameShell';
+import { DoorPrizeViewer } from '@/components/events/DoorPrizeViewer';
 import type { SlotResult } from '@/components/raffle/SlotMachine';
 
-/** Big-screen door prize view. Door prizes live at /events/[slug]/doorprize, separate from games. */
+/** A winner row on the screen; forfeited draws (saved events) stay listed, struck through. */
+interface WinnerRow extends DrawWinner {
+  forfeited?: boolean;
+}
+
+/**
+ * Big-screen door prize view at /events/[slug]/doorprize. The event's organizers draw here: on a saved event the
+ * server picks a checked-in guest and every screen and phone gets the winner from it. Anyone else who opens a
+ * saved event's link (guests on their phones) gets the read-only winners board. Sample events draw on this device.
+ */
 export function DoorPrizeScreen({ slug, initialId }: { slug: string; initialId?: string | null }) {
+  const { eventId, hydrated } = useEventConfigBySlug(slug);
+  const server = hydrated && isServerEventId(eventId);
+  const { status } = useDoorPrizeBoard(server ? eventId : null, 3000);
+
+  if (!hydrated || (server && (status === 'idle' || status === 'loading'))) {
+    return <div className="min-h-screen bg-premium-black flex items-center justify-center text-zinc-500 text-sm">Loading stage…</div>;
+  }
+  if (server && status === 'forbidden') return <DoorPrizeViewer slug={slug} initialId={initialId} />;
+  return <DoorPrizeArena slug={slug} initialId={initialId} />;
+}
+
+function DoorPrizeArena({ slug, initialId }: { slug: string; initialId?: string | null }) {
   const router = useRouter();
-  const { eventId, hydrated, event, config } = useEventConfigBySlug(slug);
-  const guests = useGuests(eventId);
+  const { eventId, event, config } = useEventConfigBySlug(slug);
+  const server = isServerEventId(eventId);
+  // New check-ins join the draw while the screen stays open.
+  const { guests } = useGuestList(eventId, server ? 20_000 : 0);
+  const { board, error: boardError } = useDoorPrizeBoard(server ? eventId : null);
   const { items, activeId } = config.doorprizes;
+  useDoorPrizeSync(server ? eventId : null, items);
   const [selectedId, setSelectedId] = useState<string | null>(initialId ?? null);
   const draw = items.find((d) => d.id === selectedId) ?? items.find((d) => d.id === activeId) ?? items[0];
   const [trigger, setTrigger] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState<SlotResult | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const eligible = draw ? guestPool(guests, draw.audience, draw.pickedGuestIds).length : 0;
+  const [forfeitError, setForfeitError] = useState<string | null>(null);
+  const digits = numberDigits(guests, config.info.capacity);
   const guestById = (id?: string) => (id ? guests.find((g) => g.id === id) : undefined);
   const drawIdRef = useRef(draw?.id);
   useEffect(() => {
     drawIdRef.current = draw?.id;
   }, [draw?.id]);
+
+  const prize = draw && server ? serverPrize(board, draw.id) : undefined;
+  const winners: WinnerRow[] = !draw
+    ? []
+    : server
+      ? (prize?.winners ?? []).map((w) => ({ ...toDrawWinner(prize!, w, digits), forfeited: w.status === 'forfeited' }))
+      : draw.winners;
+  const awarded = server ? prize?.awarded ?? 0 : draw?.winners.length ?? 0;
+  // A guest wins once per event, across all door prizes.
+  const excludedIds = new Set((server ? boardExclusions(board) : drawExclusions(config)).guestIds);
+  const eligible = draw ? guestPool(guests, draw.audience, draw.pickedGuestIds).filter((g) => !excludedIds.has(g.id)).length : 0;
+  const full = !!draw && awarded >= draw.quantity;
 
   const select = (id: string) => {
     setSelectedId(id);
@@ -35,9 +79,10 @@ export function DoorPrizeScreen({ slug, initialId }: { slug: string; initialId?:
     router.replace(`/events/${slug}/doorprize/${id}`, { scroll: false });
   };
 
+  // The operator can start a spin from another tab on this device (per-event channel).
   useEffect(() => {
     if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
-    const channel = new BroadcastChannel('all41_stage_bus');
+    const channel = new BroadcastChannel(stageBusName(eventId));
     channel.onmessage = (ev) => {
       const data = ev.data;
       if (data?.type === 'TRIGGER_RAFFLE_SPIN') {
@@ -50,10 +95,21 @@ export function DoorPrizeScreen({ slug, initialId }: { slug: string; initialId?:
       }
     };
     return () => channel.close();
-  }, []);
+  }, [eventId]);
 
-  if (!hydrated || !draw) {
-    return <div className="min-h-screen bg-premium-black flex items-center justify-center text-zinc-500 text-sm">Loading stage…</div>;
+  const forfeit = async (w: WinnerRow) => {
+    if (!confirm(`${w.number ? `No. ${w.label}` : w.label} did not come forward? They stay out of the draw and you can draw again.`)) return;
+    setForfeitError(null);
+    try {
+      await forfeitDraw(eventId, w.id);
+      setResult(null);
+    } catch (e) {
+      setForfeitError(e instanceof Error ? e.message : 'Could not forfeit that winner.');
+    }
+  };
+
+  if (!draw) {
+    return <div className="min-h-screen bg-premium-black flex items-center justify-center text-zinc-500 text-sm">Set up a door prize in the dashboard first.</div>;
   }
 
   return (
@@ -112,12 +168,13 @@ export function DoorPrizeScreen({ slug, initialId }: { slug: string; initialId?:
             />
             <button
               type="button"
-              disabled={spinning || draw.winners.length >= draw.quantity}
+              disabled={spinning || full}
               onClick={() => setTrigger((t) => t + 1)}
-              className={`px-12 py-4 rounded-2xl font-bold text-base text-black uppercase tracking-wider transition-all shadow-gold scale-on-click flex items-center gap-3 ${spinning || draw.winners.length >= draw.quantity ? 'bg-zinc-600 cursor-not-allowed' : 'bg-premium-gold hover:bg-premium-goldHover'}`}
+              className={`px-12 py-4 rounded-2xl font-display font-bold text-base text-black uppercase tracking-wider transition-all shadow-gold scale-on-click flex items-center gap-3 ${spinning || full ? 'bg-zinc-600 cursor-not-allowed' : 'bg-premium-gold hover:bg-premium-goldHover'}`}
             >
-              {spinning ? <><RefreshCw className="w-5 h-5 animate-spin" /> Drawing…</> : draw.winners.length >= draw.quantity ? 'All winners drawn' : <><Play className="w-5 h-5 fill-current" /> Draw a winner</>}
+              {spinning ? <><RefreshCw className="w-5 h-5 animate-spin" /> Drawing…</> : full ? 'All winners drawn' : <><Play className="w-5 h-5 fill-current" /> Draw a winner</>}
             </button>
+            {server && boardError && <p className="text-xs text-premium-danger">{boardError}</p>}
           </div>
 
           <div className="xl:col-span-4 space-y-6">
@@ -133,25 +190,39 @@ export function DoorPrizeScreen({ slug, initialId }: { slug: string; initialId?:
             <div className="p-6 rounded-[2rem] bg-premium-charcoal/90 border border-premium-borderDark">
               <div className="text-xs font-mono uppercase text-zinc-400 tracking-wider mb-4 flex items-center justify-between">
                 <span>{draw.name} winners</span>
-                <span className="text-premium-gold font-bold">{draw.winners.length}/{draw.quantity}</span>
+                <span className="text-premium-gold font-bold">{awarded}/{draw.quantity}</span>
               </div>
               <div className="space-y-2 max-h-72 overflow-y-auto">
-                {draw.winners.length === 0 && <p className="text-xs text-zinc-500">No winners yet.</p>}
-                {draw.winners.map((w) => (
-                  <div key={w.id} className="p-3 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-xs flex items-center justify-between">
-                    <span className="min-w-0 truncate">
-                      <span className="font-bold text-white">{w.number ? `No. ${w.label}` : w.label}</span>
-                      {w.number && !draw.anonymous && guestById(w.guestId) && <span className="text-zinc-400 ml-2">{guestById(w.guestId)?.name}</span>}
-                    </span>
-                    <span className="font-mono text-zinc-500">{new Date(w.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                  </div>
-                ))}
+                {winners.length === 0 && <p className="text-xs text-zinc-500">No winners yet.</p>}
+                {winners.map((w) => {
+                  const guest = guestById(w.guestId);
+                  return (
+                    <div key={w.id} className={`p-3 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-xs flex items-center justify-between gap-2 ${w.forfeited ? 'opacity-50' : ''}`}>
+                      <span className={`min-w-0 truncate ${w.forfeited ? 'line-through' : ''}`}>
+                        <span className="font-bold text-white">{w.number ? `No. ${w.label}` : w.label}</span>
+                        {w.number && !draw.anonymous && guest && <span className="text-zinc-400 ml-2">{guest.name}</span>}
+                        {!w.number && guest?.guest_number && <span className="font-mono text-zinc-500 ml-2">#{formatGuestNumber(guest.guest_number, digits)}</span>}
+                      </span>
+                      <span className="flex items-center gap-2 shrink-0">
+                        {w.forfeited ? (
+                          <span className="text-[10px] font-bold uppercase text-zinc-500">Forfeited</span>
+                        ) : server ? (
+                          <button type="button" onClick={() => void forfeit(w)} className="text-zinc-500 hover:text-premium-danger scale-on-click" aria-label="Forfeit and draw again" title="Did not come forward: forfeit, then draw again">
+                            <UserX className="w-3.5 h-3.5" />
+                          </button>
+                        ) : null}
+                        <span className="font-mono text-zinc-500">{new Date(w.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
-              {draw.winners.length > 0 && (
+              {forfeitError && <p className="mt-3 text-[11px] text-premium-danger">{forfeitError}</p>}
+              {!server && draw.winners.length > 0 && (
                 <button
                   type="button"
                   onClick={() => { if (confirm(`Clear the winners of “${draw.name}”?`)) updateDrawWinners(eventId, draw.id, () => []); }}
-                  className="mt-3 text-[11px] font-bold text-zinc-500 hover:text-white"
+                  className="mt-3 text-[11px] font-bold text-zinc-500 hover:text-white scale-on-click"
                 >
                   Reset winners
                 </button>

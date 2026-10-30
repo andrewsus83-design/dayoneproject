@@ -66,10 +66,9 @@ export function PublishButton({ eventId }: { eventId: string }) {
     );
   }
 
+  // Door prize winners of saved events live on the server as they are drawn, so only setup edits need a Save.
   const neverSaved = sync.savedAt === null;
   const needsSave = sync.unsaved || neverSaved;
-  // Winners drawn on this device that the server does not have yet; Save sends them too.
-  const liveOnly = !needsSave && sync.liveAt !== null;
 
   const run = async (kind: Exclude<Busy, null>, task: () => Promise<unknown>, status?: SaveOptions['status']) => {
     setBusy(kind);
@@ -110,7 +109,7 @@ export function PublishButton({ eventId }: { eventId: string }) {
   const savedTime = sync.savedAt ? clock(sync.savedAt) : null;
   const saveStyle = needsSave
     ? live ? gold : secondary
-    : liveOnly ? secondary : 'bg-premium-surfaceDark border border-premium-borderDark text-zinc-400';
+    : 'bg-premium-surfaceDark border border-premium-borderDark text-zinc-400';
 
   return (
     <div className="relative flex items-center gap-2 shrink-0">
@@ -142,10 +141,6 @@ export function PublishButton({ eventId }: { eventId: string }) {
         <span className="hidden lg:flex items-center gap-1.5 text-[11px] font-bold text-premium-gold">
           <span className="w-1.5 h-1.5 rounded-full bg-premium-gold" /> Unsaved changes
         </span>
-      ) : liveOnly ? (
-        <span className="hidden lg:flex items-center gap-1.5 text-[11px] font-bold text-zinc-400" title="Winners drawn on this device. Save to share them with your team.">
-          <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" /> Winners not saved yet
-        </span>
       ) : savedTime ? (
         <span className="hidden lg:flex items-center gap-1.5 text-[11px] font-bold text-zinc-400">
           <Check className="w-3.5 h-3.5 text-premium-success" /> Saved {savedTime}
@@ -155,12 +150,12 @@ export function PublishButton({ eventId }: { eventId: string }) {
       <button
         type="button"
         onClick={() => save()}
-        disabled={!!busy || (!needsSave && !liveOnly)}
+        disabled={!!busy || !needsSave}
         title={live ? 'Guests see saved changes right away' : 'The draft stays with your team until you publish it'}
         className={`px-3.5 py-1.5 rounded-xl text-xs font-display font-bold flex items-center gap-1.5 scale-on-click transition-all disabled:cursor-default ${saveStyle}`}
       >
-        {busy === 'save' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : needsSave || liveOnly ? <UploadCloud className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5 text-premium-success" />}
-        {busy === 'save' ? 'Saving…' : needsSave || liveOnly ? 'Save' : 'Saved'}
+        {busy === 'save' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : needsSave ? <UploadCloud className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5 text-premium-success" />}
+        {busy === 'save' ? 'Saving…' : needsSave ? 'Save' : 'Saved'}
       </button>
 
       {!live && (
@@ -212,7 +207,7 @@ export function PublishButton({ eventId }: { eventId: string }) {
             <>
               <p id="publish-panel-title" className="text-sm font-display font-bold text-white">Load their version?</p>
               <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                Your unsaved changes on this device will be discarded. Winners drawn on this device stay.
+                Your unsaved changes on this device will be discarded. Door prize winners are kept on the server either way.
               </p>
               <div className="flex gap-2 mt-4">
                 <button type="button" onClick={() => setPanel('conflict')} disabled={!!busy} className={`${panelButton} ${secondary}`}>

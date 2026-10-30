@@ -14,6 +14,7 @@ import { BROADCAST_KINDS, BROADCAST_VARIABLES, defaultBroadcastTemplates } from 
 import { emailBody, emailHtml, renderBroadcast, waPhone, whatsappHref } from '@/lib/broadcast';
 import { resolveTheme } from '@/lib/eventTheme';
 import { compressImage, downloadBlob, downloadDataUrl, toCsv } from '@/lib/image';
+import { useDoorPrizeItems } from '@/lib/doorPrizeApi';
 import { SendButtons, useOrigin } from './SendButtons';
 import type { Guest } from '@/lib/types';
 
@@ -357,6 +358,8 @@ export function BroadcastStudio({ eventId }: { eventId: string }) {
   const tpl = bc.templates[kind];
   const imageUrl = useAssetUrl(tpl.imageUrl);
   const digits = numberDigits(guests, config.info.capacity);
+  // Saved events' door prize winners come from the server (drawn on any screen).
+  const { items: doorPrizes } = useDoorPrizeItems(eventId, config.doorprizes.items, digits);
   const theme = useMemo(() => resolveTheme(config.design), [config.design]);
   const sentIds = useMemo(() => new Set(bc.sent[kind] ?? []), [bc.sent, kind]);
 
@@ -375,7 +378,7 @@ export function BroadcastStudio({ eventId }: { eventId: string }) {
     if (kind === 'winner') {
       const byId = new Map(guests.map((g) => [g.id, g]));
       const out: Recipient[] = [];
-      for (const d of config.doorprizes.items) {
+      for (const d of doorPrizes) {
         for (const w of d.winners) {
           const g = w.guestId ? byId.get(w.guestId) : undefined;
           if (g) out.push({ guest: g, prize: d.prize || d.name });
@@ -390,7 +393,7 @@ export function BroadcastStudio({ eventId }: { eventId: string }) {
       return out;
     }
     return guests.map((g) => ({ guest: g }));
-  }, [kind, guests, config.doorprizes.items, config.games.activities]);
+  }, [kind, guests, doorPrizes, config.games.activities]);
 
   const shown = recipients.filter(({ guest: g }) => {
     if (filter === 'attending' && g.rsvp_status !== 'attending') return false;

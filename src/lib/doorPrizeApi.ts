@@ -328,15 +328,27 @@ export async function fetchPublicDoorPrizes(slug: string, signal?: AbortSignal):
 
 export type FeedState = 'loading' | 'ready' | 'missing' | 'offline';
 
-/** Polls the public door prize board while the page is visible. enabled false keeps it idle. */
+/** A winner that came in while the page was open, for the reveal. */
+export interface FreshWinner {
+  prize: ServerPrize;
+  winner: ServerWinner;
+}
+
+/**
+ * Polls the public door prize board while the page is visible. enabled false keeps it idle. `fresh` is the newest
+ * winner revealed since the page opened (null until one comes in).
+ */
 export function usePublicDoorPrizes(slug: string, enabled = true, intervalMs = 3000) {
   const [data, setData] = useState<PublicDoorPrizes | null>(null);
   const [state, setState] = useState<FeedState>('loading');
+  const [fresh, setFresh] = useState<FreshWinner | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
     let alive = true;
     let controller: AbortController | null = null;
+    // Winners already on the board when the page opened are not news.
+    let seen: Set<string> | null = null;
     const load = () => {
       if (document.visibilityState !== 'visible') return;
       controller?.abort();
@@ -344,6 +356,16 @@ export function usePublicDoorPrizes(slug: string, enabled = true, intervalMs = 3
       fetchPublicDoorPrizes(slug, controller.signal)
         .then((d) => {
           if (!alive) return;
+          if (d) {
+            let news: FreshWinner | null = null;
+            for (const prize of d.prizes) {
+              for (const winner of prize.winners) {
+                if (seen && !seen.has(winner.id) && (!news || Date.parse(winner.at) > Date.parse(news.winner.at))) news = { prize, winner };
+              }
+            }
+            seen = new Set(d.prizes.flatMap((p) => p.winners.map((w) => w.id)));
+            if (news) setFresh(news);
+          }
           setData(d);
           setState(d ? 'ready' : 'missing');
         })
@@ -363,7 +385,8 @@ export function usePublicDoorPrizes(slug: string, enabled = true, intervalMs = 3
     };
   }, [slug, enabled, intervalMs]);
 
-  return { data, state: enabled ? state : ('missing' as FeedState) };
+  const dismissFresh = useCallback(() => setFresh(null), []);
+  return { data, state: enabled ? state : ('missing' as FeedState), fresh, dismissFresh };
 }
 
 /** How a winner reads on a public screen: "No. 012" for numbers and anonymous door prizes, else the name. */
