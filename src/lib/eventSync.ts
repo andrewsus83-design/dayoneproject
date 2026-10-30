@@ -3,7 +3,8 @@
 import { createClient } from '@/lib/supabase/client';
 import type { OrgEventRow } from '@/lib/events';
 import {
-  cacheOrgEvents, deleteAsset, readAsset, readEventConfig, readSyncState, replaceEventConfig, type EventConfig,
+  cacheOrgEvents, deleteAsset, isSavedVersion, markSavedVersion, readAsset, readEventConfig, readSyncState, replaceEventConfig,
+  type EventConfig, type SyncState,
 } from '@/lib/eventStore';
 import { COLUMNS, readable, venueTimestamp } from '@/lib/orgEvents';
 
@@ -56,38 +57,75 @@ async function uploadAssets(eventId: string, refs: Set<string>): Promise<Map<str
 
 type ServerRow = OrgEventRow & { config?: Partial<EventConfig>; saved_at: string | null };
 
+/** Someone saved the event after this device last loaded it, so saving now would overwrite their work. */
+export class SaveConflictError extends Error {
+  /** The server's saved_at of that newer version. */
+  readonly savedIso: string;
+
+  constructor(savedIso: string) {
+    super('A teammate saved a newer version of this event.');
+    this.name = 'SaveConflictError';
+    this.savedIso = savedIso;
+  }
+}
+
 /**
  * Puts the server copy on this device when it differs from what this device last saved or loaded,
- * unless this device has changes of its own that are not saved yet.
+ * unless this device has changes of its own that are not saved yet (discard drops them). Day-of results
+ * recorded on this device (winners, draws) are kept either way.
  */
-function applyServerCopy(row: OrgEventRow, config: Partial<EventConfig> | null | undefined, savedAtIso: string | null) {
+function applyServerCopy(row: OrgEventRow, config: Partial<EventConfig> | null | undefined, savedIso: string | null, discard = false) {
   cacheOrgEvents([row], true);
-  if (!savedAtIso || !config?.info) return;
-  const savedAt = Date.parse(savedAtIso);
+  if (!savedIso || !config?.info) return;
   const state = readSyncState(row.id);
-  if (state.savedAt === savedAt || state.unsaved) return;
-  replaceEventConfig(row.id, config as Partial<EventConfig> & Pick<EventConfig, 'info'>, savedAt);
+  if (!discard && isSavedVersion(state, savedIso)) {
+    // Older versions of the app kept only a rounded time; remember the exact one for the next save.
+    if (!state.savedIso) markSavedVersion(row.id, savedIso);
+    return;
+  }
+  if (!discard && state.unsaved) return;
+  replaceEventConfig(row.id, config as Partial<EventConfig> & Pick<EventConfig, 'info'>, savedIso, true);
 }
 
 function splitRow({ config, saved_at, ...row }: ServerRow) {
   return { row: row as OrgEventRow, config, savedAt: saved_at };
 }
 
-/** Saves everything the builder holds to the server and publishes the event, so every screen shows it. */
-export async function publishEvent(eventId: string): Promise<OrgEventRow> {
-  const version = readSyncState(eventId).updatedAt;
+/** Why a save matched no row: someone saved a newer version, or this account may not edit the event. */
+async function whyNotSaved(eventId: string, before: SyncState, force: boolean): Promise<Error> {
+  const { data } = await createClient().from('a41_events').select('saved_at').eq('id', eventId).maybeSingle();
+  if (!data) return new Error('This event was not found. It may have been deleted, or your account no longer has access.');
+  const savedIso = (data as { saved_at: string | null }).saved_at;
+  if (!force && savedIso && !isSavedVersion(before, savedIso)) return new SaveConflictError(savedIso);
+  return new Error('Your account cannot save this event. Ask the event owner for edit access.');
+}
+
+export interface SaveOptions {
+  /** Publish or unpublish in the same save. Left out, the event keeps its status. */
+  status?: 'draft' | 'published';
+  /** Save over a newer version someone else saved (after a SaveConflictError). */
+  force?: boolean;
+}
+
+/**
+ * Saves everything the builder holds to the server. A published event's pages on every phone and screen update;
+ * a draft stays visible to its organizers only. The save lands only on top of the version this device last saved
+ * or loaded; otherwise it throws SaveConflictError, unless force is set.
+ */
+export async function saveEvent(eventId: string, { status, force = false }: SaveOptions = {}): Promise<OrgEventRow> {
+  const before = readSyncState(eventId);
   const local = readEventConfig(eventId);
   const urls = await uploadAssets(eventId, collectAssets(local));
   const config = swapAssets(local, urls);
   const site = Object.fromEntries(PUBLIC_SECTIONS.map((k) => [k, config[k]]));
   const { info } = config;
 
-  const { data, error } = await createClient()
+  let query = createClient()
     .from('a41_events')
     .update({
       config,
       site,
-      status: 'published',
+      ...(status ? { status } : {}),
       name: info.name.trim(),
       slug: info.slug,
       venue_name: info.venue.trim() || null,
@@ -95,27 +133,47 @@ export async function publishEvent(eventId: string): Promise<OrgEventRow> {
       starts_at: venueTimestamp(info.startDate, info.startTime),
       ends_at: venueTimestamp(info.endDate || info.startDate, info.endTime || info.startTime),
     })
-    .eq('id', eventId)
-    .select(`${COLUMNS}, saved_at`)
-    .single();
+    .eq('id', eventId);
+  if (!force) {
+    if (before.savedIso) {
+      query = query.eq('saved_at', before.savedIso);
+    } else if (before.savedAt !== null) {
+      // Loaded by an older version of the app, which rounded the time to the millisecond.
+      query = query.gte('saved_at', new Date(before.savedAt).toISOString()).lt('saved_at', new Date(before.savedAt + 1).toISOString());
+    } else {
+      query = query.is('saved_at', null);
+    }
+  }
+  const { data, error } = await query.select(`${COLUMNS}, saved_at`);
   if (error) throw new Error(readable(error));
+  const saved = (data as ServerRow[] | null)?.[0];
+  if (!saved) throw await whyNotSaved(eventId, before, force);
 
-  const { row, savedAt } = splitRow(data as ServerRow);
+  const { row, savedAt: savedIso } = splitRow(saved);
   cacheOrgEvents([row], true);
-  // Edits made while saving stay unsaved; otherwise this device now matches the server.
-  if (readSyncState(eventId).updatedAt === version && savedAt) {
-    replaceEventConfig(eventId, config, Date.parse(savedAt));
+  if (!savedIso) return row;
+  const after = readSyncState(eventId);
+  if (after.updatedAt === before.updatedAt) {
+    // This device now matches the server; winners drawn while saving stay on top of it.
+    replaceEventConfig(eventId, config, savedIso, after.liveAt !== before.liveAt);
     urls.forEach((url, ref) => url && deleteAsset(ref));
+  } else {
+    // Edits made while saving stay unsaved, on top of the version just saved.
+    markSavedVersion(eventId, savedIso);
   }
   return row;
 }
 
-/** Loads a teammate's newer save into this device (organizers, by event id). */
-export async function pullEvent(eventId: string): Promise<boolean> {
-  const { data } = await createClient().from('a41_events').select(`${COLUMNS}, config, saved_at`).eq('id', eventId).maybeSingle();
+/**
+ * Loads a teammate's newer save onto this device (organizers, by event id). Unsaved edits on this device are kept
+ * (and the server copy skipped) unless discard is set. False when the event is not found.
+ */
+export async function pullEvent(eventId: string, { discard = false }: { discard?: boolean } = {}): Promise<boolean> {
+  const { data, error } = await createClient().from('a41_events').select(`${COLUMNS}, config, saved_at`).eq('id', eventId).maybeSingle();
+  if (error) throw new Error(error.message);
   if (!data) return false;
   const { row, config, savedAt } = splitRow(data as ServerRow);
-  applyServerCopy(row, config, savedAt);
+  applyServerCopy(row, config, savedAt, discard);
   return true;
 }
 

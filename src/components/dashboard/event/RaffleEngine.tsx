@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Copy, Download, ExternalLink, Gift, Plus, Trash2, Trophy, Tv, Palette, Settings2, Sparkles, Check, Users, X } from 'lucide-react';
-import { formatGuestNumber, guestPool, newDoorPrize, numberDigits, useEventConfig, useGuests, type DoorPrize } from '@/lib/eventStore';
+import { formatGuestNumber, guestPool, newDoorPrize, numberDigits, updateDrawWinners, useEventConfig, useGuests, type DoorPrize } from '@/lib/eventStore';
 import { AudiencePicker } from '@/components/raffle/AudiencePicker';
 import { SendButtons } from './SendButtons';
 import { DrawMachine, DRAW_STYLES } from '@/components/raffle/DrawMachine';
@@ -208,7 +208,7 @@ export function RaffleEngine({ eventId }: { eventId: string }) {
                       </span>
                       {winnerName(w.guestId) && <SendButtons eventId={eventId} kind="winner" guest={winnerName(w.guestId)!} prize={draw.prize || draw.name} size="sm" />}
                       <span className="font-mono text-zinc-500">{new Date(w.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      <button type="button" onClick={() => patch({ winners: draw.winners.filter((x) => x.id !== w.id) })} className="text-zinc-600 hover:text-premium-danger scale-on-click" aria-label="Remove winner"><X className="w-3.5 h-3.5" /></button>
+                      <button type="button" onClick={() => updateDrawWinners(eventId, draw.id, (ws) => ws.filter((x) => x.id !== w.id))} className="text-zinc-600 hover:text-premium-danger scale-on-click" aria-label="Remove winner"><X className="w-3.5 h-3.5" /></button>
                     </div>
                   ))}
                 </div>

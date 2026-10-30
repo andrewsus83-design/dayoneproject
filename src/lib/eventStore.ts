@@ -327,11 +327,21 @@ export interface EventConfig {
 }
 
 export type EventSection = keyof EventConfig;
+/** Day-of results (door prize and game winners, raffle draws) live in these sections next to the setup. */
+export type LiveSection = 'doorprizes' | 'games' | 'raffle';
 /**
  * updatedAt changes with every edit on this device. savedAt is when the server copy was saved (server time) and
- * savedVersion the updatedAt that copy matches, so any later edit shows up as unsaved.
+ * savedVersion the updatedAt that copy matches, so any later edit shows up as unsaved. savedIso is that server time
+ * exactly as the server sent it (microseconds), so a save only lands on top of the version this device has.
+ * liveAt is set when this device records day-of results the server does not have yet; they never count as unsaved.
  */
-type StoredConfig = { [K in EventSection]?: Partial<EventConfig[K]> } & { updatedAt?: number; savedAt?: number; savedVersion?: number };
+type StoredConfig = { [K in EventSection]?: Partial<EventConfig[K]> } & {
+  updatedAt?: number;
+  savedAt?: number;
+  savedIso?: string;
+  savedVersion?: number;
+  liveAt?: number;
+};
 
 export interface FormResponse {
   id: string;
@@ -508,16 +518,20 @@ export function drawExclusions(config: EventConfig) {
   return { numbers, guestIds };
 }
 
+/** Changes one door prize's winners as a day-of result (see updateLiveState). */
+export function updateDrawWinners(eventId: string, drawId: string, change: (winners: DrawWinner[]) => DrawWinner[]): WriteResult {
+  const items = readEventConfig(eventId).doorprizes.items;
+  return updateLiveState(eventId, 'doorprizes', { items: items.map((d) => (d.id === drawId ? { ...d, winners: change(d.winners) } : d)) });
+}
+
 export function recordDrawWinner(eventId: string, drawId: string, winner: { label: string; number?: number; guestId?: string }): WriteResult {
-  const current = readJSON<StoredConfig>(eventKey(eventId)) ?? {};
-  const base = getBaseEvent(eventId);
-  const items = (current.doorprizes?.items as DoorPrize[] | undefined) ?? buildDefaults(base).doorprizes.items;
-  const next = items.map((d) =>
-    d.id === drawId
-      ? { ...d, winners: [{ id: newId('w'), at: new Date().toISOString(), ...winner }, ...d.winners] }
-      : d,
-  );
-  return updateEventConfig(eventId, 'doorprizes', { items: next });
+  return updateDrawWinners(eventId, drawId, (winners) => [{ id: newId('w'), at: new Date().toISOString(), ...winner }, ...winners]);
+}
+
+/** Changes one game activity's winners as a day-of result (see updateLiveState). */
+export function updateGameWinners(eventId: string, activityId: string, change: (winners: GameWinner[]) => GameWinner[]): WriteResult {
+  const activities = readEventConfig(eventId).games.activities;
+  return updateLiveState(eventId, 'games', { activities: activities.map((a) => (a.id === activityId ? { ...a, winners: change(a.winners) } : a)) });
 }
 
 export function resolveDrawTotal(draw: DoorPrize, config: EventConfig, guestCount: number): number {
@@ -820,6 +834,45 @@ export function updateEventConfig<K extends EventSection>(
   return writeJSON(eventKey(eventId), next);
 }
 
+/**
+ * Records day-of results (who won a door prize or game, which raffle numbers are out). They are kept on this device
+ * through teammates' saves and go to the server with this device's next Save, but never mark the setup unsaved,
+ * so a big screen that draws winners keeps receiving the organizer's updates.
+ */
+export function updateLiveState<K extends LiveSection>(eventId: string, section: K, patch: Partial<EventConfig[K]>): WriteResult {
+  const current = readJSON<StoredConfig>(eventKey(eventId)) ?? {};
+  return writeJSON(eventKey(eventId), { ...current, [section]: { ...(current[section] ?? {}), ...patch }, liveAt: Date.now() });
+}
+
+/** This device's day-of results laid over a copy from the server, matched by door prize and activity id. */
+function withLiveState(config: Partial<EventConfig>, local: StoredConfig): Partial<EventConfig> {
+  const next = { ...config };
+  const draws = local.doorprizes?.items as DoorPrize[] | undefined;
+  if (draws) {
+    const winners = new Map(draws.map((d) => [d.id, d.winners]));
+    // The public copy has no door prizes at all; then this device's own list stays.
+    next.doorprizes = config.doorprizes?.items
+      ? { ...config.doorprizes, items: config.doorprizes.items.map((d) => ({ ...d, winners: winners.get(d.id) ?? d.winners })) }
+      : (local.doorprizes as DoorPrizesConfig);
+  }
+  const activities = local.games?.activities as Activity[] | undefined;
+  if (activities) {
+    const winners = new Map(activities.map((a) => [a.id, a.winners]));
+    next.games = config.games?.activities
+      ? { ...config.games, activities: config.games.activities.map((a) => ({ ...a, winners: winners.get(a.id) ?? a.winners })) }
+      : (local.games as GamesConfig);
+  }
+  if (local.raffle) {
+    const { drawnNumbers, drawnGuestIds } = local.raffle;
+    next.raffle = {
+      ...(config.raffle ?? local.raffle),
+      ...(drawnNumbers ? { drawnNumbers } : {}),
+      ...(drawnGuestIds ? { drawnGuestIds } : {}),
+    } as RaffleConfig;
+  }
+  return next;
+}
+
 export function resetEventSection(eventId: string, section: EventSection): WriteResult {
   const current = readJSON<StoredConfig>(eventKey(eventId)) ?? {};
   const next: StoredConfig = { ...current, updatedAt: Date.now() };
@@ -837,24 +890,63 @@ export interface SyncState {
   updatedAt: number | null;
   /** When the server copy was saved (server time), or null if never. */
   savedAt: number | null;
+  /** The same server time exactly as the server sent it; null if never saved, or loaded by an older version of the app. */
+  savedIso: string | null;
   /** This device has changes the server does not have yet. */
   unsaved: boolean;
+  /** When this device recorded day-of results (winners, draws) the server does not have yet. */
+  liveAt: number | null;
 }
 
 function syncState(stored: StoredConfig | null): SyncState {
   const updatedAt = stored?.updatedAt ?? null;
-  return { updatedAt, savedAt: stored?.savedAt ?? null, unsaved: updatedAt !== null && updatedAt !== stored?.savedVersion };
+  return {
+    updatedAt,
+    savedAt: stored?.savedAt ?? null,
+    savedIso: stored?.savedIso ?? null,
+    unsaved: updatedAt !== null && updatedAt !== stored?.savedVersion,
+    liveAt: stored?.liveAt ?? null,
+  };
 }
 
 export function readSyncState(eventId: string): SyncState {
   return syncState(readJSON<StoredConfig>(eventKey(eventId)));
 }
 
-/** Makes the server copy this device's copy (after saving, or when the server has a newer one). */
-export function replaceEventConfig(eventId: string, config: Partial<EventConfig> & Pick<EventConfig, 'info'>, savedAt: number): WriteResult {
+/** True when the server's saved_at is the version this device last saved or loaded. */
+export function isSavedVersion(state: SyncState, savedIso: string | null): boolean {
+  if (!savedIso) return state.savedAt === null;
+  return state.savedIso ? state.savedIso === savedIso : state.savedAt === Date.parse(savedIso);
+}
+
+/**
+ * Makes the server copy this device's copy (after saving, or when the server has a newer one).
+ * keepLive keeps this device's day-of results that the server copy does not have yet.
+ */
+export function replaceEventConfig(
+  eventId: string,
+  config: Partial<EventConfig> & Pick<EventConfig, 'info'>,
+  savedIso: string,
+  keepLive = false,
+): WriteResult {
+  const local = readJSON<StoredConfig>(eventKey(eventId));
+  const live = keepLive && local?.liveAt ? local : null;
   const version = Date.now();
   updateSlugIndex(eventId, config.info.slug);
-  return writeJSON(eventKey(eventId), { ...config, updatedAt: version, savedAt, savedVersion: version });
+  return writeJSON(eventKey(eventId), {
+    ...(live ? withLiveState(config, live) : config),
+    updatedAt: version,
+    savedAt: Date.parse(savedIso),
+    savedIso,
+    savedVersion: version,
+    ...(live ? { liveAt: live.liveAt } : {}),
+  });
+}
+
+/** Notes a save that landed while this device kept editing: its later edits stay unsaved, on top of that version. */
+export function markSavedVersion(eventId: string, savedIso: string): WriteResult {
+  const current = readJSON<StoredConfig>(eventKey(eventId)) ?? {};
+  return writeJSON(eventKey(eventId), { ...current, savedAt: Date.parse(savedIso), savedIso });
 }
 
 /** Remembers the organization's backend events on this device so every screen can open them by id or link. */

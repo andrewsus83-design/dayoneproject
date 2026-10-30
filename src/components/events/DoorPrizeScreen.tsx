@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, EyeOff, Play, RefreshCw, Settings2, Trophy } from 'lucide-react';
-import { guestPool, updateEventConfig, useEventConfigBySlug, useGuests } from '@/lib/eventStore';
+import { guestPool, updateDrawWinners, useEventConfigBySlug, useGuests } from '@/lib/eventStore';
 import { DrawMachine, DRAW_STYLES } from '@/components/raffle/DrawMachine';
 import { SlotSettings } from '@/components/raffle/SlotSettings';
 import { StageFrameShell } from '@/components/stage/StageFrameShell';
@@ -150,7 +150,7 @@ export function DoorPrizeScreen({ slug, initialId }: { slug: string; initialId?:
               {draw.winners.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => { if (confirm(`Clear the winners of “${draw.name}”?`)) updateEventConfig(eventId, 'doorprizes', { items: items.map((d) => (d.id === draw.id ? { ...d, winners: [] } : d)) }); }}
+                  onClick={() => { if (confirm(`Clear the winners of “${draw.name}”?`)) updateDrawWinners(eventId, draw.id, () => []); }}
                   className="mt-3 text-[11px] font-bold text-zinc-500 hover:text-white"
                 >
                   Reset winners

@@ -7,7 +7,7 @@ import {
   AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowUp, Check, Copy, Download, ExternalLink, Gamepad2, MapPin, Palette, Plus, Search, Trash2, Trophy, Tv, Upload, Users, X,
 } from 'lucide-react';
 import {
-  formatGuestNumber, guestPool, newActivity, newClue, newId, newQuizItem, numberDigits, QUIZ_STEP_SECONDS, quizPointLadder, useEventConfig, useGuests,
+  formatGuestNumber, guestPool, newActivity, newClue, newId, newQuizItem, numberDigits, QUIZ_STEP_SECONDS, quizPointLadder, updateGameWinners, useEventConfig, useGuests,
   type Activity, type ClueItem, type NameAlign, type QuizItem,
 } from '@/lib/eventStore';
 import { AudiencePicker } from '@/components/raffle/AudiencePicker';
@@ -200,7 +200,7 @@ function GameWinners({ eventId, activity, onChange }: { eventId: string; activit
                 <span className="font-mono font-bold text-premium-gold">{formatGuestNumber(g.guest_number, digits)}</span>
                 <span className="flex-1 min-w-[120px] font-bold text-white truncate">{g.name}</span>
                 <SendButtons eventId={eventId} kind="winner" guest={g} prize={prize} size="sm" />
-                <button type="button" onClick={() => onChange({ winners: activity.winners.filter((x) => x.id !== w.id) })} className="text-zinc-600 hover:text-premium-danger scale-on-click" aria-label="Remove winner">
+                <button type="button" onClick={() => updateGameWinners(eventId, activity.id, (ws) => ws.filter((x) => x.id !== w.id))} className="text-zinc-600 hover:text-premium-danger scale-on-click" aria-label="Remove winner">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -221,7 +221,7 @@ function GameWinners({ eventId, activity, onChange }: { eventId: string; activit
             <button
               key={g.id}
               type="button"
-              onClick={() => onChange({ winners: [...activity.winners, { id: newId('gw'), guestId: g.id, at: new Date().toISOString() }] })}
+              onClick={() => updateGameWinners(eventId, activity.id, (ws) => [...ws, { id: newId('gw'), guestId: g.id, at: new Date().toISOString() }])}
               className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-xs hover:bg-premium-surfaceDark scale-on-click"
             >
               <span className="font-mono font-bold text-premium-gold w-12">{formatGuestNumber(g.guest_number, digits)}</span>
