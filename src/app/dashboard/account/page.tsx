@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Check, Loader2, ShieldCheck, Smartphone, UserCircle } from 'lucide-react';
 import { useSessionUser } from '@/lib/useSession';
+import { createClient } from '@/lib/supabase/client';
 import { appRole, displayName, isPlatformAdmin, ROLE_LABELS } from '@/lib/auth';
 import { authApi } from '@/lib/authApi';
 import { AuthenticatorQr } from '@/components/auth/AuthenticatorQr';
@@ -11,6 +12,8 @@ export default function AccountPage() {
   const { user } = useSessionUser();
   const owner = isPlatformAdmin(user);
   const role = appRole(user);
+  // The authenticator can only be changed from a session that was opened with it (the database decides).
+  const [verified, setVerified] = useState<boolean | null>(null);
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [enroll, setEnroll] = useState<{ secret: string; uri: string } | null>(null);
   const [code, setCode] = useState('');
@@ -20,7 +23,16 @@ export default function AccountPage() {
 
   useEffect(() => {
     if (!owner) return;
-    authApi.authenticatorStatus().then((r) => setEnabled(r.enabled)).catch(() => setEnabled(null));
+    let alive = true;
+    createClient().rpc('a41_whoami').then(({ data }) => {
+      if (!alive) return;
+      const isAdmin = !!(data as { isAdmin?: boolean } | null)?.isAdmin;
+      setVerified(isAdmin);
+      if (isAdmin) authApi.authenticatorStatus().then((r) => alive && setEnabled(r.enabled)).catch(() => alive && setEnabled(null));
+    });
+    return () => {
+      alive = false;
+    };
   }, [owner]);
 
   const start = async () => {
@@ -73,7 +85,14 @@ export default function AccountPage() {
         </p>
       </div>
 
-      {owner && (
+      {owner && verified === false && (
+        <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-2 text-sm text-zinc-300">
+          <h2 className="font-display font-bold text-white text-lg flex items-center gap-2"><Smartphone className="w-4 h-4 text-premium-gold" /> Authenticator app</h2>
+          <p>To change your authenticator, sign out and sign in again on the Platform admin tab with your current authenticator code.</p>
+        </div>
+      )}
+
+      {owner && verified && (
         <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-4">
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-display font-bold text-white text-lg flex items-center gap-2"><Smartphone className="w-4 h-4 text-premium-gold" /> Authenticator app</h2>

@@ -3,17 +3,26 @@
 //
 // - email-code:   organizers/admins get a 6-digit code by email (sent with Resend, not Supabase SMTP).
 // - totp-login:   platform admins sign in with email + authenticator code.
-// - totp-setup / totp-confirm / totp-status: a signed-in platform admin manages their authenticator.
+// - totp-setup / totp-confirm / totp-status: a platform admin signed in with their authenticator manages it.
 // - totp-bootstrap-start / -finish: first authenticator for a platform admin, proven by the one-time
 //   setup code stored in Supabase Vault as `a41auth_setup_code` (only the project owner can read it).
-// Sessions are minted with auth.admin.generateLink; the browser finishes with auth.verifyOtp.
+// Authenticator sign-ins open the session here (generateLink + verifyOtp) and record its id in
+// a41_private.admin_sessions: only those sessions carry platform-admin rights. The browser gets the tokens.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
+// The app, local dev, and this project's own Vercel preview deployments.
 const ALLOWED_ORIGINS = ['https://app.dayoneproject.xyz', 'http://localhost:3042', 'http://localhost:3000'];
+const PREVIEW_ORIGIN = /^https:\/\/all41-u356-[a-z0-9-]+-andrewsus83-5642s-projects\.vercel\.app$/;
 const ISSUER = 'dayoneproject.xyz';
 
+// 10 wrong authenticator or setup codes for one email within a day lock that email out for 24 hours.
+const MAX_CODE_FAILURES = 10;
+const DAY_SECONDS = 86_400;
+const LOCKED = 'Too many wrong codes. Sign-in for this email is locked for 24 hours.';
+const CODE_SENT = 'If this email has an organizer account, a code is on its way.';
+
 function corsHeaders(origin: string | null) {
-  const allowed = origin && (ALLOWED_ORIGINS.includes(origin) || /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin));
+  const allowed = origin && (ALLOWED_ORIGINS.includes(origin) || PREVIEW_ORIGIN.test(origin));
   return {
     'Access-Control-Allow-Origin': allowed ? origin! : ALLOWED_ORIGINS[0],
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -76,6 +85,17 @@ async function matchTotp(secret: string, code: string): Promise<number | null> {
   return null;
 }
 
+/** The claims inside a JWT (not verified: the token comes straight from Supabase Auth in this function). */
+function jwtClaims(token: string): Record<string, unknown> | null {
+  try {
+    const part = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = part + '='.repeat((4 - (part.length % 4)) % 4);
+    return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(padded), (c) => c.charCodeAt(0))));
+  } catch {
+    return null;
+  }
+}
+
 function emailHtml(code: string) {
   return `<!doctype html><html><body style="margin:0;background:#09090B;font-family:Manrope,Arial,sans-serif;color:#FAFAFA">
 <div style="max-width:440px;margin:0 auto;padding:40px 24px;text-align:center">
@@ -83,7 +103,7 @@ function emailHtml(code: string) {
 <h1 style="font-size:22px;margin:24px 0 8px">Your sign-in code</h1>
 <p style="color:#A1A1AA;font-size:14px;margin:0 0 24px">Enter this code on dayoneproject.xyz to sign in.</p>
 <div style="font-family:monospace;font-size:34px;letter-spacing:10px;font-weight:700;color:#C5A059;background:#18181B;border:1px solid #27272A;border-radius:16px;padding:18px 0">${code}</div>
-<p style="color:#71717A;font-size:12px;margin:24px 0 0">The code expires in 1 hour. If you didn't ask for it, you can ignore this email.</p>
+<p style="color:#71717A;font-size:12px;margin:24px 0 0">The code works once and expires shortly. If you didn't ask for it, you can ignore this email.</p>
 </div></body></html>`;
 }
 
@@ -97,29 +117,60 @@ Deno.serve(async (req) => {
   const url = Deno.env.get('SUPABASE_URL')!;
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
   const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false, autoRefreshToken: false } });
-  const ip = (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || 'unknown';
+  // The gateway sets x-real-ip / cf-connecting-ip; the first X-Forwarded-For entry is whatever the caller sent.
+  const ip =
+    req.headers.get('x-real-ip')?.trim() ||
+    req.headers.get('cf-connecting-ip')?.trim() ||
+    (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() ||
+    'unknown';
 
   const hit = async (key: string, max: number, windowSeconds: number) => {
     const { data } = await admin.rpc('a41_svc_hit', { p_key: key, p_max: max, p_window_seconds: windowSeconds });
     return data === true;
+  };
+  /** Authenticator lockout, counted per email whether or not the email has an account. */
+  const lockedOut = async (email: string) =>
+    ((await admin.rpc('a41_svc_attempts', { p_key: `code-lock:${email}`, p_window_seconds: DAY_SECONDS })).data ?? 0) > 0;
+  const codeFailed = async (email: string) => {
+    if (!(await hit(`code-fail:${email}`, MAX_CODE_FAILURES - 1, DAY_SECONDS))) await hit(`code-lock:${email}`, 1, DAY_SECONDS);
   };
   const secret = async (name: string) => (await admin.rpc('a41_svc_secret', { p_name: name })).data as string | null;
   const findUser = async (email: string) => {
     const { data } = await admin.rpc('a41_svc_user', { p_email: email });
     return (data?.[0] ?? null) as { id: string; email: string; role: string | null; banned: boolean; is_platform_admin: boolean } | null;
   };
-  /** The signed-in caller (for authenticator setup). */
+  /** The signed-in caller, only when the database sees a platform admin (an authenticator session once H1 is on). */
   const caller = async () => {
-    const asCaller = createClient(url, anonKey, { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } });
-    const { data } = await asCaller.auth.getUser();
-    if (!data.user?.email) return null;
-    const u = await findUser(data.user.email);
-    return u && u.is_platform_admin && !u.banned ? u : null;
+    const asCaller = createClient(url, anonKey, {
+      global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: me, error } = await asCaller.rpc('a41_whoami');
+    if (error || !me?.isAdmin || !me.email) return null;
+    const u = await findUser(me.email);
+    return u && u.id === me.id && !u.banned ? u : null;
   };
   const tokenHashFor = async (email: string) => {
     const { data, error } = await admin.auth.admin.generateLink({ type: 'magiclink', email });
     if (error || !data.properties) throw new Error('Could not start the session.');
     return data.properties;
+  };
+  /** Opens the platform admin's session after their authenticator code passed, and records it as such. */
+  const openAdminSession = async (user: { id: string; email: string }) => {
+    const props = await tokenHashFor(user.email);
+    const fresh = createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+    const { data, error } = await fresh.auth.verifyOtp({ token_hash: props.hashed_token, type: 'magiclink' });
+    const session = data.session;
+    if (error || !session || data.user?.id !== user.id) throw new Error('Could not start the session.');
+    const sessionId = jwtClaims(session.access_token)?.session_id;
+    const { error: bindError } = typeof sessionId === 'string'
+      ? await admin.rpc('a41_svc_bind_admin_session', { p_session: sessionId, p_user: user.id })
+      : { error: new Error('The session has no id.') };
+    if (bindError) {
+      await admin.auth.admin.signOut(session.access_token, 'local').catch(() => {});
+      throw new Error('Could not start the session.');
+    }
+    return { accessToken: session.access_token, refreshToken: session.refresh_token };
   };
 
   try {
@@ -128,15 +179,19 @@ Deno.serve(async (req) => {
 
     switch (body.action) {
       case 'email-code': {
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'Enter a valid email address.' }, 400);
         if (!(await hit(`ip:${ip}`, 30, 900)) || !(await hit(`email-code:${email}`, 5, 900))) {
           return json({ error: 'Too many codes requested. Wait 15 minutes and try again.' }, 429);
         }
-        const user = await findUser(email);
-        if (!user || user.banned || !(user.role === 'organizer' || user.role === 'admin' || user.is_platform_admin)) {
-          return json({ error: 'No organizer account uses this email. Ask your admin to add you.' }, 404);
-        }
         const resendKey = await secret('a41_RESEND_API_KEY');
         if (!resendKey) return json({ error: 'Email sign-in is not set up yet: add RESEND_API_KEY in Admin > API keys.' }, 503);
+        const user = await findUser(email);
+        const organizer = !!user && !user.banned && (user.role === 'organizer' || user.role === 'admin');
+        if (user && !user.banned && user.is_platform_admin && !organizer) {
+          return json({ error: 'This account signs in on the Platform admin tab with its authenticator.' }, 403);
+        }
+        // The same answer whether or not the email has an account, so this form can't be used to find accounts.
+        if (!user || !organizer) return json({ ok: true, message: CODE_SENT });
         const from = (await secret('a41_RESEND_FROM')) || 'dayoneproject.xyz <login@dayoneproject.xyz>';
 
         const props = await tokenHashFor(user.email);
@@ -149,14 +204,14 @@ Deno.serve(async (req) => {
             to: [user.email],
             subject: `${code} is your dayoneproject.xyz sign-in code`,
             html: emailHtml(code),
-            text: `Your dayoneproject.xyz sign-in code is ${code}. It expires in 1 hour.`,
+            text: `Your dayoneproject.xyz sign-in code is ${code}. It works once and expires shortly.`,
           }),
         });
         if (!res.ok) {
           const detail = await res.json().catch(() => ({}));
           return json({ error: `The email could not be sent: ${detail?.message ?? res.statusText}` }, 502);
         }
-        return json({ ok: true });
+        return json({ ok: true, message: CODE_SENT });
       }
 
       case 'totp-login': {
@@ -164,15 +219,21 @@ Deno.serve(async (req) => {
         if (!(await hit(`ip:${ip}`, 30, 900)) || !(await hit(`totp:${email}`, 6, 900))) {
           return json({ error: 'Too many tries. Wait 15 minutes and try again.' }, 429);
         }
+        if (await lockedOut(email)) return json({ error: LOCKED }, 429);
         const user = await findUser(email);
-        if (!user || user.banned || !user.is_platform_admin) return json({ error: 'Wrong email or code.' }, 401);
+        if (!user || user.banned || !user.is_platform_admin) {
+          await codeFailed(email);
+          return json({ error: 'Wrong email or code.' }, 401);
+        }
         const key = await secret(`a41auth_totp_${user.id}`);
         if (!key) return json({ error: 'No authenticator is set up for this account yet.' }, 409);
         const step = await matchTotp(key, code);
         // Each code works once.
-        if (step === null || !(await hit(`totp-used:${user.id}:${step}`, 1, 120))) return json({ error: 'Wrong email or code.' }, 401);
-        const props = await tokenHashFor(user.email);
-        return json({ tokenHash: props.hashed_token });
+        if (step === null || !(await hit(`totp-used:${user.id}:${step}`, 1, 120))) {
+          await codeFailed(email);
+          return json({ error: 'Wrong email or code.' }, 401);
+        }
+        return json(await openAdminSession(user));
       }
 
       case 'totp-bootstrap-start':
@@ -181,9 +242,11 @@ Deno.serve(async (req) => {
         if (!(await hit(`ip:${ip}`, 30, 900)) || !(await hit(`bootstrap:${email}`, 8, 900))) {
           return json({ error: 'Too many tries. Wait 15 minutes and try again.' }, 429);
         }
+        if (await lockedOut(email)) return json({ error: LOCKED }, 429);
         const user = await findUser(email);
         const expected = (await secret('a41auth_setup_code'))?.trim().toUpperCase();
         if (!user || user.banned || !user.is_platform_admin || !expected || setupCode !== expected) {
+          await codeFailed(email);
           return json({ error: 'Wrong email or setup code.' }, 401);
         }
         if (await secret(`a41auth_totp_${user.id}`)) return json({ error: 'An authenticator is already set up. Sign in with it.' }, 409);
@@ -199,13 +262,15 @@ Deno.serve(async (req) => {
 
         const pending = await secret(`a41auth_totp_pending_${user.id}`);
         const step = pending ? await matchTotp(pending, String(body.code ?? '').trim()) : null;
-        if (!pending || step === null) return json({ error: 'That code does not match. Check the time on your phone and try again.' }, 400);
+        if (!pending || step === null) {
+          await codeFailed(email);
+          return json({ error: 'That code does not match. Check the time on your phone and try again.' }, 400);
+        }
         await hit(`totp-used:${user.id}:${step}`, 1, 120);
         await admin.rpc('a41_svc_set_secret', { p_name: `a41auth_totp_${user.id}`, p_value: pending });
         await admin.rpc('a41_svc_delete_secret', { p_name: `a41auth_totp_pending_${user.id}` });
         await admin.rpc('a41_svc_delete_secret', { p_name: 'a41auth_setup_code' });
-        const props = await tokenHashFor(user.email);
-        return json({ tokenHash: props.hashed_token });
+        return json(await openAdminSession(user));
       }
 
       case 'totp-status': {

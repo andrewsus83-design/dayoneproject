@@ -5,24 +5,23 @@
 // - Admin organizer: membership role 'owner' (runs the organization's events), signs in with an emailed code.
 // - Register desk:   membership role 'staff' (check-in only), signs in with email + an access code.
 // Every owner-member can see the team; only the creator can change it.
+// Logins are shared with other products, so an existing account is only linked when it is already an
+// event-platform organizer, or has no role and no password; anything else gets one generic refusal.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
+// The app, local dev, and this project's own Vercel preview deployments.
 const ALLOWED_ORIGINS = ['https://app.dayoneproject.xyz', 'http://localhost:3042', 'http://localhost:3000'];
+const PREVIEW_ORIGIN = /^https:\/\/all41-u356-[a-z0-9-]+-andrewsus83-5642s-projects\.vercel\.app$/;
+const USE_ANOTHER_EMAIL = 'Use a different email for this person.';
 
 function corsHeaders(origin: string | null) {
-  const allowed = origin && (ALLOWED_ORIGINS.includes(origin) || /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin));
+  const allowed = origin && (ALLOWED_ORIGINS.includes(origin) || PREVIEW_ORIGIN.test(origin));
   return {
     'Access-Control-Allow-Origin': allowed ? origin! : ALLOWED_ORIGINS[0],
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     Vary: 'Origin',
   };
-}
-
-function randomSecret() {
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 type Member = {
@@ -96,32 +95,36 @@ Deno.serve(async (req) => {
         const code = String(body.code ?? '');
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'Enter a valid email address.' }, 400);
         if ((await members()).some((m) => m.email.toLowerCase() === email)) return json({ error: 'This person is already on your team.' }, 409);
+        if (desk && code.length < 8) return json({ error: 'The access code needs at least 8 characters.' }, 400);
 
         const { data: found } = await admin.rpc('a41_svc_user', { p_email: email });
         const existing = found?.[0] as { id: string; role: string | null } | undefined;
         let userId: string;
 
-        if (desk) {
+        if (existing) {
           // The access code is the account password, so desk accounts must be new and only for this desk.
-          if (existing) return json({ error: 'This email already has an account. Use a separate email for the register desk.' }, 409);
-          if (code.length < 8) return json({ error: 'The access code needs at least 8 characters.' }, 400);
+          if (desk) return json({ error: USE_ANOTHER_EMAIL }, 409);
+          // Already an organizer here, or an account with no role and no password (nothing another app relies on).
+          const organizer = existing.role === 'organizer' || existing.role === 'admin';
+          const { data: hasPassword } = await admin.rpc('a41_svc_user_has_password', { p_user: existing.id });
+          if (!organizer && (existing.role !== null || hasPassword !== false)) return json({ error: USE_ANOTHER_EMAIL }, 409);
+          const { data: full } = await admin.auth.admin.getUserById(existing.id);
+          const { error } = await admin.auth.admin.updateUserById(existing.id, {
+            app_metadata: { ...(full.user?.app_metadata ?? {}), a41_role: existing.role ?? 'organizer' },
+            user_metadata: name ? { ...(full.user?.user_metadata ?? {}), name } : full.user?.user_metadata,
+          });
+          if (error) return json({ error: USE_ANOTHER_EMAIL }, 409);
+          userId = existing.id;
+        } else if (desk) {
           const { data, error } = await admin.auth.admin.createUser({
             email, password: code, email_confirm: true, user_metadata: { name }, app_metadata: { a41_role: 'desk' },
           });
           if (error) return json({ error: error.message }, 400);
           userId = data.user.id;
-        } else if (existing) {
-          if (existing.role === 'desk') return json({ error: 'This email is a register desk account. Use another email.' }, 409);
-          const { data: full } = await admin.auth.admin.getUserById(existing.id);
-          await admin.auth.admin.updateUserById(existing.id, {
-            app_metadata: { ...(full.user?.app_metadata ?? {}), a41_role: existing.role ?? 'organizer' },
-            user_metadata: name ? { ...(full.user?.user_metadata ?? {}), name } : full.user?.user_metadata,
-          });
-          userId = existing.id;
         } else {
-          // Admin organizers sign in with an emailed code; the password is random and never shown.
+          // Admin organizers sign in with an emailed code, so the account gets no password at all.
           const { data, error } = await admin.auth.admin.createUser({
-            email, password: randomSecret(), email_confirm: true, user_metadata: { name }, app_metadata: { a41_role: 'organizer' },
+            email, email_confirm: true, user_metadata: { name }, app_metadata: { a41_role: 'organizer' },
           });
           if (error) return json({ error: error.message }, 400);
           userId = data.user.id;
@@ -129,6 +132,7 @@ Deno.serve(async (req) => {
 
         const { error: memberError } = await admin.from('a41_memberships').insert({ org_id: orgId, user_id: userId, role: desk ? 'staff' : 'owner' });
         if (memberError) return json({ error: memberError.message }, 400);
+        // The same answer for new and linked accounts.
         return json({ ok: true });
       }
 
@@ -141,6 +145,16 @@ Deno.serve(async (req) => {
         // Desk accounts exist only for this team, so switch them off too.
         if (target.membership_role === 'staff' && target.app_role === 'desk') {
           await admin.auth.admin.updateUserById(id, { ban_duration: '876000h' });
+        }
+        // Someone on no team any more keeps their login (it may serve another app) but loses event-platform access.
+        // Platform admins keep theirs.
+        const { count } = await admin.from('a41_memberships').select('org_id', { count: 'exact', head: true }).eq('user_id', id);
+        const { data: found } = await admin.rpc('a41_svc_user', { p_email: target.email });
+        const platformAdmin = !!(found?.[0] as { is_platform_admin?: boolean } | undefined)?.is_platform_admin;
+        if (count === 0 && target.app_role && !platformAdmin) {
+          const { data: full } = await admin.auth.admin.getUserById(id);
+          // Auth merges app_metadata on update, so the role is removed by sending it as null.
+          await admin.auth.admin.updateUserById(id, { app_metadata: { ...(full.user?.app_metadata ?? {}), a41_role: null } });
         }
         return json({ ok: true });
       }

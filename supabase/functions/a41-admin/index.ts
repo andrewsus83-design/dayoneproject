@@ -4,24 +4,20 @@
 // Deployed to Supabase project dayoneproject (pmuryumfyekjwqntcypo) as `a41-admin` with verify_jwt on.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
+// The app, local dev, and this project's own Vercel preview deployments.
 const ALLOWED_ORIGINS = ['https://app.dayoneproject.xyz', 'http://localhost:3042', 'http://localhost:3000'];
+const PREVIEW_ORIGIN = /^https:\/\/all41-u356-[a-z0-9-]+-andrewsus83-5642s-projects\.vercel\.app$/;
 // organizer/admin sign in with an emailed code; desk staff with email + a generated access code (their password).
 const ROLES = ['organizer', 'admin', 'desk'];
 
 function corsHeaders(origin: string | null) {
-  const allowed = origin && (ALLOWED_ORIGINS.includes(origin) || /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin));
+  const allowed = origin && (ALLOWED_ORIGINS.includes(origin) || PREVIEW_ORIGIN.test(origin));
   return {
     'Access-Control-Allow-Origin': allowed ? origin! : ALLOWED_ORIGINS[0],
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     Vary: 'Origin',
   };
-}
-
-function randomSecret() {
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 type AnyUser = {
@@ -108,8 +104,9 @@ Deno.serve(async (req) => {
         if (role === 'desk' && password.length < 8) return json({ error: 'The access code needs at least 8 characters.' }, 400);
         const { data, error } = await admin.auth.admin.createUser({
           email,
-          // Organizers and admins never use a password: give them an unguessable one nobody sees.
-          password: role === 'desk' ? password : randomSecret(),
+          // Organizers and admins sign in with emailed codes and get no password at all
+          // (a41-team only links existing accounts that have none).
+          ...(role === 'desk' ? { password } : {}),
           email_confirm: true,
           user_metadata: { name },
           app_metadata: { a41_role: role },
@@ -125,8 +122,9 @@ Deno.serve(async (req) => {
         const u = found.user as AnyUser;
         const patch: Record<string, unknown> = {};
         if (body.role !== undefined) {
-          const app = { ...(u.app_metadata ?? {}) };
-          if (body.role === null) delete app.a41_role;
+          const app: Record<string, unknown> = { ...(u.app_metadata ?? {}) };
+          // Auth merges app_metadata on update, so a key is removed by sending it as null (deleting it kept the role).
+          if (body.role === null) app.a41_role = null;
           else if (body.role === 'desk' && app.a41_role !== 'desk') {
             return json({ error: 'Register desk accounts are created as new accounts with their own email.' }, 400);
           } else if (ROLES.includes(body.role)) app.a41_role = body.role;

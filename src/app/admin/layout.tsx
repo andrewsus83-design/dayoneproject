@@ -10,11 +10,12 @@ export const metadata = {
 };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  // Second lock behind the proxy: only platform admins render anything here.
+  // Second lock behind the proxy: only platform admins (signed in with the authenticator) render anything here.
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login?next=/admin');
-  if (!isPlatformAdmin(user)) redirect('/dashboard');
+  const { data: me } = await supabase.rpc('a41_whoami');
+  if (!me?.isAdmin) redirect(isPlatformAdmin(user) ? '/login?as=owner&error=authenticator&next=/admin' : '/dashboard');
 
   return (
     <div className="flex min-h-screen bg-premium-black text-zinc-100 font-sans">
