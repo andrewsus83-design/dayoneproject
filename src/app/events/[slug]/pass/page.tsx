@@ -503,7 +503,7 @@ function GuestAppContent({ slug }: { slug: string }) {
 
         {/* Bottom navigation */}
         <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[420px] z-30 pb-[env(safe-area-inset-bottom)]">
-          <div className="mx-4 mb-5 glass-panel rounded-[2rem] px-2 py-2 flex items-center justify-around shadow-2xl border border-zinc-700/80">
+          <div className="mx-3 mb-4 glass-panel rounded-[2rem] px-1 py-1.5 flex items-center shadow-2xl border border-zinc-700/80">
             {NAV.map(({ id, icon: Icon, label, central, locked }) => {
               const active = shown === id;
               if (central) {
@@ -512,7 +512,7 @@ function GuestAppContent({ slug }: { slug: string }) {
                     key={id}
                     type="button"
                     onClick={() => setTab(id)}
-                    className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl scale-on-click transition-all ${active ? 'bg-premium-gold/20' : ''}`}
+                    className={`flex-1 min-w-0 flex flex-col items-center gap-0.5 px-1 py-1 rounded-2xl scale-on-click transition-all ${active ? 'bg-premium-gold/20' : ''}`}
                     aria-current={active ? 'page' : undefined}
                   >
                     <div className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${active ? 'bg-premium-gold text-black shadow-gold' : 'bg-premium-charcoal text-premium-gold border border-premium-gold/30'}`}>
@@ -527,7 +527,7 @@ function GuestAppContent({ slug }: { slug: string }) {
                   key={id}
                   type="button"
                   onClick={() => setTab(id)}
-                  className="relative flex flex-col items-center gap-0.5 px-3 py-2 rounded-2xl scale-on-click transition-all"
+                  className="relative flex-1 min-w-0 flex flex-col items-center gap-0.5 px-1 py-2 rounded-2xl scale-on-click transition-all"
                   aria-current={active ? 'page' : undefined}
                 >
                   <span className="relative">
