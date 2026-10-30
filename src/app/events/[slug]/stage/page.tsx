@@ -4,20 +4,8 @@ import { useEventConfigBySlug, useGuests } from '@/lib/eventStore';
 import { type SlotResult } from '@/components/raffle/SlotMachine';
 import { DrawMachine, DRAW_STYLES } from '@/components/raffle/DrawMachine';
 import React, { useState, useEffect, use, Suspense } from 'react';
-import {
-  MOCK_EVENT,
-  MOCK_WEDDING_EVENT,
-  MOCK_CORPORATE_NEXUS_EVENT,
-  MOCK_WEDDING_BALI_EVENT,
-  MOCK_POPVERSE_EVENT,
-  MOCK_PHOTO_WALL_UPLOADS,
-  MOCK_GUESTS,
-  MOCK_RAFFLES,
-  MOCK_RUNDOWN,
-  MOCK_MENU,
-  DEFAULT_STAGE_CONFIG,
-} from '@/lib/mockData';
-import { PhotoWallUpload, Guest, StageModuleId, StageConfig } from '@/lib/types';
+import { DEFAULT_STAGE_CONFIG } from '@/lib/mockData';
+import { PhotoWallUpload, StageModuleId } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
 import { getClientDomain } from '@/lib/domain';
 import { PinterestMasonryPhotoWall } from '@/components/events/PinterestMasonryPhotoWall';
@@ -26,140 +14,57 @@ import {
   Minimize2,
   Camera,
   Gamepad2,
-  Gift,
   Sparkles,
-  QrCode,
-  Users,
-  Trophy,
-  Crown,
-  Clock,
-  CheckCircle2,
-  UtensilsCrossed,
-  Tv,
-  Building,
   RotateCcw,
-  Volume2,
 } from 'lucide-react';
 import QRCode from 'qrcode';
-import confetti from 'canvas-confetti';
+
+// The rundown, menu and sponsor slides have no content to show yet, so they stay off the stage
+// instead of showing sample data.
+const MODULES_WITHOUT_CONTENT: StageModuleId[] = ['rundown', 'menu', 'sponsors'];
+const enabledModules = DEFAULT_STAGE_CONFIG.modules.filter((m) => m.isEnabled && !MODULES_WITHOUT_CONTENT.includes(m.id));
+const KEY_MODULES: Record<string, StageModuleId> = { '1': 'welcome', '2': 'photowall', '3': 'quiz', '4': 'raffle' };
 
 function StageBigScreenContent({ slug }: { slug: string }) {
   const { eventId, event, config } = useEventConfigBySlug(slug);
   const clientDomain = getClientDomain(slug);
   const stageGuests = useGuests(eventId);
-  const stageEligible = stageGuests.filter((g) => g.is_checked_in);
-  const [stageDrawId, setStageDrawId] = useState<string | null>(null);
-  const stageDraw = config.doorprizes.items.find((d) => d.id === (stageDrawId ?? config.doorprizes.activeId)) ?? config.doorprizes.items[0];
+  const checkedInCount = stageGuests.filter((g) => g.is_checked_in).length;
+  const stageDraw = config.doorprizes.items.find((d) => d.id === config.doorprizes.activeId) ?? config.doorprizes.items[0];
+  const activity = config.games.activities.find((a) => a.id === config.games.activeId) ?? config.games.activities[0];
   const [slotTrigger, setSlotTrigger] = useState(0);
   const [slotResult, setSlotResult] = useState<SlotResult | null>(null);
   const captionsEnabled = event.settings?.enablePhotoWallCaptions ?? true;
 
-  const [stageConfig, setStageConfig] = useState<StageConfig>(DEFAULT_STAGE_CONFIG);
+  const tickerText = `★ Welcome to ${event.name} • Share your photos at ${clientDomain}/photowall ★`;
+
   const [currentModuleIndex, setCurrentModuleIndex] = useState(0);
   const [stageMode, setStageMode] = useState<StageModuleId>('welcome');
   const [isAutoRotating, setIsAutoRotating] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hudVisible, setHudVisible] = useState(false);
 
-  // Photo Wall State
-  const [photos, setPhotos] = useState<PhotoWallUpload[]>(MOCK_PHOTO_WALL_UPLOADS);
+  // Approved guest photos; stays empty until the photo wall feeds the stage.
+  const [photos] = useState<PhotoWallUpload[]>([]);
   const [qrUploadUrl, setQrUploadUrl] = useState('');
 
-  // Quiz Big Screen State
-  const [quizTimer, setQuizTimer] = useState(15);
-
-  // Raffle Big Screen State
   const [isRaffleSpinning, setIsRaffleSpinning] = useState(false);
-  const [raffleWinner, setRaffleWinner] = useState<Guest | null>(null);
-  const [wheelRotation, setWheelRotation] = useState(0);
-  const [activeRafflePrize, setActiveRafflePrize] = useState('Apple MacBook Pro M4 Max (16-inch)');
-  const [activeRaffleStyle, setActiveRaffleStyle] = useState<'wheel' | 'claw' | 'slot'>('slot');
-  const [activeQuizQuestion, setActiveQuizQuestion] = useState({
-    id: 1,
-    question: 'In which year was the first startup unicorn born in Southeast Asia?',
-    options: ['A. 2009', 'B. 2012', 'C. 2014', 'D. 2016'],
-    correct: 'B. 2012',
-    points: 1000,
-    timerSeconds: 15,
-  });
-  const [quizGameStep, setQuizGameStep] = useState<'question_active' | 'answers_locked' | 'reveal' | 'podium'>('question_active');
-  const [liveCheckedInCount, setLiveCheckedInCount] = useState(418);
 
-  // Filter only enabled modules
-  const enabledModules = stageConfig.modules.filter((m) => m.isEnabled);
-
-  // Real-time synchronization with Frontend Operator (/dashboard/events/[id]/operator)
-  useEffect(() => {
-    const loadSavedState = () => {
-      try {
-        const raw = localStorage.getItem('all41_live_stage_state');
-        if (!raw) return;
-        const parsed = JSON.parse(raw);
-        if (parsed.activeModule) setStageMode(parsed.activeModule);
-        if (typeof parsed.isAutoRotating === 'boolean') setIsAutoRotating(parsed.isAutoRotating);
-        if (parsed.stageConfig) setStageConfig(parsed.stageConfig);
-        if (parsed.approvedPhotos) setPhotos(parsed.approvedPhotos);
-        if (parsed.rafflePrize) setActiveRafflePrize(parsed.rafflePrize);
-        if (parsed.raffleStyle) setActiveRaffleStyle(parsed.raffleStyle);
-        if (parsed.quizQuestion) {
-          setActiveQuizQuestion(parsed.quizQuestion);
-          setQuizTimer(parsed.quizQuestion.timerSeconds || 15);
-        }
-        if (parsed.gameStep) setQuizGameStep(parsed.gameStep);
-        if (typeof parsed.checkedInCount === 'number' && parsed.checkedInCount > 10) {
-          setLiveCheckedInCount(parsed.checkedInCount);
-        }
-      } catch {
-        // Ignore storage parse errors
-      }
-    };
-
-    loadSavedState();
-
-    let channel: BroadcastChannel | null = null;
-    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-      channel = new BroadcastChannel('all41_stage_bus');
-      channel.onmessage = (event) => {
-        const data = event.data;
-        if (!data) return;
-        if (data.type === 'STAGE_PUSH_LIVE') {
-          setStageMode(data.activeModule);
-          setIsAutoRotating(Boolean(data.isAutoRotating));
-          if (data.stageConfig) setStageConfig(data.stageConfig);
-          if (data.approvedPhotos) setPhotos(data.approvedPhotos);
-          if (data.rafflePrize) setActiveRafflePrize(data.rafflePrize);
-          if (data.raffleStyle) setActiveRaffleStyle(data.raffleStyle);
-          if (data.quizQuestion) {
-            setActiveQuizQuestion(data.quizQuestion);
-            setQuizTimer(data.quizQuestion.timerSeconds || 15);
-          }
-          if (data.gameStep) setQuizGameStep(data.gameStep);
-        } else if (data.type === 'TRIGGER_RAFFLE_SPIN') {
-          setStageMode('raffle');
-          setIsAutoRotating(false);
-          if (data.rafflePrize) setActiveRafflePrize(data.rafflePrize);
-          if (data.raffleStyle) setActiveRaffleStyle(data.raffleStyle);
-          handleStageSpin(data.doorPrizeId);
-        }
-      };
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen().catch(() => {});
+      setIsFullscreen(false);
     }
-
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'all41_live_stage_state') loadSavedState();
-    };
-    window.addEventListener('storage', handleStorage);
-
-    return () => {
-      if (channel) channel.close();
-      window.removeEventListener('storage', handleStorage);
-    };
-  }, []);
+  };
 
   useEffect(() => {
     QRCode.toDataURL(`https://${clientDomain}/photowall`, {
       width: 240,
       margin: 1,
-      color: { dark: '#07090e', light: '#ffffff' },
+      color: { dark: '#09090B', light: '#ffffff' },
     }).then(setQrUploadUrl);
 
     // Keyboard shortcuts for ballroom technicians
@@ -170,13 +75,11 @@ function StageBigScreenContent({ slug }: { slug: string }) {
         e.preventDefault();
         setIsAutoRotating((r) => !r);
       }
-      if (e.key === '1') { setStageMode('welcome'); setIsAutoRotating(false); }
-      if (e.key === '2') { setStageMode('photowall'); setIsAutoRotating(false); }
-      if (e.key === '3') { setStageMode('quiz'); setIsAutoRotating(false); }
-      if (e.key === '4') { setStageMode('raffle'); setIsAutoRotating(false); }
-      if (e.key === '5') { setStageMode('rundown'); setIsAutoRotating(false); }
-      if (e.key === '6') { setStageMode('menu'); setIsAutoRotating(false); }
-      if (e.key === '7') { setStageMode('sponsors'); setIsAutoRotating(false); }
+      const target = KEY_MODULES[e.key];
+      if (target) {
+        setStageMode(target);
+        setIsAutoRotating(false);
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -199,26 +102,14 @@ function StageBigScreenContent({ slug }: { slug: string }) {
     }, duration);
 
     return () => clearTimeout(timer);
-  }, [isAutoRotating, currentModuleIndex, enabledModules]);
+  }, [isAutoRotating, currentModuleIndex]);
 
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen().catch(() => {});
-      setIsFullscreen(false);
-    }
-  };
-
-  const handleStageSpin = (doorPrizeId?: string) => {
+  const handleStageSpin = () => {
     if (isRaffleSpinning) return;
     setSlotResult(null);
-    if (doorPrizeId) setStageDrawId(doorPrizeId);
     // Wait a beat so the machine is mounted when the stage just switched to the raffle module.
     window.setTimeout(() => setSlotTrigger((t) => t + 1), 150);
   };
-
 
   return (
     <div className="min-h-screen bg-premium-black text-zinc-100 flex flex-col justify-between overflow-x-hidden relative select-none font-sans">
@@ -245,9 +136,6 @@ function StageBigScreenContent({ slug }: { slug: string }) {
           <div>
             <h1 className="text-xl font-display font-bold text-white flex items-center gap-2">
               <span>{event.name}</span>
-              <span className="px-3 py-1 bg-premium-gold/20 text-premium-gold rounded-full text-xs font-bold uppercase border border-premium-gold/30 font-mono">
-                BALLROOM LED MASTER
-              </span>
               {isAutoRotating && (
                 <span className="px-2.5 py-0.5 rounded-full bg-premium-neon/15 text-premium-neon border border-premium-neon/30 font-mono text-[10px] flex items-center gap-1">
                   <RotateCcw className="w-2.5 h-2.5 animate-spin" />
@@ -256,17 +144,18 @@ function StageBigScreenContent({ slug }: { slug: string }) {
               )}
             </h1>
             <p className="text-xs text-zinc-400 font-mono">
-              <span className="text-premium-neon font-bold">{clientDomain}</span> • {formatDate(event.start_date)} • {event.location_name}
+              <span className="text-premium-neon font-bold">{clientDomain}</span> • {formatDate(event.start_date)}
+              {event.location_name ? ` • ${event.location_name}` : ''}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-6">
           <div className="text-right hidden sm:block">
-            <span className="text-[10px] font-mono uppercase text-zinc-400 block">Verified Audience</span>
-            <div className="text-lg font-black text-premium-success flex items-center gap-1.5 justify-end">
+            <span className="text-[10px] font-mono uppercase text-zinc-400 block">Checked in</span>
+            <div className="text-lg font-display font-bold text-premium-success flex items-center gap-1.5 justify-end">
               <span className="w-2 h-2 rounded-full bg-premium-success animate-pulse" />
-              <span>418 Checked In</span>
+              <span>{checkedInCount.toLocaleString()} guests</span>
             </div>
           </div>
 
@@ -281,12 +170,12 @@ function StageBigScreenContent({ slug }: { slug: string }) {
         </div>
       </header>
 
-      {/* MODULE 1: Welcome & VIP Attendance Counter */}
+      {/* MODULE 1: Welcome & attendance */}
       {stageMode === 'welcome' && (
         <main className="flex-1 p-10 sm:p-14 flex flex-col justify-center items-center text-center max-w-5xl mx-auto z-10 animate-fadeIn">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-premium-gold/20 border border-premium-gold/30 text-xs font-bold text-premium-gold uppercase tracking-widest mb-6">
             <Sparkles className="w-4 h-4 text-premium-gold" />
-            <span>Welcome Distinguished Guests & Honorees</span>
+            <span>Welcome</span>
           </div>
 
           <h2 className="text-4xl sm:text-7xl font-display font-medium text-white tracking-tight leading-tight mb-6">
@@ -294,41 +183,37 @@ function StageBigScreenContent({ slug }: { slug: string }) {
           </h2>
 
           <p className="text-base sm:text-xl text-zinc-300 max-w-2xl mx-auto mb-10 leading-relaxed font-light">
-            Please take your seats. The grand presentation and live interactive experiences are commencing shortly.
+            Please take your seats. The program begins shortly.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-3xl">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-2xl">
             <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark shadow-xl">
-              <span className="text-xs font-mono uppercase text-zinc-400">Gate Attendance</span>
-              <div className="text-4xl font-display font-bold text-premium-success mt-2">418 Pax</div>
-              <span className="text-xs text-zinc-500 mt-1 block">Sub-second QR verified</span>
+              <span className="text-xs font-mono uppercase text-zinc-400">Checked in</span>
+              <div className="text-4xl font-display font-bold text-premium-success mt-2">{checkedInCount.toLocaleString()}</div>
+              <span className="text-xs text-zinc-500 mt-1 block">Guests scanned at the door</span>
             </div>
 
             <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark shadow-xl">
-              <span className="text-xs font-mono uppercase text-zinc-400">Ballroom Wi-Fi</span>
-              <div className="text-xl font-mono font-bold text-white mt-2">DAYONE_GUEST</div>
-              <span className="text-xs text-premium-gold mt-1 font-mono block">Pass: tech2026</span>
-            </div>
-
-            <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark shadow-xl">
-              <span className="text-xs font-mono uppercase text-zinc-400">Guest Portal</span>
+              <span className="text-xs font-mono uppercase text-zinc-400">Guest page</span>
               <div className="text-lg font-mono font-bold text-premium-neon mt-2 truncate">{clientDomain}</div>
-              <span className="text-xs text-zinc-400 mt-1 block">Live photo wall & quiz pad</span>
+              <span className="text-xs text-zinc-400 mt-1 block">Photo wall and games</span>
             </div>
           </div>
         </main>
       )}
 
-      {/* MODULE 2: Pinterest-style Live Masonry Photo & Video Wall */}
+      {/* MODULE 2: Pinterest-style photo wall */}
       {stageMode === 'photowall' && (
         <main className="flex-1 p-8 sm:p-12 max-w-7xl mx-auto w-full z-10 animate-fadeIn">
           <div className="flex items-center justify-between mb-6 pb-4 border-b border-premium-borderDark">
             <div className="flex items-center gap-3">
               <Camera className="w-6 h-6 text-premium-neon" />
-              <h3 className="text-2xl font-display font-bold text-white">Live Ballroom Photo & Video Wall</h3>
-              <span className="px-3 py-1 rounded-full bg-premium-success/20 text-premium-success text-xs font-mono font-bold">
-                PINTEREST STREAM ({photos.length} APPROVED)
-              </span>
+              <h3 className="text-2xl font-display font-bold text-white">Photo Wall</h3>
+              {photos.length > 0 && (
+                <span className="px-3 py-1 rounded-full bg-premium-success/20 text-premium-success text-xs font-mono font-bold">
+                  {photos.length} PHOTOS
+                </span>
+              )}
             </div>
 
             <div className="text-right font-mono text-xs text-premium-gold">
@@ -336,105 +221,49 @@ function StageBigScreenContent({ slug }: { slug: string }) {
             </div>
           </div>
 
-          <PinterestMasonryPhotoWall
-            photos={photos}
-            showCaptions={captionsEnabled}
-            canLike={true}
-            frameOverlayUrl={slug === 'popverse' ? 'https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793300673142_6e56e2a4_1793300673564_d0c29a20.png' : undefined}
-          />
+          {photos.length > 0 ? (
+            <PinterestMasonryPhotoWall
+              photos={photos}
+              showCaptions={captionsEnabled}
+              canLike={true}
+              frameOverlayUrl={slug === 'popverse' ? 'https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793300673142_6e56e2a4_1793300673564_d0c29a20.png' : undefined}
+            />
+          ) : (
+            <div className="py-16 flex flex-col items-center text-center gap-6">
+              {qrUploadUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={qrUploadUrl} alt="QR code for the photo wall" className="w-48 h-48 rounded-3xl bg-white p-3" />
+              )}
+              <div className="space-y-2">
+                <h4 className="text-3xl font-display font-bold text-white">Share your photos</h4>
+                <p className="text-zinc-400 font-mono">{clientDomain}/photowall</p>
+              </div>
+            </div>
+          )}
         </main>
       )}
 
-      {/* MODULE 3: Kahoot Game Arena (Audience Projector View Synced with Operator) */}
+      {/* MODULE 3: Games — how to join */}
       {stageMode === 'quiz' && (
-        <main className="flex-1 p-10 flex flex-col justify-center items-center max-w-5xl mx-auto w-full z-10 animate-fadeIn space-y-8">
-          <div className="flex flex-wrap items-center justify-between w-full gap-3">
-            <span className="px-4 py-1.5 rounded-full bg-premium-charcoal border border-premium-gold/40 text-sm font-mono text-premium-gold font-bold">
-              ⚡ LIVE TRIVIA BLITZ • QUESTION {activeQuizQuestion.id} OF 3 ({activeQuizQuestion.points} PTS)
-            </span>
-            <span className="text-xs font-mono text-premium-neon bg-premium-surfaceDark border border-premium-borderDark px-3.5 py-1.5 rounded-full font-bold">
-              📱 Join buzzer: {clientDomain}/play
-            </span>
-            <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-premium-charcoal text-sm font-bold font-mono text-premium-gold border border-premium-borderDark">
-              <Clock className="w-4 h-4" />
-              <span>
-                {quizGameStep === 'question_active'
-                  ? `${quizTimer}s remaining`
-                  : quizGameStep === 'answers_locked'
-                  ? 'Buzzers Locked'
-                  : quizGameStep === 'reveal'
-                  ? 'Correct Answer Revealed'
-                  : 'Leaderboard Podium'}
-              </span>
-            </div>
+        <main className="flex-1 p-10 flex flex-col justify-center items-center max-w-4xl mx-auto w-full z-10 animate-fadeIn text-center space-y-8">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-premium-gold/20 border border-premium-gold/30 text-xs font-bold text-premium-gold uppercase tracking-widest">
+            <Gamepad2 className="w-4 h-4" />
+            <span>{activity?.kind === 'scavenger' ? 'Scavenger Hunt' : 'Live Trivia'}</span>
           </div>
-
-          {quizGameStep === 'podium' ? (
-            <div className="p-10 rounded-[2.5rem] bg-premium-charcoal border border-premium-gold shadow-2xl w-full text-center space-y-6">
-              <span className="text-xs font-mono uppercase tracking-widest text-premium-gold font-bold">
-                ★ OFFICIAL LIVE TRIVIA PODIUM ★
-              </span>
-              <h2 className="text-4xl font-display font-bold text-white">Top Fastest Responders</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                {[
-                  { rank: '1st Place', name: 'Budi Santoso', table: 'Diamond 01', score: '2,850 PTS', accent: 'border-premium-gold bg-premium-gold/10 text-premium-gold' },
-                  { rank: '2nd Place', name: 'Clarissa Tan', table: 'Platinum 03', score: '2,700 PTS', accent: 'border-premium-neon bg-premium-neon/10 text-premium-neon' },
-                  { rank: '3rd Place', name: 'Hendrik Wijaya', table: 'Diamond 02', score: '2,400 PTS', accent: 'border-premium-success bg-premium-success/10 text-premium-success' },
-                ].map((winner) => (
-                  <div key={winner.rank} className={`p-6 rounded-3xl border ${winner.accent} space-y-1`}>
-                    <div className="text-xs font-mono font-bold uppercase">{winner.rank}</div>
-                    <div className="text-2xl font-display font-bold text-white">{winner.name}</div>
-                    <div className="text-xs font-mono text-zinc-300">Table {winner.table}</div>
-                    <div className="text-lg font-mono font-bold pt-2">{winner.score}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="p-10 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark w-full text-center shadow-2xl">
-                <h2 className="text-3xl sm:text-4xl font-display font-bold text-white leading-snug">
-                  {activeQuizQuestion.question}
-                </h2>
-              </div>
-
-              <div className="grid grid-cols-2 gap-6 w-full">
-                {activeQuizQuestion.options.map((opt, idx) => {
-                  const shapes = ['▲', '◆', '●', '■'];
-                  const baseColors = [
-                    'bg-premium-danger text-white',
-                    'bg-premium-neon text-black',
-                    'bg-premium-gold text-black',
-                    'bg-premium-success text-black',
-                  ];
-                  const isCorrect = opt === activeQuizQuestion.correct;
-                  const stateClass =
-                    quizGameStep === 'reveal'
-                      ? isCorrect
-                        ? 'ring-4 ring-white scale-[1.02] shadow-2xl'
-                        : 'opacity-25 grayscale'
-                      : '';
-
-                  return (
-                    <div
-                      key={opt}
-                      className={`p-6 rounded-3xl ${baseColors[idx % 4]} flex items-center justify-between gap-4 shadow-xl transition-all duration-300 ${stateClass}`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <span className="text-3xl font-display font-bold">{shapes[idx % 4]}</span>
-                        <span className="text-xl font-display font-bold">{opt}</span>
-                      </div>
-                      {quizGameStep === 'reveal' && isCorrect && (
-                        <span className="px-3 py-1 rounded-full bg-black/80 text-premium-success text-xs font-mono font-bold uppercase">
-                          ✓ Correct
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </>
+          <h2 className="text-4xl sm:text-6xl font-display font-medium text-white tracking-tight">
+            {activity?.name || 'Get ready to play'}
+          </h2>
+          {activity && (
+            <p className="text-lg text-zinc-400 font-light">
+              {activity.kind === 'scavenger'
+                ? `${activity.clues.length} ${activity.clues.length === 1 ? 'clue' : 'clues'} to find`
+                : `${activity.questions.length} ${activity.questions.length === 1 ? 'question' : 'questions'}`}
+            </p>
           )}
+          <div className="px-8 py-5 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark">
+            <span className="text-xs font-mono uppercase text-zinc-400 block mb-1">Join on your phone</span>
+            <span className="text-2xl font-mono font-bold text-premium-neon">{clientDomain}/play</span>
+          </div>
         </main>
       )}
 
@@ -476,9 +305,9 @@ function StageBigScreenContent({ slug }: { slug: string }) {
             <button
               type="button"
               disabled={isRaffleSpinning}
-              onClick={() => handleStageSpin()}
+              onClick={handleStageSpin}
               className={`px-10 py-4 rounded-2xl font-display font-bold text-sm uppercase tracking-wider text-black shadow-gold transition-all scale-on-click ${
-                isRaffleSpinning ? 'bg-zinc-700 text-zinc-400 cursor-not-allowed' : 'bg-premium-gold hover:bg-premium-goldHover'
+                isRaffleSpinning ? 'bg-premium-borderDark text-zinc-400 cursor-not-allowed' : 'bg-premium-gold hover:bg-premium-goldHover'
               }`}
             >
               {isRaffleSpinning ? 'DRAWING LIVE ON STAGE...' : 'TRIGGER STAGE DRAW'}
@@ -487,117 +316,19 @@ function StageBigScreenContent({ slug }: { slug: string }) {
         </main>
       )}
 
-      {/* MODULE 5: Live Agenda & Keynote Slide */}
-      {stageMode === 'rundown' && (
-        <main className="flex-1 p-10 sm:p-14 max-w-5xl mx-auto w-full z-10 animate-fadeIn space-y-8">
-          <div className="flex items-center justify-between border-b border-premium-borderDark pb-4">
-            <div className="flex items-center gap-3">
-              <Clock className="w-6 h-6 text-premium-gold" />
-              <h3 className="text-2xl font-display font-medium text-white">Event Rundown & Keynote Schedule</h3>
-            </div>
-            <span className="text-xs font-mono text-premium-success bg-premium-success/15 px-3 py-1 rounded-full border border-premium-success/30 font-bold">
-              Live Stage Sync
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {MOCK_RUNDOWN.map((item) => (
-              <div
-                key={item.id}
-                className={`p-6 rounded-[2rem] border transition-all ${
-                  item.isCurrent
-                    ? 'bg-gradient-to-r from-premium-surfaceDark to-premium-charcoal border-premium-gold shadow-gold'
-                    : 'bg-premium-charcoal border-premium-borderDark'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-mono text-premium-gold font-bold">{item.time}</span>
-                  {item.isCurrent && (
-                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-premium-success/20 text-premium-success font-mono font-bold uppercase border border-premium-success/30">
-                      ● Active Now
-                    </span>
-                  )}
-                </div>
-                <h4 className="text-base font-display font-medium text-white">{item.title}</h4>
-                {item.speakerOrHost && (
-                  <p className="text-xs text-premium-neon mt-1">{item.speakerOrHost} • {item.location}</p>
-                )}
-                {item.description && (
-                  <p className="text-xs text-zinc-400 mt-2 leading-relaxed">{item.description}</p>
-                )}
-              </div>
-            ))}
-          </div>
-        </main>
-      )}
-
-      {/* MODULE 6: Banquet Dining Menu Showcase Slide */}
-      {stageMode === 'menu' && (
-        <main className="flex-1 p-10 sm:p-14 max-w-5xl mx-auto w-full z-10 animate-fadeIn space-y-8">
-          <div className="flex items-center justify-between border-b border-premium-borderDark pb-4">
-            <div className="flex items-center gap-3">
-              <UtensilsCrossed className="w-6 h-6 text-premium-gold" />
-              <h3 className="text-2xl font-display font-medium text-white">Executive Banquet Dining Showcase</h3>
-            </div>
-            <span className="text-xs font-mono text-premium-gold bg-premium-gold/20 px-3 py-1 rounded-full border border-premium-gold/30 font-bold">
-              4-Course Haute Cuisine
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {MOCK_MENU.map((m) => (
-              <div key={m.id} className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-2 shadow-xl">
-                <span className="text-xs font-mono text-premium-gold uppercase font-bold tracking-widest block">
-                  {m.course}
-                </span>
-                <h4 className="text-lg font-display font-medium text-white">{m.name}</h4>
-                <p className="text-xs text-zinc-400 leading-relaxed">{m.description}</p>
-                {m.pairing && (
-                  <div className="text-xs text-premium-neon font-mono pt-2 border-t border-zinc-800">
-                    Sommelier Pairing: <strong>{m.pairing}</strong>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </main>
-      )}
-
-      {/* MODULE 7: Sponsors & Partners Slide */}
-      {stageMode === 'sponsors' && (
-        <main className="flex-1 p-12 flex flex-col justify-center items-center text-center max-w-5xl mx-auto w-full z-10 animate-fadeIn space-y-8">
-          <div>
-            <span className="text-xs font-mono uppercase text-premium-gold font-bold tracking-widest block">
-              WITH SINCERE GRATITUDE TO OUR PARTNERS
-            </span>
-            <h2 className="text-4xl sm:text-5xl font-display font-medium text-white mt-2">
-              Principal Sponsors & Industry Co-Hosts
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 w-full pt-4">
-            {['Nexus Ventures', 'Alpha Global SG', 'CloudScale Asia', 'FintechSEA', 'CyberShield', 'VenturePulse', 'SummitAI', 'dayoneproject.xyz Platform'].map((name, idx) => (
-              <div
-                key={name}
-                className="p-8 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark flex flex-col items-center justify-center shadow-xl hover:border-premium-gold transition-colors"
-              >
-                <div className="w-12 h-12 rounded-2xl bg-premium-gold/15 border border-premium-gold/30 flex items-center justify-center font-display font-bold text-lg text-premium-gold mb-3 shadow-gold">
-                  {idx + 1}
-                </div>
-                <strong className="text-sm text-white font-display font-medium">{name}</strong>
-                <span className="text-[10px] font-mono text-zinc-500 uppercase mt-1">Tier-1 Sponsor</span>
-              </div>
-            ))}
-          </div>
+      {stageMode === 'raffle' && !stageDraw && (
+        <main className="flex-1 p-10 flex flex-col justify-center items-center text-center z-10 animate-fadeIn">
+          <h2 className="text-4xl font-display font-medium text-white">Door prize draw</h2>
+          <p className="text-zinc-400 mt-3">Set up a door prize in the dashboard to draw it here.</p>
         </main>
       )}
 
       {/* Scrolling Stage Bottom Ticker Text */}
       <div className="h-10 bg-premium-surfaceDark border-t border-premium-borderDark overflow-hidden flex items-center z-20">
         <div className="whitespace-nowrap animate-marquee font-mono text-xs text-premium-gold flex items-center gap-8">
-          <span>{stageConfig.tickerText}</span>
+          <span>{tickerText}</span>
           <span>•</span>
-          <span>{stageConfig.tickerText}</span>
+          <span>{tickerText}</span>
         </div>
       </div>
 
@@ -622,7 +353,7 @@ function StageBigScreenContent({ slug }: { slug: string }) {
 
           {/* Module Switcher Buttons */}
           <div className="flex items-center gap-1.5 overflow-x-auto">
-            {stageConfig.modules.filter((m) => m.isEnabled).map((m, idx) => (
+            {enabledModules.map((m, idx) => (
               <button
                 key={m.id}
                 type="button"
@@ -657,7 +388,7 @@ export default function StageBigScreenPage({
   params: Promise<{ slug: string }>;
 }) {
   return (
-    <Suspense fallback={<div className="p-8 text-xs text-gray-400">Loading stage screen...</div>}>
+    <Suspense fallback={<div className="p-8 text-xs text-zinc-400">Loading stage screen...</div>}>
       <StageBigScreenWrapper params={params} />
     </Suspense>
   );

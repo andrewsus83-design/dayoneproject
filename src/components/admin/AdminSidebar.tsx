@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ArrowLeft, BarChart3, Calendar, KeyRound, Layers, MessageSquare, Shield, Users, Wallet } from 'lucide-react';
+import { ArrowLeft, BarChart3, Calendar, KeyRound, Layers, MessageSquare, Shield, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserMenu } from '@/components/auth/UserMenu';
 
@@ -11,7 +11,6 @@ const ADMIN_NAV = [
   { label: 'Users', href: '/admin/users', icon: Users },
   { label: 'Events', href: '/admin/events', icon: Calendar },
   { label: 'API Keys', href: '/admin/keys', icon: KeyRound },
-  { label: 'Referral Payouts', href: '/admin/payouts', icon: Wallet },
   { label: 'WhatsApp Queue & Pacing', href: '/admin/whatsapp', icon: MessageSquare },
 ];
 

@@ -46,7 +46,7 @@ const EVENT_NAV_GROUPS = [
     label: 'Audience',
     items: [
       { label: 'Guests', tab: 'guests', icon: Users },
-      { label: 'Registrations', tab: 'registrations', icon: ClipboardCheck, badge: '2' },
+      { label: 'Registrations', tab: 'registrations', icon: ClipboardCheck },
       { label: 'Broadcast', tab: 'broadcast', icon: Radio },
     ],
   },
@@ -178,14 +178,7 @@ export function Sidebar() {
                             <Icon className={cn('w-3.5 h-3.5 flex-shrink-0', isActive ? 'text-premium-gold' : 'text-zinc-600')} />
                             <span>{item.label}</span>
                           </div>
-                          <div className="flex items-center gap-1.5">
-                            {'badge' in item && item.badge && (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-premium-danger/20 text-premium-danger font-bold border border-premium-danger/20">
-                                {item.badge}
-                              </span>
-                            )}
-                            {isActive && <ChevronRight className="w-3 h-3 text-zinc-600" />}
-                          </div>
+                          {isActive && <ChevronRight className="w-3 h-3 text-zinc-600" />}
                         </Link>
                       );
                     })}
