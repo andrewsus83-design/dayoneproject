@@ -123,6 +123,14 @@ function InvitationContent({ slug }: { slug: string }) {
       token: heldPass,
     });
     if (!res.ok) return refusal(res, maxPerReply);
+    if (!res.stored && 'reason' in res) {
+      return {
+        ok: false,
+        error: res.sent === 'email'
+          ? "You're already on the guest list. We've emailed your pass to you, so check your inbox."
+          : "You're already on the guest list. Open the link the host sent you, or ask the host for your pass.",
+      };
+    }
     if (!res.stored) return { ok: true };
     return { ok: true, token: res.token, number: res.guest_number, name: res.name };
   };

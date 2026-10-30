@@ -177,6 +177,11 @@ export type RegisterResult =
     }
   /** A decline from someone new when the list is full: nothing to store, the closing screen still shows. */
   | { ok: true; stored: false; response: 'declined' }
+  /**
+   * The email or phone belongs to a guest already on the list, and this phone doesn't hold their pass. Nothing was
+   * changed; the pass went to that guest's own email ('email') or there was no email to send it to ('none').
+   */
+  | { ok: true; stored: false; reason: 'already_registered'; sent: 'email' | 'none' }
   | { ok: false; reason: RegisterFailure; field?: string };
 
 export interface GuestCounts {
