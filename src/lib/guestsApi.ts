@@ -388,6 +388,57 @@ export async function registerGuest(slug: string, input: RegisterInput): Promise
   return result;
 }
 
+/* ───────────────────────── Replies sent with no signal ───────────────────────── */
+
+/** No internet (as opposed to the server saying no). */
+export function isOfflineError(e: unknown): boolean {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+  const msg = e instanceof Error ? e.message : String(e ?? '');
+  return /no connection|failed to fetch|networkerror|network|load failed/i.test(msg);
+}
+
+const replyKey = (slug: string) => `d1-reply-${slug}`;
+
+/** Keeps a reply on this phone until it can be sent (the latest reply replaces an earlier one). */
+export function queueReply(slug: string, input: RegisterInput) {
+  try {
+    localStorage.setItem(replyKey(slug), JSON.stringify({ input, at: new Date().toISOString() }));
+  } catch {}
+}
+
+export function readQueuedReply(slug: string): { input: RegisterInput; at: string } | null {
+  try {
+    const raw = localStorage.getItem(replyKey(slug));
+    return raw ? (JSON.parse(raw) as { input: RegisterInput; at: string }) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearQueuedReply(slug: string) {
+  try {
+    localStorage.removeItem(replyKey(slug));
+  } catch {}
+}
+
+/**
+ * Sends the reply saved on this phone. Null when there is none or the phone is still offline (it stays saved);
+ * otherwise the server's answer and the reply it was for (the saved copy is then dropped).
+ */
+export async function sendQueuedReply(slug: string): Promise<{ result: RegisterResult; input: RegisterInput } | null> {
+  const saved = readQueuedReply(slug);
+  if (!saved) return null;
+  try {
+    const result = await registerGuest(slug, saved.input);
+    clearQueuedReply(slug);
+    return { result, input: saved.input };
+  } catch (e) {
+    if (isOfflineError(e)) return null;
+    clearQueuedReply(slug);
+    throw e;
+  }
+}
+
 /** The pass behind a token, or null when there is no such pass (or the event is not published). */
 export function getPass(token: string): Promise<GuestPass | null> {
   return rpc<GuestPass | null>('a41_guest_pass', { p_token: parsePassToken(token) });

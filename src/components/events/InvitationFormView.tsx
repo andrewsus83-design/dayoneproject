@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState, type CSSProperties } from 
 import QRCode from 'qrcode';
 import {
   AlarmClock, ArrowLeft, ArrowRight, Calendar, Check, Clock, Download, ExternalLink, FileText, Heart, Lock, Mail, MapPin, Move,
-  Navigation, Pencil, Phone,
+  Navigation, Pencil, Phone, WifiOff,
 } from 'lucide-react';
 import {
   fillVariables, findQuestion, formatEventDate, formatGuestNumber, formatEventTime, formatOpensAt, getQuestions, isQuestion, makePassToken, newId, useAssetUrl,
@@ -24,6 +24,8 @@ export type SubmitResult = WriteResult & {
   name?: string;
   /** The form closed in the meantime: show the closed screen with this reason. */
   closedReason?: string;
+  /** No signal: the reply is saved on this phone and sent when it is back (no ticket until then). */
+  queued?: boolean;
 };
 
 type Screen =
@@ -31,6 +33,7 @@ type Screen =
   | { kind: 'page'; index: number }
   | { kind: 'review' }
   | { kind: 'done'; response: FormResponse }
+  | { kind: 'queued' }
   | { kind: 'closed' }
   | { kind: 'upcoming' };
 
@@ -280,6 +283,10 @@ export function InvitationFormView({
         }
         if (!res.ok) {
           setFormError(res.error ?? 'Your reply could not be saved. Please try again.');
+          return;
+        }
+        if (res.queued) {
+          setScreen({ kind: 'queued' });
           return;
         }
         setScreen({
@@ -670,6 +677,22 @@ export function InvitationFormView({
           </>,
         )}
       </>
+    );
+  } else if (screen.kind === 'queued') {
+    body = (
+      <div className="flex flex-col items-center text-center" style={{ padding: sp.card, gap: sp.stack }}>
+        <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
+          <WifiOff className="w-6 h-6" style={{ color: theme.primaryText }} />
+        </div>
+        <h2 className="text-2xl font-bold" style={headingStyle}>Saved on this phone</h2>
+        <p className="text-sm leading-relaxed" style={{ color: theme.muted }}>
+          There is no signal right now. Your reply sends itself as soon as you are back online, and your QR pass opens here.
+          Keep this page open.
+        </p>
+        <p className="text-xs flex items-center gap-2" style={{ color: theme.subtle }}>
+          <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: theme.primary }} /> Waiting for signal…
+        </p>
+      </div>
     );
   } else if (screen.kind === 'done') {
     const r = screen.response;

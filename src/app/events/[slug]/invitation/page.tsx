@@ -1,13 +1,15 @@
 'use client';
 
-import React, { use, Suspense, useMemo } from 'react';
+import React, { use, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   addResponse, readGuests, useAssetUrl, useEventConfigBySlug, useResponses, useSampleGuests, writeGuests, formatEventDate,
   nextGuestNumber, numberDigits,
   type FormResponse,
 } from '@/lib/eventStore';
-import { guestAppPath, isServerEventId, registerGuest, useStoredPass, type RegisterResult } from '@/lib/guestsApi';
+import {
+  guestAppPath, isOfflineError, isServerEventId, queueReply, registerGuest, sendQueuedReply, useStoredPass, type RegisterInput, type RegisterResult,
+} from '@/lib/guestsApi';
 import { resolveTheme } from '@/lib/eventTheme';
 import { InvitationFormView, type SubmitResult } from '@/components/events/InvitationFormView';
 import { EventFonts } from '@/components/events/EventFonts';
@@ -52,6 +54,7 @@ function InvitationContent({ slug }: { slug: string }) {
   const sampleGuests = useSampleGuests(eventId);
   const heldPass = useStoredPass(slug);
   const router = useRouter();
+  const [replyNotice, setReplyNotice] = useState<string | null>(null);
   const inv = config.invitation;
   const photo = useAssetUrl(inv.photoUrl);
   const heroBlock = config.landing.blocks.find((b) => b.type === 'hero');
@@ -115,7 +118,7 @@ function InvitationContent({ slug }: { slug: string }) {
   const handleSubmit = async (r: FormResponse): Promise<SubmitResult> => {
     if (sample) return handleSampleSubmit(r);
     // registerGuest keeps the pass on this phone (d1-pass-<slug>) for the pass page, trivia and the photo wall.
-    const res = await registerGuest(slug, {
+    const input: RegisterInput = {
       name: r.name,
       email: r.email,
       phone: r.phone,
@@ -123,7 +126,16 @@ function InvitationContent({ slug }: { slug: string }) {
       partySize: r.party || 1,
       answers: r.answers,
       token: heldPass,
-    });
+    };
+    let res: RegisterResult;
+    try {
+      res = await registerGuest(slug, input);
+    } catch (e) {
+      if (!isOfflineError(e)) throw e;
+      // No signal: keep the reply on this phone; the effect below sends it once the phone is back online.
+      queueReply(slug, input);
+      return { ok: true, queued: true };
+    }
     if (!res.ok) return refusal(res, maxPerReply);
     if (!res.stored && 'reason' in res) {
       return {
@@ -136,6 +148,40 @@ function InvitationContent({ slug }: { slug: string }) {
     if (!res.stored) return { ok: true };
     return { ok: true, token: res.token, number: res.guest_number, name: res.name };
   };
+
+  // A reply saved with no signal is sent when the phone is back online (on load, on "online", and every 10 s).
+  useEffect(() => {
+    if (sample) return;
+    let alive = true;
+    const send = async () => {
+      try {
+        const sent = await sendQueuedReply(slug);
+        if (!alive || !sent) return;
+        const { result, input } = sent;
+        if (!result.ok) {
+          const refused = refusal(result, maxPerReply);
+          setReplyNotice(refused.closedReason ?? refused.error ?? 'Your reply could not be saved. Please send it again.');
+        } else if (!result.stored) {
+          setReplyNotice("You're already on the guest list. Check your inbox for your pass, or open the link the host sent you.");
+        } else if (input.attending) {
+          router.replace(guestAppPath(slug));
+        } else {
+          setReplyNotice('Your reply was sent. Thank you for letting us know.');
+        }
+      } catch (e) {
+        if (alive) setReplyNotice(e instanceof Error ? e.message : 'Your reply could not be saved. Please send it again.');
+      }
+    };
+    void send();
+    window.addEventListener('online', send);
+    // Nothing is sent when no reply is saved on this phone.
+    const timer = window.setInterval(() => void send(), 10_000);
+    return () => {
+      alive = false;
+      window.removeEventListener('online', send);
+      window.clearInterval(timer);
+    };
+  }, [sample, slug, router, maxPerReply]);
 
   // A guest who is coming goes straight to the guest app, on their QR pass.
   const submitAndOpenApp = async (r: FormResponse): Promise<SubmitResult> => {
@@ -152,6 +198,12 @@ function InvitationContent({ slug }: { slug: string }) {
   return (
     <>
       <EventFonts href={theme.fontsHref} />
+      {replyNotice && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-md px-4 py-3 rounded-2xl text-sm font-bold shadow-2xl flex items-start gap-3" style={{ background: theme.card, color: theme.text, border: `1px solid ${theme.border}` }} role="status">
+          <span className="flex-1">{replyNotice}</span>
+          <button type="button" onClick={() => setReplyNotice(null)} className="text-xs underline scale-on-click" style={{ color: theme.subtle }}>OK</button>
+        </div>
+      )}
       <InvitationFormView
         info={config.info}
         invitation={inv}
