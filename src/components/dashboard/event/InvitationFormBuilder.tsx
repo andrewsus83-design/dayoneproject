@@ -77,6 +77,20 @@ export function InvitationFormBuilder({ isWedding, eventName, primaryColor, slug
   const [copiedLink, setCopiedLink] = useState(false);
   const [previewName] = useState('Rafael Cruz');
 
+  // Cover tab: selected color theme
+  const [selectedTheme, setSelectedTheme] = useState('Golden Field');
+
+  // Closing tab: active closing view state
+  const [closingView, setClosingView] = useState<'Confirmed' | 'Declined' | 'Form closed'>('Confirmed');
+
+  // Closing tab: toggle states for "What guests can do"
+  const [guestToggles, setGuestToggles] = useState({
+    ticket: true,
+    calendar: true,
+    directions: true,
+    contact: false,
+  });
+
   // Add-question picker state
   const [showAddQuestion, setShowAddQuestion] = useState(false);
   const [newLabel, setNewLabel] = useState('');
@@ -166,7 +180,12 @@ export function InvitationFormBuilder({ isWedding, eventName, primaryColor, slug
                   <button
                     key={th.name}
                     type="button"
-                    className="flex items-center gap-1.5 px-2 py-1.5 rounded-full border border-premium-borderDark text-[10px] font-bold text-zinc-300 hover:border-premium-gold/50 scale-on-click"
+                    onClick={() => setSelectedTheme(th.name)}
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full border text-[10px] font-bold scale-on-click transition-all ${
+                      selectedTheme === th.name
+                        ? 'border-premium-gold text-white bg-premium-gold/10'
+                        : 'border-premium-borderDark text-zinc-300 hover:border-premium-gold/50'
+                    }`}
                   >
                     <span className="flex gap-0.5 items-center">
                       <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: th.c1 }} />
@@ -467,11 +486,12 @@ export function InvitationFormBuilder({ isWedding, eventName, primaryColor, slug
             </div>
 
             <div className="flex gap-2">
-              {['Confirmed', 'Declined', 'Form closed'].map((lbl) => (
+              {(['Confirmed', 'Declined', 'Form closed'] as const).map((lbl) => (
                 <button
                   key={lbl}
                   type="button"
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border ${lbl === 'Confirmed' ? 'bg-premium-gold text-black border-premium-gold' : 'bg-premium-surfaceDark text-zinc-400 border-premium-borderDark hover:text-white'}`}
+                  onClick={() => setClosingView(lbl)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border scale-on-click ${closingView === lbl ? 'bg-premium-gold text-black border-premium-gold' : 'bg-premium-surfaceDark text-zinc-400 border-premium-borderDark hover:text-white'}`}
                 >
                   {lbl}
                 </button>
@@ -514,20 +534,24 @@ export function InvitationFormBuilder({ isWedding, eventName, primaryColor, slug
 
               <div className="space-y-3 pt-2">
                 <div className="text-[10px] font-mono uppercase text-zinc-500 tracking-widest mb-2">What guests can do</div>
-                {[
-                  { label: 'Show the ticket with QR code', sub: 'The QR is what you scan at the door.' },
-                  { label: '"Add to calendar" button' },
-                  { label: '"Directions" button' },
-                  { label: 'Show your phone and email' },
-                ].map((item) => (
-                  <div key={item.label} className="flex items-center justify-between py-2">
+                {([
+                  { key: 'ticket' as const, label: 'Show the ticket with QR code', sub: 'The QR is what you scan at the door.' },
+                  { key: 'calendar' as const, label: '"Add to calendar" button' },
+                  { key: 'directions' as const, label: '"Directions" button' },
+                  { key: 'contact' as const, label: 'Show your phone and email' },
+                ] as const).map((item) => (
+                  <div key={item.key} className="flex items-center justify-between py-2">
                     <div>
                       <div className="text-xs text-white font-medium">{item.label}</div>
-                      {item.sub && <div className="text-[10px] text-zinc-500 mt-0.5">{item.sub}</div>}
+                      {'sub' in item && <div className="text-[10px] text-zinc-500 mt-0.5">{item.sub}</div>}
                     </div>
-                    <div className="w-10 h-6 rounded-full bg-premium-success flex items-center justify-end pr-0.5 cursor-pointer">
+                    <button
+                      type="button"
+                      onClick={() => setGuestToggles((prev) => ({ ...prev, [item.key]: !prev[item.key] }))}
+                      className={`w-10 h-6 rounded-full transition-colors flex items-center scale-on-click ${guestToggles[item.key] ? 'bg-premium-success justify-end pr-0.5' : 'bg-zinc-700 pl-0.5'}`}
+                    >
                       <div className="w-5 h-5 rounded-full bg-white" />
-                    </div>
+                    </button>
                   </div>
                 ))}
               </div>
