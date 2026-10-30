@@ -50,7 +50,7 @@ const STATUS_LABEL: Record<GuestPhoto['status'], { label: string; className: str
 
 function Shell({ slug, title, subtitle, children }: { slug: string; title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-premium-black text-zinc-100 font-sans">
+    <div className="guest-app min-h-screen bg-premium-black text-zinc-100 font-sans">
       <div className="max-w-md mx-auto min-h-screen flex flex-col border-x border-premium-borderDark">
         <header className="h-16 px-4 border-b border-premium-borderDark bg-premium-surfaceDark/90 backdrop-blur-md flex items-center gap-3 sticky top-0 z-40">
           <Link

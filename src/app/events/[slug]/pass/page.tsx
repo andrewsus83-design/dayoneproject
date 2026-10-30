@@ -317,7 +317,7 @@ function GuestAppContent({ slug }: { slug: string }) {
   ];
 
   return (
-    <div className="min-h-screen bg-premium-black text-zinc-100 flex justify-center font-sans selection:bg-premium-gold selection:text-premium-black">
+    <div className="guest-app min-h-screen bg-premium-black text-zinc-100 flex justify-center font-sans selection:bg-premium-gold selection:text-premium-black">
       <div className="w-full max-w-[420px] min-h-screen bg-premium-black relative flex flex-col sm:border-x sm:border-premium-borderDark">
         {/* Top app bar */}
         <header className="px-5 pt-6 pb-4 flex justify-between items-center gap-3 bg-premium-black/90 backdrop-blur border-b border-premium-borderDark sticky top-0 z-20">

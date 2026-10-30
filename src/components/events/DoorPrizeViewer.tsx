@@ -12,7 +12,7 @@ const REVEAL_MS = 12_000;
 
 function Notice({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-premium-black text-zinc-100 font-sans flex items-center justify-center px-6">
+    <div className="guest-app min-h-screen bg-premium-black text-zinc-100 font-sans flex items-center justify-center px-6">
       <div className="max-w-sm text-center space-y-4">
         <div className="w-12 h-12 mx-auto bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-xl shadow-gold">D1</div>
         <h1 className="text-xl font-display font-bold text-white">{title}</h1>
@@ -82,7 +82,7 @@ export function DoorPrizeViewer({ slug, initialId }: { slug: string; initialId?:
   const spotlight = fresh ?? (prize && prize.winners[0] ? { prize, winner: prize.winners[0] } : null);
 
   return (
-    <div className="min-h-screen bg-premium-black text-zinc-100 font-sans relative overflow-hidden">
+    <div className="guest-app min-h-screen bg-premium-black text-zinc-100 font-sans relative overflow-hidden">
       <div className="absolute top-1/4 left-1/3 w-[600px] h-[600px] bg-premium-gold/10 blur-[160px] pointer-events-none rounded-full" />
       <div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-premium-neon/10 blur-[160px] pointer-events-none rounded-full" />
 

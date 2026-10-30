@@ -22,14 +22,14 @@ import {
 
 function Shell({ slug, score, children }: { slug: string; score?: number | null; children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-premium-black text-zinc-100 flex flex-col max-w-md mx-auto border-x border-premium-borderDark select-none font-sans">
+    <div className="guest-app min-h-screen bg-premium-black text-zinc-100 flex flex-col max-w-md mx-auto border-x border-premium-borderDark select-none font-sans">
       <header className="h-14 px-4 bg-premium-surfaceDark border-b border-premium-borderDark flex items-center justify-between sticky top-0 z-40">
         <Link href={guestAppPath(slug, 'activity')} className="p-2 rounded-xl bg-premium-charcoal text-zinc-400 hover:text-white border border-premium-borderDark scale-on-click" aria-label="Back to the guest app">
           <ArrowLeft className="w-4 h-4" />
         </Link>
-        <div className="text-center">
+        <div className="text-center min-w-0 flex-1 px-2">
           <span className="text-xs font-display font-bold text-white block">Live Trivia</span>
-          <span className="text-[10px] text-premium-neon font-mono">{getClientDomain(slug)}</span>
+          <span className="text-[10px] text-premium-neon font-mono block truncate">{getClientDomain(slug)}</span>
         </div>
         <div className="min-w-[4rem] text-right">
           {typeof score === 'number' && <span className="text-xs font-mono font-bold text-premium-gold">{score.toLocaleString()} pts</span>}
