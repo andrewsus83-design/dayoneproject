@@ -58,7 +58,10 @@ function wallClock(iso: string, timeZone: string): string {
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:00Z`;
 }
 
-/** A backend event shown with the default corporate or wedding template until the organizer edits it. */
+/**
+ * A backend event shown with the default corporate or wedding template until the organizer edits it.
+ * Only the template's settings carry over: no sample cover photo or white-label flag.
+ */
 export function eventFromRow(row: OrgEventRow): Event {
   const template = row.type === 'wedding' ? MOCK_WEDDING_EVENT : MOCK_EVENT;
   return {
@@ -68,6 +71,8 @@ export function eventFromRow(row: OrgEventRow): Event {
     name: row.name,
     slug: row.slug,
     description: '',
+    cover_image_url: '',
+    is_white_label: false,
     event_type: row.type,
     start_date: wallClock(row.starts_at, row.timezone),
     end_date: wallClock(row.ends_at, row.timezone),
@@ -106,6 +111,11 @@ function savedEventWithSlug(slug: string): OrgEventRow | undefined {
 /** Built-in sample events (they never come from the server). */
 export function isSampleSlug(slug: string): boolean {
   return BASE_EVENTS.some((e) => e.slug === slug) || slug in SLUG_ALIASES;
+}
+
+/** True for the built-in sample events, which keep their sample prizes, trivia and photos. */
+export function isSampleEventId(eventId: string): boolean {
+  return BASE_EVENTS.some((e) => e.id === eventId);
 }
 
 /** True once this device knows an event with this link (created here, opened before, or loaded from the server). */

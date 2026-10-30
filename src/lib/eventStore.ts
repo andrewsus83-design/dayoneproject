@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import { Event, Guest } from './types';
-import { getBaseEvent, resolveEventIdFromSlug, SLUG_INDEX_KEY, ORG_EVENTS_KEY, type OrgEventRow } from './events';
+import { getBaseEvent, isSampleEventId, resolveEventIdFromSlug, SLUG_INDEX_KEY, ORG_EVENTS_KEY, type OrgEventRow } from './events';
 import { MOCK_GUESTS, POPVERSE_QUIZ_QUESTIONS } from './mockData';
 import { buildDefaultBlocks, legacyToBlocks, type LandingBlock } from './landingBlocks';
 import { defaultBroadcast } from './broadcastTemplates';
@@ -573,11 +573,21 @@ export function defaultFrame(base?: Event): StageFrame {
 export const POPVERSE_STAGE_FRAME =
   'https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793300675118_e65da6c9_1793300675879_1fc2362a.png';
 
-const DEFAULT_QUIZ: QuizItem[] = [
+/** The sample events' trivia. */
+const SAMPLE_QUIZ: QuizItem[] = [
   { id: 'q-1', text: 'In what year was dayoneproject.xyz founded?', options: ['2023', '2024', '2025', '2026'], answer: 1, points: 1000, seconds: 15 },
   { id: 'q-2', text: 'Which payment rail powers QR check-in in Indonesia?', options: ['QRIS', 'Swift GPI', 'FedNow', 'SEPA'], answer: 0, points: 1000, seconds: 15 },
   { id: 'q-3', text: 'Which protocol is best suited for live audience quiz sync?', options: ['WebSockets', 'HTTP Polling', 'SMTP', 'FTP'], answer: 0, points: 1000, seconds: 15 },
 ];
+
+/** A neutral starter round for real events, meant to be edited. */
+const STARTER_QUIZ: QuizItem[] = [
+  { id: 'q-1', text: 'Which planet is known as the Red Planet?', options: ['Venus', 'Mars', 'Jupiter', 'Mercury'], answer: 1, points: 1000, seconds: 15 },
+  { id: 'q-2', text: 'How many continents are there?', options: ['5', '6', '7', '8'], answer: 2, points: 1000, seconds: 15 },
+  { id: 'q-3', text: 'What is the largest ocean on Earth?', options: ['Atlantic', 'Indian', 'Arctic', 'Pacific'], answer: 3, points: 1000, seconds: 15 },
+];
+
+const starterQuiz = (base?: Event) => (base && isSampleEventId(base.id) ? SAMPLE_QUIZ : STARTER_QUIZ);
 
 /** Speed scoring: full points in the first 3 seconds, then one step down every 3 seconds, to half points in the last step. */
 export const QUIZ_STEP_SECONDS = 3;
@@ -606,7 +616,7 @@ export function newActivity(kind: Activity['kind'], base?: Event, index = 1): Ac
     id: newId('act'),
     name: kind === 'quiz' ? `Trivia Round ${index}` : `Scavenger Hunt ${index}`,
     kind,
-    questions: kind === 'quiz' ? DEFAULT_QUIZ.map((q) => ({ ...q, id: newId('qz') })) : [],
+    questions: kind === 'quiz' ? starterQuiz(base).map((q) => ({ ...q, id: newId('qz') })) : [],
     clues: kind === 'scavenger' ? [newClue(), newClue(), newClue()] : [],
     frame: defaultFrame(base),
     ...ACTIVITY_EXTRAS,
@@ -621,7 +631,7 @@ function defaultGames(base: Event): GamesConfig {
     kind: 'quiz',
     questions: popverse
       ? POPVERSE_QUIZ_QUESTIONS.map((q) => ({ ...q, seconds: 15 }))
-      : DEFAULT_QUIZ,
+      : starterQuiz(base),
     clues: [],
     frame: defaultFrame(base),
     ...ACTIVITY_EXTRAS,
@@ -647,6 +657,11 @@ export function newDoorPrize(base?: Event, index = 1): DoorPrize {
 }
 
 function defaultDoorPrizes(base: Event): DoorPrizesConfig {
+  // Real events start with one empty door prize; only the sample events come with sample prizes.
+  if (!isSampleEventId(base.id)) {
+    const only: DoorPrize = { ...newDoorPrize(base), id: 'dp-main', name: 'Door Prize', prize: '' };
+    return { items: [only], activeId: only.id };
+  }
   const items: DoorPrize[] = [
     { ...newDoorPrize(base), id: 'dp-grand', name: 'Grand Prize', prize: 'Apple MacBook Pro M4 Max (16-inch)', quantity: 1, sponsor: 'dayoneproject.xyz Innovation' },
     { ...newDoorPrize(base), id: 'dp-second', name: 'Second Prize', prize: 'iPhone 16 Pro Max', quantity: 2, style: 'claw' },
