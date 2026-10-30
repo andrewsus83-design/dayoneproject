@@ -102,6 +102,19 @@ export async function updateOrgEvent(
   return row;
 }
 
+/**
+ * Publishes or unpublishes an event without touching its saved setup (saved_at stays, so nobody's next save
+ * conflicts). Guests can open published events only.
+ */
+export async function setOrgEventStatus(id: string, status: 'draft' | 'published'): Promise<OrgEventRow> {
+  const { data, error } = await createClient().from('a41_events').update({ status }).eq('id', id).select(COLUMNS);
+  if (error) throw new Error(readable(error));
+  const row = (data as OrgEventRow[] | null)?.[0];
+  if (!row) throw new Error('Your account cannot publish this event. Ask the event owner.');
+  cacheOrgEvents([row], true);
+  return row;
+}
+
 /** Wall-clock date + time at the venue as a timestamp the database understands. */
 export function venueTimestamp(date: string, time: string): string {
   return `${date}T${time || '00:00'}:00${TIMEZONE_OFFSET}`;

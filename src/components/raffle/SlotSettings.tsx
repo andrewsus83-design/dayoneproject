@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Hash, User, RotateCcw } from 'lucide-react';
-import { guestPool, numberDigits, resolveDrawTotal, useEventConfig, useGuests, type DoorPrize, type SlotMode } from '@/lib/eventStore';
+import { guestPool, numberDigits, resolveDrawTotal, updateDrawWinners, useEventConfig, useGuests, type DoorPrize, type SlotMode } from '@/lib/eventStore';
 
 /** Number/Name controls for one door prize that uses the slot machine. */
 export function SlotSettings({ eventId, drawId, className = '' }: { eventId: string; drawId?: string; className?: string }) {
@@ -87,7 +87,7 @@ export function SlotSettings({ eventId, drawId, className = '' }: { eventId: str
 
       <button
         type="button"
-        onClick={() => { if (confirm(`Clear the ${draw.winners.length} winner(s) of “${draw.name}”?`)) patch({ winners: [] }); }}
+        onClick={() => { if (confirm(`Clear the ${draw.winners.length} winner(s) of “${draw.name}”?`)) updateDrawWinners(eventId, draw.id, () => []); }}
         disabled={draw.winners.length === 0}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-premium-borderDark text-zinc-400 hover:text-white text-xs font-bold scale-on-click disabled:opacity-40"
         title="Clear this door prize's winners so they can be drawn again"
