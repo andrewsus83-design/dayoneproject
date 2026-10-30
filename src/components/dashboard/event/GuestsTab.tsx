@@ -68,7 +68,7 @@ export function GuestsTab({ eventId, onOpenInvitationBuilder }: { eventId: strin
   const info = config.info;
   const isWedding = event.event_type === 'wedding';
   // Polls so check-ins from the door show up while the tab is open.
-  const list = useGuestList(eventId, 15_000);
+  const list = useGuestList(eventId, 20_000);
   const guests = list.guests;
   const digits = numberDigits(guests, list.capacity ?? info.capacity);
 
@@ -451,7 +451,7 @@ export function GuestsTab({ eventId, onOpenInvitationBuilder }: { eventId: strin
                     <td className="p-4 pr-6 text-right whitespace-nowrap">
                       {edit ? (
                         <span className="inline-flex items-center gap-2">
-                          <button type="button" onClick={() => void saveEdit()} disabled={working} className="px-3 py-1.5 rounded-lg bg-premium-gold hover:bg-premium-goldHover text-black font-bold text-[11px] scale-on-click disabled:opacity-50">Save</button>
+                          <button type="button" onClick={() => void saveEdit()} disabled={working} className="px-3 py-1.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-[11px] shadow-gold scale-on-click disabled:opacity-50">Save</button>
                           <button type="button" onClick={() => setEditing(null)} className="text-zinc-500 hover:text-white text-[11px] font-bold scale-on-click">Cancel</button>
                         </span>
                       ) : (
