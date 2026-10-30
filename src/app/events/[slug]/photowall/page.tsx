@@ -1,426 +1,516 @@
 'use client';
 
-import { useEventConfigBySlug } from '@/lib/eventStore';
-import React, { useState, useRef, use, Suspense } from 'react';
+import React, { useCallback, useEffect, useRef, useState, use, Suspense, useSyncExternalStore } from 'react';
 import Link from 'next/link';
-import { MOCK_EVENT, MOCK_WEDDING_EVENT, MOCK_CORPORATE_NEXUS_EVENT, MOCK_WEDDING_BALI_EVENT, MOCK_POPVERSE_EVENT, MOCK_GUESTS } from '@/lib/mockData';
-import { Guest } from '@/lib/types';
+import { useSearchParams } from 'next/navigation';
+import confetti from 'canvas-confetti';
 import {
+  ArrowLeft,
   Camera,
-  Upload,
-  Sparkles,
   CheckCircle2,
   AlertCircle,
-  ArrowLeft,
-  X,
-  Share2,
+  Clock,
+  Images,
+  QrCode,
   RefreshCw,
-  Sliders,
-  Download,
-  Video,
-  MessageSquare,
+  ShieldCheck,
+  Trash2,
+  Upload,
+  XCircle,
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
+import { useEventConfigBySlug } from '@/lib/eventStore';
+import { isSampleSlug } from '@/lib/events';
+import { MOCK_PHOTO_WALL_UPLOADS } from '@/lib/mockData';
+import { PinterestMasonryPhotoWall } from '@/components/events/PinterestMasonryPhotoWall';
+import {
+  MAX_CAPTION,
+  feedToUploads,
+  guestPhotoApi,
+  photoErrorMessage,
+  photoUrl,
+  readStoredPass,
+  useWallFeed,
+  type GuestPhoto,
+  type GuestPhotoState,
+  type UploadJob,
+} from '@/lib/photoWallApi';
 
-function GuestPhotoWallContent({ slug }: { slug: string }) {
-  const { event } = useEventConfigBySlug(slug);
-  const captionsEnabled = event.settings?.enablePhotoWallCaptions ?? true;
-  const maxCaptionLength = event.settings?.maxCaptionLength ?? 300;
+const noopSubscribe = () => () => {};
+const REFRESH_MS = 20_000;
+const SAMPLE_PHOTOS = MOCK_PHOTO_WALL_UPLOADS.filter((p) => p.is_approved);
 
-  // Selected verified guest
-  const [selectedGuest] = useState<Guest>(MOCK_GUESTS[0]); // Budi Santoso (checked in)
-  const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
-  const [selectedFilter, setSelectedFilter] = useState<string>('cyberpunk-neon');
-  const [selectedFrame, setSelectedFrame] = useState<string>('gold-badge-2026');
-  const [caption, setCaption] = useState<string>('Having an awesome time at TechUnite! 🚀✨');
-  const [previewMedia, setPreviewMedia] = useState<string | null>(
-    'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=80'
-  );
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [uploadStatus, setUploadStatus] = useState<'idle' | 'compressing' | 'queued' | 'success'>('idle');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+const STATUS_LABEL: Record<GuestPhoto['status'], { label: string; className: string; Icon: typeof Clock }> = {
+  pending: { label: 'Waiting for approval', className: 'bg-premium-gold/15 text-premium-gold border-premium-gold/40', Icon: Clock },
+  approved: { label: 'On the wall', className: 'bg-premium-success/15 text-premium-success border-premium-success/40', Icon: CheckCircle2 },
+  rejected: { label: 'Not approved', className: 'bg-premium-danger/15 text-premium-danger border-premium-danger/40', Icon: XCircle },
+  removed: { label: 'Removed', className: 'bg-premium-surfaceDark text-zinc-400 border-premium-borderDark', Icon: XCircle },
+};
 
-  const filters = [
-    { id: 'normal', name: 'Original', style: 'none' },
-    { id: 'cyberpunk-neon', name: 'Neon Cyber', style: 'contrast(1.2) saturate(1.5)' },
-    { id: 'glam-gold', name: 'Warm Gold', style: 'sepia(0.3) saturate(1.3)' },
-    { id: 'monochrome', name: 'Dramatic B&W', style: 'grayscale(1) contrast(1.3)' },
-  ];
-
-  const frames = [
-    { id: 'none', name: 'No Frame' },
-    { id: 'gold-badge-2026', name: 'VIP Gold 2026' },
-    { id: 'cyber-frame', name: 'Cyan Tech Border' },
-    { id: 'celebration-pink', name: 'Neon Pink Glow' },
-  ];
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setErrorMessage(null);
-
-    if (mediaType === 'image') {
-      if (file.size > 2 * 1024 * 1024) {
-        setErrorMessage('File photo melebihi batas 2MB. Harap gunakan foto dengan ukuran lebih kecil.');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setPreviewMedia(event.target?.result as string);
-        setUploadStatus('idle');
-      };
-      reader.readAsDataURL(file);
-    } else {
-      if (file.size > 20 * 1024 * 1024) {
-        setErrorMessage('Video melebihi batas 20MB (720p). Harap rekam video dengan durasi lebih singkat.');
-        return;
-      }
-      setVideoFile(file);
-      const url = URL.createObjectURL(file);
-      setPreviewMedia(url);
-      setUploadStatus('idle');
-    }
-  };
-
-  const handleUpload = () => {
-    setUploadStatus('compressing');
-
-    setTimeout(() => {
-      setUploadStatus('queued');
-
-      setTimeout(() => {
-        setUploadStatus('success');
-        confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
-      }, 1200);
-    }, 1000);
-  };
-
-  const handleDownload = () => {
-    if (!previewMedia) return;
-    const a = document.createElement('a');
-    a.href = previewMedia;
-    a.download = `all41-${Date.now()}.${mediaType === 'video' ? 'mp4' : 'webp'}`;
-    a.click();
-  };
-
-  const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `${event.name} • Live Photo Wall`,
-          text: caption || 'Captured live at the event!',
-          url: window.location.href,
-        });
-      } catch (err) {}
-    } else if (navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href);
-      alert('Tautan berhasil disalin ke clipboard!');
-    }
-  };
-
-  const maxPhotos = event.settings?.maxPhotosPerGuest || 10;
-  const currentUploads = selectedGuest.photos_uploaded_count;
-  const remainingUploads = Math.max(0, maxPhotos - currentUploads);
-
+function Shell({ slug, title, subtitle, children }: { slug: string; title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#07090e] text-[#f8fafc] flex flex-col justify-between max-w-md mx-auto border-x border-[#1a2133] selection:bg-[#dfb76c]/30">
-      {/* Header */}
-      <header className="h-16 px-4 border-b border-[#1a2133] bg-[#0c0e17] flex items-center justify-between sticky top-0 z-40">
-        <div className="flex items-center gap-2">
+    <div className="min-h-screen bg-premium-black text-zinc-100 font-sans">
+      <div className="max-w-md mx-auto min-h-screen flex flex-col border-x border-premium-borderDark">
+        <header className="h-16 px-4 border-b border-premium-borderDark bg-premium-surfaceDark/90 backdrop-blur-md flex items-center gap-3 sticky top-0 z-40">
           <Link
             href={`/events/${slug}`}
-            className="p-2 rounded-lg bg-[#141926] text-gray-400 hover:text-white"
+            aria-label="Back to the event"
+            className="p-2 rounded-xl bg-premium-charcoal border border-premium-borderDark text-zinc-400 hover:text-white scale-on-click"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
-          <div>
-            <h1 className="text-xs font-bold text-white flex items-center gap-1.5">
-              <span>Live Photo Wall Uploader</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-[#00f0ff] animate-pulse" />
-            </h1>
-            <p className="text-[10px] text-gray-400 font-mono">app.dayoneproject.xyz/events/{slug}</p>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-sm font-display font-bold text-white truncate">{title}</h1>
+            {subtitle && <p className="text-[11px] text-zinc-400 truncate">{subtitle}</p>}
           </div>
-        </div>
-
-        <Link
-          href={`/events/${slug}/photowall/live`}
-          target="_blank"
-          className="text-[11px] font-bold text-[#00f0ff] hover:underline"
-        >
-          View Live Wall
-        </Link>
-      </header>
-
-      {/* Main Upload Body */}
-      <main className="p-4 space-y-4 flex-1 overflow-y-auto">
-        {/* Media Type Toggle: Image vs Video */}
-        <div className="grid grid-cols-2 gap-2 bg-[#0c0f18] p-1 rounded-2xl border border-[#1b2336]">
-          <button
-            type="button"
-            onClick={() => {
-              setMediaType('image');
-              setErrorMessage(null);
-            }}
-            className={`py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-              mediaType === 'image'
-                ? 'bg-[#00f0ff] text-[#07090f] shadow'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            <Camera className="w-3.5 h-3.5" />
-            <span>Photo (WebP ≤ 2MB)</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setMediaType('video');
-              setErrorMessage(null);
-            }}
-            className={`py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-              mediaType === 'video'
-                ? 'bg-[#ff007f] text-white shadow'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            <Video className="w-3.5 h-3.5" />
-            <span>Video (720p ≤ 20MB)</span>
-          </button>
-        </div>
-
-        {/* Guest Verification & Fair-Use Quota Notice */}
-        <div className="p-3 rounded-2xl bg-[#121624] border border-[#20293d] flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#00ff88]" />
-            <span className="font-bold text-white">{selectedGuest.name}</span>
-            <span className="text-gray-400 font-mono">({selectedGuest.table_number})</span>
+          <div className="w-8 h-8 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-sm shadow-gold flex-shrink-0">
+            D1
           </div>
-          <span className="text-[10px] text-gray-400 font-mono">
-            Quota: {currentUploads}/{maxPhotos} used
-          </span>
-        </div>
-
-        {/* Error Notification */}
-        {errorMessage && (
-          <div className="p-3 rounded-xl bg-[#ff007f]/15 border border-[#ff007f] text-xs text-white flex items-center gap-2 animate-fadeIn">
-            <AlertCircle className="w-4 h-4 text-[#ff007f] flex-shrink-0" />
-            <span>{errorMessage}</span>
-          </div>
-        )}
-
-        {/* Upload Success State */}
-        {uploadStatus === 'success' && (
-          <div className="p-4 rounded-2xl bg-[#0b2419] border border-[#00ff88] text-center space-y-3 animate-fadeIn">
-            <div className="w-10 h-10 rounded-full bg-[#00ff88]/20 text-[#00ff88] mx-auto flex items-center justify-center">
-              <CheckCircle2 className="w-6 h-6" />
-            </div>
-            <h3 className="text-sm font-bold text-white">Broadcasted to Live Stage Wall!</h3>
-            <p className="text-xs text-gray-300">
-              Your {mediaType === 'video' ? 'video' : 'photo'} is now live on the main ballroom LED display.
-            </p>
-
-            {/* Download & Social Share Buttons */}
-            <div className="flex items-center justify-center gap-2 pt-1">
-              <button
-                type="button"
-                onClick={handleDownload}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#122b1e] border border-[#00ff88]/40 text-xs font-bold text-[#00ff88]"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Download Media</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleShare}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#122b1e] border border-[#00ff88]/40 text-xs font-bold text-[#dfb76c]"
-              >
-                <Share2 className="w-3.5 h-3.5" />
-                <span>Share to Social</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Media Preview Canvas */}
-        <div className="relative rounded-3xl overflow-hidden border border-[#252f47] bg-[#101422] aspect-[4/5] flex items-center justify-center shadow-xl">
-          {mediaType === 'video' && videoFile ? (
-            <video
-              src={previewMedia || ''}
-              controls
-              className="w-full h-full object-contain"
-            />
-          ) : previewMedia ? (
-            <div className="relative w-full h-full">
-              <img
-                src={previewMedia}
-                alt="Upload preview"
-                className="w-full h-full object-cover transition-all"
-                style={{
-                  filter: filters.find((f) => f.id === selectedFilter)?.style || 'none',
-                }}
-              />
-
-              {/* Decorative Frame Overlays */}
-              {selectedFrame === 'gold-badge-2026' && (
-                <div className="absolute inset-2 border-2 border-[#dfb76c] rounded-2xl pointer-events-none flex flex-col justify-between p-3">
-                  <span className="text-[10px] font-mono font-bold text-[#dfb76c] uppercase tracking-widest bg-black/50 px-2 py-0.5 rounded self-start">
-                    VIP ACCESS 2026
-                  </span>
-                  <span className="text-[10px] font-mono font-bold text-[#dfb76c] uppercase tracking-widest bg-black/50 px-2 py-0.5 rounded self-end">
-                    TECHUNITE APAC
-                  </span>
-                </div>
-              )}
-
-              {selectedFrame === 'cyber-frame' && (
-                <div className="absolute inset-2 border-2 border-[#00f0ff] rounded-2xl pointer-events-none shadow-[inset_0_0_20px_rgba(0,240,255,0.3)] flex flex-col justify-between p-3">
-                  <span className="text-[10px] font-mono font-bold text-[#00f0ff] uppercase bg-black/60 px-2 py-0.5 rounded self-start">
-                    ⚡ LIVE BROADCAST
-                  </span>
-                </div>
-              )}
-
-              {selectedFrame === 'celebration-pink' && (
-                <div className="absolute inset-2 border-2 border-[#ff007f] rounded-2xl pointer-events-none shadow-[inset_0_0_20px_rgba(255,0,127,0.3)]" />
-              )}
-            </div>
-          ) : (
-            <div className="text-center p-6 space-y-2">
-              <Camera className="w-12 h-12 text-gray-500 mx-auto" />
-              <p className="text-xs text-gray-400">Take a photo or record video from device</p>
-            </div>
-          )}
-
-          {/* Retake / Change Media Button */}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl bg-black/75 backdrop-blur-md border border-white/20 text-xs font-semibold text-white flex items-center gap-1.5 hover:bg-black"
-          >
-            <Camera className="w-3.5 h-3.5 text-[#00f0ff]" />
-            <span>{previewMedia ? 'Change File' : 'Choose Media'}</span>
-          </button>
-        </div>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={mediaType === 'image' ? 'image/*' : 'video/mp4,video/quicktime'}
-          capture="user"
-          onChange={handleFileChange}
-          className="hidden"
-        />
-
-        {/* Filter Selection for Photos */}
-        {mediaType === 'image' && (
-          <div>
-            <label className="text-xs font-semibold text-gray-300 block mb-1.5">Color Filter</label>
-            <div className="grid grid-cols-4 gap-1.5">
-              {filters.map((f) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => setSelectedFilter(f.id)}
-                  className={`py-2 px-1 rounded-xl text-[10px] font-medium border text-center transition-all ${
-                    selectedFilter === f.id
-                      ? 'bg-[#18233a] border-[#00f0ff] text-[#00f0ff]'
-                      : 'bg-[#101422] border-[#1e263d] text-gray-400'
-                  }`}
-                >
-                  {f.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Frame Selection */}
-        <div>
-          <label className="text-xs font-semibold text-gray-300 block mb-1.5">Stage Frame</label>
-          <div className="grid grid-cols-2 gap-2">
-            {frames.map((fr) => (
-              <button
-                key={fr.id}
-                type="button"
-                onClick={() => setSelectedFrame(fr.id)}
-                className={`py-2 px-2.5 rounded-xl text-[11px] font-medium border text-left transition-all ${
-                  selectedFrame === fr.id
-                    ? 'bg-[#18233a] border-[#dfb76c] text-[#dfb76c]'
-                    : 'bg-[#101422] border-[#1e263d] text-gray-400'
-                }`}
-              >
-                {fr.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Captions Input (Strictly respecting Event Setting: ON/OFF, Max 300 Chars) */}
-        {captionsEnabled ? (
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-semibold text-gray-300">
-                Wishes or Caption (Up to {maxCaptionLength} characters)
-              </label>
-              <span
-                className={`text-[10px] font-mono ${
-                  caption.length > maxCaptionLength ? 'text-[#ff007f]' : 'text-gray-400'
-                }`}
-              >
-                {caption.length} / {maxCaptionLength}
-              </span>
-            </div>
-            <textarea
-              rows={2}
-              maxLength={maxCaptionLength}
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              placeholder="Write a message to display on the live stage..."
-              className="w-full px-3.5 py-2.5 rounded-xl bg-[#101422] border border-[#1e263d] text-xs text-white focus:outline-none focus:border-[#dfb76c] resize-none"
-            />
-          </div>
-        ) : (
-          <div className="p-3 rounded-xl bg-[#0e121e] border border-[#1e263d] text-xs text-gray-400 flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-gray-500 flex-shrink-0" />
-            <span>Captions disabled for this event. Media-only upload.</span>
-          </div>
-        )}
-      </main>
-
-      {/* Bottom Sticky Action Button */}
-      <footer className="p-4 border-t border-[#1a2133] bg-[#0c0e17] sticky bottom-0 z-40">
-        <button
-          type="button"
-          disabled={uploadStatus === 'compressing' || uploadStatus === 'queued' || remainingUploads <= 0}
-          onClick={handleUpload}
-          className={`w-full py-3.5 rounded-xl font-bold text-xs text-[#0b0d13] flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${
-            uploadStatus === 'compressing' || uploadStatus === 'queued'
-              ? 'bg-gray-500 cursor-not-allowed'
-              : 'bg-gradient-to-r from-[#00f0ff] via-[#dfb76c] to-[#ff007f] hover:brightness-110'
-          }`}
-        >
-          {uploadStatus === 'compressing' ? (
-            <>
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              <span>Optimizing WebP (≤2MB) & Validating Video...</span>
-            </>
-          ) : uploadStatus === 'queued' ? (
-            <>
-              <RefreshCw className="w-4 h-4 animate-spin text-[#dfb76c]" />
-              <span>Queued in Moderation Station...</span>
-            </>
-          ) : (
-            <>
-              <Upload className="w-4 h-4" />
-              <span>Broadcast to Live Stage Wall</span>
-            </>
-          )}
-        </button>
-      </footer>
+        </header>
+        <main className="p-4 space-y-4 flex-1">{children}</main>
+      </div>
     </div>
+  );
+}
+
+function Gate({ icon, title, children }: { icon: React.ReactNode; title: string; children?: React.ReactNode }) {
+  return (
+    <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark text-center space-y-3">
+      <div className="w-12 h-12 mx-auto rounded-full bg-premium-surfaceDark border border-premium-borderDark flex items-center justify-center">{icon}</div>
+      <h2 className="text-lg font-display font-bold text-white">{title}</h2>
+      {children}
+    </div>
+  );
+}
+
+function SamplePhotoWall({ slug, eventName }: { slug: string; eventName: string }) {
+  return (
+    <Shell slug={slug} title="Photo wall" subtitle={eventName}>
+      <div className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-xs text-zinc-400 leading-relaxed">
+        This is a sample event, so uploads are off here. On your own published event, checked-in guests share up to
+        10 photos each from this page.
+      </div>
+      <PinterestMasonryPhotoWall photos={SAMPLE_PHOTOS} canLike={false} />
+    </Shell>
+  );
+}
+
+function GuestPhotoWallContent({ slug }: { slug: string }) {
+  const { event } = useEventConfigBySlug(slug);
+  const fromUrl = useSearchParams().get('t');
+  const stored = useSyncExternalStore(noopSubscribe, () => readStoredPass(slug), () => null);
+  const hydrated = useSyncExternalStore(noopSubscribe, () => true, () => false);
+  const token = fromUrl || stored;
+
+  if (isSampleSlug(slug)) return <SamplePhotoWall slug={slug} eventName={event.name} />;
+  if (!hydrated) {
+    return (
+      <Shell slug={slug} title="Photo wall" subtitle={event.name}>
+        <p className="text-xs text-zinc-500 text-center py-12">Loading…</p>
+      </Shell>
+    );
+  }
+  if (!token) {
+    return (
+      <Shell slug={slug} title="Photo wall" subtitle={event.name}>
+        <Gate icon={<QrCode className="w-6 h-6 text-premium-gold" />} title="Show your QR pass at the entrance first">
+          <p className="text-sm text-zinc-400 leading-relaxed">
+            After you&apos;re checked in, open this page from your pass link on this phone so we know it&apos;s you.
+          </p>
+        </Gate>
+      </Shell>
+    );
+  }
+  return <GuestPhotoWall slug={slug} token={token} fallbackName={event.name} />;
+}
+
+function GuestPhotoWall({ slug, token, fallbackName }: { slug: string; token: string; fallbackName: string }) {
+  const [state, setState] = useState<GuestPhotoState | null>(null);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'not-found' | 'offline'>('loading');
+
+  const refresh = useCallback(
+    () =>
+      guestPhotoApi
+        .state(token)
+        .then((s) => {
+          setState(s);
+          setStatus(s ? 'ready' : 'not-found');
+        })
+        .catch(() => setStatus((v) => (v === 'ready' ? v : 'offline'))),
+    [token],
+  );
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  // This call is per guest (not cached), so only keep asking while something can change on its own:
+  // waiting for check-in, for the host to open the wall, or for a photo to be approved.
+  const needsPoll = !state || !state.enabled || !state.checked_in || state.photos.some((p) => p.status === 'pending');
+  useEffect(() => {
+    const onVisible = () => document.visibilityState === 'visible' && refresh();
+    document.addEventListener('visibilitychange', onVisible);
+    const timer = needsPoll ? window.setInterval(() => document.visibilityState === 'visible' && refresh(), REFRESH_MS) : undefined;
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      if (timer) window.clearInterval(timer);
+    };
+  }, [refresh, needsPoll]);
+
+  const { feed, state: feedState } = useWallFeed(slug, state?.wall_key ?? null, 6000);
+  // The host made a new wall key: fetch it so the album keeps working.
+  useEffect(() => {
+    if (feedState === 'missing' && state?.wall_key) refresh();
+  }, [feedState, state?.wall_key, refresh]);
+  const title = 'Photo wall';
+  const subtitle = state?.event_name || fallbackName;
+
+  if (status === 'loading') {
+    return (
+      <Shell slug={slug} title={title} subtitle={subtitle}>
+        <p className="text-xs text-zinc-500 text-center py-12">Loading your photos…</p>
+      </Shell>
+    );
+  }
+  if (status === 'offline') {
+    return (
+      <Shell slug={slug} title={title} subtitle={subtitle}>
+        <Gate icon={<AlertCircle className="w-6 h-6 text-premium-danger" />} title="We couldn't load the photo wall">
+          <p className="text-sm text-zinc-400">Check your internet connection and try again.</p>
+          <button
+            type="button"
+            onClick={refresh}
+            className="px-5 py-2.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-sm shadow-gold scale-on-click"
+          >
+            Try again
+          </button>
+        </Gate>
+      </Shell>
+    );
+  }
+  if (status === 'not-found' || !state) {
+    return (
+      <Shell slug={slug} title={title} subtitle={subtitle}>
+        <Gate icon={<QrCode className="w-6 h-6 text-premium-gold" />} title="We couldn't find your pass">
+          <p className="text-sm text-zinc-400 leading-relaxed">Open the photo wall from the pass link you received for this event.</p>
+        </Gate>
+      </Shell>
+    );
+  }
+
+  const album = feedToUploads(feed?.photos ?? []);
+  const firstName = state.guest_name.split(/\s+/)[0];
+
+  return (
+    <Shell slug={slug} title={title} subtitle={subtitle}>
+      {!state.enabled ? (
+        <Gate icon={<Camera className="w-6 h-6 text-zinc-400" />} title="The photo wall isn't open yet">
+          <p className="text-sm text-zinc-400">Your host hasn&apos;t switched on photo sharing for this event.</p>
+        </Gate>
+      ) : !state.checked_in ? (
+        <Gate icon={<QrCode className="w-6 h-6 text-premium-gold" />} title="Show your QR pass at the entrance first">
+          <p className="text-sm text-zinc-400 leading-relaxed">
+            Once you&apos;re checked in, you can share up to {state.photo_quota} photos here, {firstName}.
+          </p>
+          <button
+            type="button"
+            onClick={refresh}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-sm font-bold text-white hover:border-premium-gold/50 scale-on-click"
+          >
+            <RefreshCw className="w-4 h-4" />
+            I&apos;m checked in
+          </button>
+        </Gate>
+      ) : !state.consented_at ? (
+        <ConsentCard token={token} state={state} onDone={refresh} />
+      ) : state.uploads_open ? (
+        <Uploader token={token} state={state} onChange={refresh} />
+      ) : (
+        <Gate icon={<Clock className="w-6 h-6 text-zinc-400" />} title="Photo uploads have closed">
+          <p className="text-sm text-zinc-400">You can still see the album and remove your own photos.</p>
+        </Gate>
+      )}
+
+      {state.photos.length > 0 && <MyPhotos token={token} photos={state.photos} onChange={refresh} />}
+
+      {state.wall_key && (
+        <section className="space-y-3 pt-2">
+          <h2 className="text-sm font-display font-bold text-white flex items-center gap-2">
+            <Images className="w-4 h-4 text-premium-neon" />
+            Event album
+            <span className="text-[11px] font-mono font-normal text-zinc-500">{feed?.total ?? 0} on the wall</span>
+          </h2>
+          {album.length ? (
+            <PinterestMasonryPhotoWall photos={album} showCaptions={feed?.captions ?? true} canLike={false} />
+          ) : (
+            <p className="text-xs text-zinc-500 p-4 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark">
+              No photos on the wall yet.
+            </p>
+          )}
+        </section>
+      )}
+    </Shell>
+  );
+}
+
+function ConsentCard({ token, state, onDone }: { token: string; state: GuestPhotoState; onDone: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const agree = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await guestPhotoApi.consent(token);
+      await onDone();
+    } catch (e) {
+      setError(photoErrorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="p-5 rounded-[2rem] bg-premium-charcoal border border-premium-gold/50 space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-premium-gold/15 border border-premium-gold/40 flex items-center justify-center flex-shrink-0">
+          <ShieldCheck className="w-5 h-5 text-premium-gold" />
+        </div>
+        <h2 className="text-lg font-display font-bold text-white">Share photos on the wall</h2>
+      </div>
+      <ul className="space-y-2 text-sm text-zinc-300 leading-relaxed list-disc pl-5">
+        <li>Photos you share appear on the event&apos;s photo wall and in the album other guests see, with your first name and initial.</li>
+        <li>
+          {state.moderation === 'manual'
+            ? 'The host approves each photo before it appears.'
+            : 'Your photos go straight onto the wall.'}
+        </li>
+        <li>You can remove your photos at any time.</li>
+        <li>All photos are deleted 30 days after the event.</li>
+      </ul>
+      {error && <p className="text-xs text-premium-danger">{error}</p>}
+      <button
+        type="button"
+        onClick={agree}
+        disabled={busy}
+        className="w-full py-3 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-sm shadow-gold scale-on-click disabled:opacity-60"
+      >
+        {busy ? 'Saving…' : 'I agree, let me share photos'}
+      </button>
+    </div>
+  );
+}
+
+function Uploader({ token, state, onChange }: { token: string; state: GuestPhotoState; onChange: () => Promise<void> }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [caption, setCaption] = useState('');
+  const [step, setStep] = useState<'idle' | 'compressing' | 'uploading' | 'saving'>('idle');
+  const [error, setError] = useState<string | null>(null);
+  const [posted, setPosted] = useState<GuestPhoto | null>(null);
+  const jobRef = useRef<UploadJob>({});
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Free the preview's memory when it changes or the page closes.
+  useEffect(() => () => {
+    if (preview) URL.revokeObjectURL(preview);
+  }, [preview]);
+
+  const remaining = Math.max(0, state.photo_quota - state.photos_used);
+  const busy = step !== 'idle';
+
+  const pick = (picked: File | undefined) => {
+    if (!picked) return;
+    setFile(picked);
+    setPreview(URL.createObjectURL(picked));
+    setError(null);
+    setPosted(null);
+    jobRef.current = {};
+    if (inputRef.current) inputRef.current.value = '';
+  };
+
+  const submit = async () => {
+    if (!file) return;
+    setError(null);
+    try {
+      const photo = await guestPhotoApi.upload(token, file, state.captions_enabled ? caption : '', jobRef.current, setStep);
+      jobRef.current = {};
+      setFile(null);
+      setPreview(null);
+      setCaption('');
+      setPosted(photo);
+      if (photo.status === 'approved') confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
+    } catch (e) {
+      setError(photoErrorMessage(e));
+    } finally {
+      setStep('idle');
+      await onChange();
+    }
+  };
+
+  const stepLabel = step === 'compressing' ? 'Optimizing your photo…' : step === 'uploading' ? 'Uploading…' : 'Saving…';
+  const manual = state.moderation === 'manual';
+
+  return (
+    <div className="space-y-4">
+      <div className="p-3 rounded-2xl bg-premium-charcoal border border-premium-borderDark flex items-center justify-between text-xs">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="w-2 h-2 rounded-full bg-premium-success flex-shrink-0" />
+          <span className="font-bold text-white truncate">{state.guest_name}</span>
+          <span className="text-premium-success font-mono flex-shrink-0">checked in</span>
+        </div>
+        <span className="text-[11px] text-zinc-400 font-mono flex-shrink-0">
+          {state.photos_used}/{state.photo_quota} photos
+        </span>
+      </div>
+
+      {posted && (
+        <div className="p-4 rounded-2xl bg-premium-success/10 border border-premium-success/40 flex items-start gap-3">
+          <CheckCircle2 className="w-5 h-5 text-premium-success flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-display font-bold text-white">
+              {posted.status === 'approved' ? 'Your photo is on the wall!' : 'Sent! Waiting for the host to approve it.'}
+            </p>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              {remaining > 0 ? `You can share ${remaining} more.` : 'That was your last photo. Remove one to add another.'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="p-3 rounded-xl bg-premium-danger/10 border border-premium-danger/50 text-xs text-white flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-premium-danger flex-shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {remaining <= 0 ? (
+        <Gate icon={<Images className="w-6 h-6 text-premium-gold" />} title={`You've shared ${state.photo_quota} photos`}>
+          <p className="text-sm text-zinc-400">That&apos;s the most each guest can share. Remove one of yours below to add another.</p>
+        </Gate>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={busy}
+            className="relative w-full rounded-[2rem] overflow-hidden border border-premium-borderDark bg-premium-charcoal aspect-[4/5] flex items-center justify-center scale-on-click disabled:opacity-80"
+          >
+            {preview ? (
+              <img src={preview} alt="Your photo" className="w-full h-full object-cover" />
+            ) : (
+              <div className="text-center p-6 space-y-2">
+                <Camera className="w-12 h-12 text-premium-gold mx-auto" />
+                <p className="text-sm font-display font-bold text-white">Take or choose a photo</p>
+                <p className="text-xs text-zinc-400">We shrink it to a light WebP before it uploads.</p>
+              </div>
+            )}
+            {preview && !busy && (
+              <span className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl glass-panel text-xs font-semibold text-white flex items-center gap-1.5">
+                <Camera className="w-3.5 h-3.5 text-premium-neon" />
+                Change photo
+              </span>
+            )}
+          </button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            onChange={(e) => pick(e.target.files?.[0])}
+            className="hidden"
+          />
+
+          {state.captions_enabled && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label htmlFor="photo-caption" className="text-xs font-semibold text-zinc-300">
+                  Caption (optional)
+                </label>
+                <span className="text-[10px] font-mono text-zinc-500">
+                  {caption.length}/{MAX_CAPTION}
+                </span>
+              </div>
+              <textarea
+                id="photo-caption"
+                rows={2}
+                maxLength={MAX_CAPTION}
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                placeholder="Say something about this moment…"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-sm text-white focus:outline-none focus:border-premium-gold resize-none"
+              />
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!file || busy}
+            className="w-full py-3.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-sm shadow-gold scale-on-click flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {busy ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            <span>{busy ? stepLabel : manual ? 'Send for approval' : 'Post to the wall'}</span>
+          </button>
+          <p className="text-[11px] text-zinc-500 text-center">
+            {manual ? 'The host approves each photo before it appears on the wall.' : 'Photos go straight to the wall.'}
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+function MyPhotos({ token, photos, onChange }: { token: string; photos: GuestPhoto[]; onChange: () => Promise<void> }) {
+  const [removing, setRemoving] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const remove = async (photo: GuestPhoto) => {
+    if (!window.confirm('Remove this photo from the wall and the album?')) return;
+    setRemoving(photo.id);
+    setError(null);
+    try {
+      await guestPhotoApi.remove(token, photo.id);
+    } catch (e) {
+      setError(photoErrorMessage(e));
+    } finally {
+      setRemoving(null);
+      await onChange();
+    }
+  };
+
+  return (
+    <section className="space-y-3 pt-2">
+      <h2 className="text-sm font-display font-bold text-white">Your photos</h2>
+      {error && <p className="text-xs text-premium-danger">{error}</p>}
+      <div className="grid grid-cols-2 gap-3">
+        {photos.map((photo) => {
+          const s = STATUS_LABEL[photo.status];
+          return (
+            <div key={photo.id} className="rounded-2xl overflow-hidden bg-premium-charcoal border border-premium-borderDark">
+              <div className="relative aspect-square bg-premium-surfaceDark">
+                <img src={photoUrl(photo.storage_path)} alt={photo.caption || 'Your photo'} loading="lazy" className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => remove(photo)}
+                  disabled={removing === photo.id}
+                  aria-label="Remove this photo"
+                  className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/70 border border-white/20 text-white hover:text-premium-danger flex items-center justify-center scale-on-click disabled:opacity-50"
+                >
+                  {removing === photo.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+              <div className="p-2.5 space-y-1">
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold ${s.className}`}>
+                  <s.Icon className="w-3 h-3" />
+                  {s.label}
+                </span>
+                {photo.caption && <p className="text-[11px] text-zinc-400 line-clamp-2">{photo.caption}</p>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -435,7 +525,7 @@ export default function GuestPhotoWallPage({
   params: Promise<{ slug: string }>;
 }) {
   return (
-    <Suspense fallback={<div className="p-8 text-xs text-gray-400">Loading uploader...</div>}>
+    <Suspense fallback={<div className="min-h-screen bg-premium-black p-8 text-xs text-zinc-500">Loading photo wall…</div>}>
       <GuestPhotoWallWrapper params={params} />
     </Suspense>
   );

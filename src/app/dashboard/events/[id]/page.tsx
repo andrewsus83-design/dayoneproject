@@ -26,7 +26,7 @@ import {
   useEventConfig, useGuests, useHydrated, writeGuests, formatGuestNumber, numberDigits, resetEventSection, makePassToken, newId, DEFAULT_ACCESS,
   useOrgEventsCache, type EventInfo,
 } from '@/lib/eventStore';
-import { isSlugTaken } from '@/lib/events';
+import { BASE_EVENTS, isSlugTaken } from '@/lib/events';
 import { slugProblem, updateOrgEvent, venueTimestamp } from '@/lib/orgEvents';
 import { downloadBlob, toCsv } from '@/lib/image';
 import * as XLSX from 'xlsx';
@@ -1090,10 +1090,10 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h3 className="text-2xl font-display font-bold text-white">Photo Wall Manager</h3>
-                <p className="text-xs text-zinc-400">Filter effects, frames, moderation, Google Drive backup, and live stage wall.</p>
+                <p className="text-xs text-zinc-400">Guest uploads, moderation, captions, and the live wall link.</p>
               </div>
             </div>
-            <PhotoWallManager />
+            <PhotoWallManager eventId={eventId} slug={event.slug} sample={BASE_EVENTS.some((e) => e.id === eventId)} />
           </div>
         )}
 

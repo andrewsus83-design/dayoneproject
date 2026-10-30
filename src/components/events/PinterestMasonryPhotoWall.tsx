@@ -8,11 +8,7 @@ import {
   Share2,
   Play,
   Sparkles,
-  CheckCircle2,
   X,
-  ExternalLink,
-  MessageCircle,
-  Copy,
   Check,
   Video,
 } from 'lucide-react';
@@ -32,38 +28,30 @@ export function PinterestMasonryPhotoWall({
   canLike = true,
   frameOverlayUrl,
 }: PinterestMasonryPhotoWallProps) {
-  const [items, setItems] = useState<PhotoWallUpload[]>(photos);
+  // Photos come straight from props, so a polling parent (live wall, album) shows new ones as they arrive.
   const [likedIds, setLikedIds] = useState<Record<string, boolean>>({});
-  const [selectedItem, setSelectedItem] = useState<PhotoWallUpload | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const items = photos;
+  const selectedItem = selectedId ? items.find((p) => p.id === selectedId) ?? null : null;
+  const setSelectedItem = (item: PhotoWallUpload | null) => setSelectedId(item?.id ?? null);
+  const likesOf = (item: PhotoWallUpload) => (item.likes_count || 0) + (likedIds[item.id] ? 1 : 0);
 
   const handleToggleLike = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (!canLike) return;
-
-    setLikedIds((prev) => {
-      const isLiked = !prev[id];
-      setItems((currentItems) =>
-        currentItems.map((item) => {
-          if (item.id === id) {
-            const currentLikes = item.likes_count || 0;
-            return {
-              ...item,
-              likes_count: isLiked ? currentLikes + 1 : Math.max(0, currentLikes - 1),
-            };
-          }
-          return item;
-        })
-      );
-      return { ...prev, [id]: isLiked };
-    });
+    setLikedIds((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   const handleDownload = (e: React.MouseEvent, item: PhotoWallUpload) => {
     e.stopPropagation();
+    const ext = item.media_type === 'video' ? 'mp4' : item.image_url.includes('.jpg') ? 'jpg' : 'webp';
+    const filename = `dayoneproject-${item.id}.${ext}`;
     const link = document.createElement('a');
-    link.href = item.video_url && item.media_type === 'video' ? item.video_url : item.image_url;
-    link.download = `all41-${item.id}.${item.media_type === 'video' ? 'mp4' : 'webp'}`;
+    const href = item.video_url && item.media_type === 'video' ? item.video_url : item.image_url;
+    // Supabase Storage sends the file as a download (not a new tab) when asked to.
+    link.href = href.includes('/storage/v1/object/public/') ? `${href}?download=${encodeURIComponent(filename)}` : href;
+    link.download = filename;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
     document.body.appendChild(link);
@@ -73,26 +61,34 @@ export function PinterestMasonryPhotoWall({
 
   const handleShare = async (e: React.MouseEvent, item: PhotoWallUpload) => {
     e.stopPropagation();
-    const shareData = {
-      title: 'Event Live Photo Wall • dayoneproject.xyz',
-      text: item.caption || 'Check out this live event moment on dayoneproject.xyz!',
-      url: window.location.href,
-    };
+    // Stored photos are shared as the photo itself (or its own link), never the page address,
+    // which can carry the wall key.
+    const stored = item.image_url.includes('/storage/v1/object/public/');
+    const link = stored ? item.image_url : window.location.href;
+    const text = item.caption || 'A moment from the event, on dayoneproject.xyz';
 
     if (navigator.share) {
       try {
-        await navigator.share(shareData);
+        if (stored && navigator.canShare) {
+          const blob = await fetch(item.image_url).then((r) => r.blob());
+          const file = new File([blob], `dayoneproject-${item.id}.${blob.type === 'image/jpeg' ? 'jpg' : 'webp'}`, { type: blob.type });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], text });
+            return;
+          }
+        }
+        await navigator.share({ title: 'Event photo wall • dayoneproject.xyz', text, url: link });
       } catch (err) {
-        copyCurrentLink();
+        if (!(err instanceof DOMException && err.name === 'AbortError')) copyLink(link);
       }
     } else {
-      copyCurrentLink();
+      copyLink(link);
     }
   };
 
-  const copyCurrentLink = () => {
+  const copyLink = (link: string) => {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href);
+      navigator.clipboard.writeText(link).catch(() => undefined);
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2500);
     }
@@ -194,29 +190,33 @@ export function PinterestMasonryPhotoWall({
                   <div className="flex items-center justify-between text-xs pt-2 border-t border-white/10">
                     <div className="truncate mr-2">
                       <span className="font-bold text-premium-neon truncate block">
-                        @{item.guest?.name || 'Attendee'}
+                        {item.guest?.name || 'Guest'}
                       </span>
-                      <span className="text-[10px] text-zinc-400 font-mono truncate block">
-                        Table {item.guest?.table_number || 'General VIP'}
-                      </span>
+                      {item.guest?.table_number && (
+                        <span className="text-[10px] text-zinc-400 font-mono truncate block">
+                          Table {item.guest.table_number}
+                        </span>
+                      )}
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={(e) => handleToggleLike(e, item.id)}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-mono transition-all scale-on-click ${
-                        isLiked
-                          ? 'bg-premium-danger text-white shadow-danger scale-105'
-                          : 'bg-black/60 text-zinc-300 hover:text-white border border-white/20'
-                      }`}
-                    >
-                      <Heart
-                        className={`w-3.5 h-3.5 ${
-                          isLiked ? 'fill-white stroke-white' : 'stroke-current'
+                    {canLike && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleLike(e, item.id)}
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-mono transition-all scale-on-click ${
+                          isLiked
+                            ? 'bg-premium-danger text-white shadow-danger scale-105'
+                            : 'bg-black/60 text-zinc-300 hover:text-white border border-white/20'
                         }`}
-                      />
-                      <span>{item.likes_count || 0}</span>
-                    </button>
+                      >
+                        <Heart
+                          className={`w-3.5 h-3.5 ${
+                            isLiked ? 'fill-white stroke-white' : 'stroke-current'
+                          }`}
+                        />
+                        <span>{likesOf(item)}</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -261,32 +261,34 @@ export function PinterestMasonryPhotoWall({
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-xl font-display font-medium text-white flex items-center gap-2">
-                    <span>{selectedItem.guest?.name || 'Verified Guest'}</span>
+                    <span>{selectedItem.guest?.name || 'Guest'}</span>
                     <span className="px-2.5 py-0.5 bg-premium-success/20 text-premium-success border border-premium-success/30 rounded-full text-xs font-bold font-mono">
                       Checked-in
                     </span>
                   </h3>
-                  <p className="text-xs text-zinc-400 font-mono mt-0.5">
-                    Table {selectedItem.guest?.table_number || 'VIP'} • Broadcasted Live to Ballroom LED
-                  </p>
+                  {selectedItem.guest?.table_number && (
+                    <p className="text-xs text-zinc-400 font-mono mt-0.5">Table {selectedItem.guest.table_number}</p>
+                  )}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={(e) => handleToggleLike(e, selectedItem.id)}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl text-xs font-bold transition-all scale-on-click ${
-                    likedIds[selectedItem.id]
-                      ? 'bg-premium-danger text-white shadow-danger scale-105'
-                      : 'bg-premium-surfaceDark text-zinc-300 hover:text-white border border-premium-borderDark'
-                  }`}
-                >
-                  <Heart
-                    className={`w-4 h-4 ${
-                      likedIds[selectedItem.id] ? 'fill-white stroke-white' : ''
+                {canLike && (
+                  <button
+                    type="button"
+                    onClick={(e) => handleToggleLike(e, selectedItem.id)}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl text-xs font-bold transition-all scale-on-click ${
+                      likedIds[selectedItem.id]
+                        ? 'bg-premium-danger text-white shadow-danger scale-105'
+                        : 'bg-premium-surfaceDark text-zinc-300 hover:text-white border border-premium-borderDark'
                     }`}
-                  />
-                  <span>{selectedItem.likes_count || 0} Cheers</span>
-                </button>
+                  >
+                    <Heart
+                      className={`w-4 h-4 ${
+                        likedIds[selectedItem.id] ? 'fill-white stroke-white' : ''
+                      }`}
+                    />
+                    <span>{likesOf(selectedItem)} Cheers</span>
+                  </button>
+                )}
               </div>
 
               {/* Caption if enabled */}
