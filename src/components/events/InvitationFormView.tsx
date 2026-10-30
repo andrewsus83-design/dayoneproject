@@ -12,8 +12,19 @@ import {
 } from '@/lib/eventStore';
 import { alpha, type ResolvedTheme } from '@/lib/eventTheme';
 import { downloadBlob, downloadDataUrl } from '@/lib/image';
+import { passCode } from '@/lib/guestsApi';
 
 export type PreviewScreen = 'cover' | 'page' | 'review' | 'confirmed' | 'declined' | 'closed' | 'upcoming';
+
+export type SubmitResult = WriteResult & {
+  number?: number;
+  /** The pass token the server issued (replaces the local one). */
+  token?: string;
+  /** The guest's name as it is on the list. */
+  name?: string;
+  /** The form closed in the meantime: show the closed screen with this reason. */
+  closedReason?: string;
+};
 
 type Screen =
   | { kind: 'cover' }
@@ -42,7 +53,8 @@ interface Props {
   embedded?: boolean;
   forcedScreen?: PreviewScreen;
   forcedItemId?: string | null;
-  onSubmit?: (response: FormResponse) => WriteResult & { number?: number };
+  /** Saves the reply; may be async. The result can carry the pass the server issued (token, number, listed name). */
+  onSubmit?: (response: FormResponse) => SubmitResult | Promise<SubmitResult>;
   /** Digits used to pad guest numbers (001 vs 0001). */
   numberPad?: number;
   onAdjustPhoto?: (patch: { photoX: number; photoY: number }) => void;
@@ -158,6 +170,8 @@ export function InvitationFormView({
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [lateClosed, setLateClosed] = useState<string | null>(null);
   const [qrUrl, setQrUrl] = useState('');
   const dragRef = useRef<{ x: number; y: number; px: number; py: number; w: number; h: number } | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -218,7 +232,7 @@ export function InvitationFormView({
 
   const baseVars = { event: info.name, date: formatEventDate(info.startDate), time: formatEventTime(info.startTime), venue: info.venue, opens: formatOpensAt(invitation.opensAt) };
   const fill = (text: string, r?: FormResponse) =>
-    fillVariables(text, { ...baseVars, name: r?.name.split(' ')[0], fullname: r?.name, party: r?.party, code: r?.token, number: r?.number ? formatGuestNumber(r.number, numberPad) : undefined });
+    fillVariables(text, { ...baseVars, name: r?.name.split(' ')[0], fullname: r?.name, party: r?.party, code: r ? passCode(r.token) : undefined, number: r?.number ? formatGuestNumber(r.number, numberPad) : undefined });
 
   const sp = theme.space;
   const accentIsScript = theme.accentFamily !== theme.headingFamily;
@@ -248,17 +262,33 @@ export function InvitationFormView({
       party: attending ? Math.max(1, partyRaw || 1) : 0,
       token: makePassToken(),
     };
-    let saved = response;
-    if (onSubmit) {
-      const res = onSubmit(response);
-      if (!res.ok) {
-        setFormError(res.error ?? 'Your reply could not be saved. Please try again.');
-        return;
-      }
-      if (res.number) saved = { ...response, number: res.number };
+    if (!onSubmit) {
+      setFormError(null);
+      setScreen({ kind: 'done', response });
+      return;
     }
+    if (sending) return;
+    setSending(true);
     setFormError(null);
-    setScreen({ kind: 'done', response: saved });
+    Promise.resolve()
+      .then(() => onSubmit(response))
+      .then((res) => {
+        if (res.closedReason) {
+          setLateClosed(res.closedReason);
+          setScreen({ kind: 'closed' });
+          return;
+        }
+        if (!res.ok) {
+          setFormError(res.error ?? 'Your reply could not be saved. Please try again.');
+          return;
+        }
+        setScreen({
+          kind: 'done',
+          response: { ...response, number: res.number ?? response.number, token: res.token ?? response.token, name: res.name || response.name },
+        });
+      })
+      .catch(() => setFormError('Your reply could not be sent. Check your connection and try again.'))
+      .finally(() => setSending(false));
   };
 
   const pageErrors = (page: Page, ans: Record<string, string>) => {
@@ -577,8 +607,8 @@ export function InvitationFormView({
               {choiceOnly && !answeredChoice && firstQuestion && !firstQuestion.required ? (
                 <button type="button" onClick={() => goNext(index, answers)} className="flex-1 py-3.5 text-sm font-bold scale-on-click" style={secondaryBtn}>Skip</button>
               ) : (
-                <button type="button" onClick={() => goNext(index, answers)} className="flex-1 py-3.5 text-sm font-bold flex items-center justify-center gap-2 scale-on-click" style={primaryBtn}>
-                  {index === pages.length - 1 ? (invitation.askReview && visibleQuestions.length ? 'Review answers' : invitation.sendLabel || 'Send') : 'Next'}
+                <button type="button" disabled={sending} onClick={() => goNext(index, answers)} className="flex-1 py-3.5 text-sm font-bold flex items-center justify-center gap-2 scale-on-click disabled:opacity-60" style={primaryBtn}>
+                  {index === pages.length - 1 ? (invitation.askReview && visibleQuestions.length ? 'Review answers' : sending ? 'Sending…' : invitation.sendLabel || 'Send') : 'Next'}
                   <ArrowRight className="w-4 h-4" />
                 </button>
               )}
@@ -631,10 +661,11 @@ export function InvitationFormView({
                 }
                 submit(answers);
               }}
-              className="flex-1 py-3.5 text-sm font-bold flex items-center justify-center gap-2 scale-on-click"
+              disabled={sending}
+              className="flex-1 py-3.5 text-sm font-bold flex items-center justify-center gap-2 scale-on-click disabled:opacity-60"
               style={primaryBtn}
             >
-              {invitation.sendLabel || 'Send'} <Check className="w-4 h-4" />
+              {sending ? 'Sending…' : invitation.sendLabel || 'Send'} <Check className="w-4 h-4" />
             </button>
           </>,
         )}
@@ -695,12 +726,12 @@ export function InvitationFormView({
             <div className="px-5 pb-5 pt-4 flex flex-col items-center gap-2" style={{ borderTop: `1px dashed ${theme.border}` }}>
               <div className="w-40 h-40 bg-white rounded-2xl p-2 flex items-center justify-center">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                {qrUrl ? <img src={qrUrl} alt={`QR pass ${r.token}`} className="w-full h-full" /> : <div className="w-full h-full animate-pulse bg-zinc-200 rounded-xl" />}
+                {qrUrl ? <img src={qrUrl} alt={`QR pass ${passCode(r.token)}`} className="w-full h-full" /> : <div className="w-full h-full animate-pulse bg-zinc-200 rounded-xl" />}
               </div>
-              <div className="font-mono text-sm font-bold tracking-widest">{r.token}</div>
+              <div className="font-mono text-sm font-bold tracking-widest">{passCode(r.token)}</div>
               {copy.smallPrint && <p className="text-[11px] text-center" style={{ color: theme.subtle }}>{fill(copy.smallPrint, r)}</p>}
               {qrUrl && (
-                <button type="button" onClick={() => downloadDataUrl(`${r.token}.png`, qrUrl)} className="mt-1 inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold scale-on-click" style={secondaryBtn}>
+                <button type="button" onClick={() => downloadDataUrl(`pass-${passCode(r.token)}.png`, qrUrl)} className="mt-1 inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold scale-on-click" style={secondaryBtn}>
                   <Download className="w-3.5 h-3.5" /> Save QR pass
                 </button>
               )}
@@ -711,7 +742,7 @@ export function InvitationFormView({
         {r.attending && (invitation.showCalendar || invitation.showDirections) && (
           <div className="grid grid-cols-2 gap-3">
             {invitation.showCalendar && (
-              <button type="button" onClick={() => downloadIcs(info, r.token)} className="py-3.5 text-sm font-bold flex items-center justify-center gap-2 scale-on-click" style={secondaryBtn}>
+              <button type="button" onClick={() => downloadIcs(info, passCode(r.token))} className="py-3.5 text-sm font-bold flex items-center justify-center gap-2 scale-on-click" style={secondaryBtn}>
                 <Calendar className="w-4 h-4" /> Add to calendar
               </button>
             )}
@@ -737,7 +768,7 @@ export function InvitationFormView({
         </div>
         <h2 className="text-2xl font-bold" style={headingStyle}>{fill(invitation.closed.heading)}</h2>
         <p className="text-sm leading-relaxed" style={{ color: theme.muted }}>{fill(invitation.closed.message)}</p>
-        {closedReason && <p className="text-xs" style={{ color: theme.subtle }}>{closedReason}</p>}
+        {(closedReason || lateClosed) && <p className="text-xs" style={{ color: theme.subtle }}>{closedReason || lateClosed}</p>}
         <div className="text-left">{contactBlock}</div>
       </div>
     );

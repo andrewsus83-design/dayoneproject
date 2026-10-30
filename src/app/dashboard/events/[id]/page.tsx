@@ -15,21 +15,20 @@ import { BroadcastStudio } from '@/components/dashboard/event/BroadcastStudio';
 import { EventDesignStudio } from '@/components/dashboard/event/EventDesignStudio';
 import { CommentsWall } from '@/components/dashboard/event/CommentsWall';
 import { PublishButton } from '@/components/dashboard/event/PublishButton';
+import { GuestsTab } from '@/components/dashboard/event/GuestsTab';
+import { RegistrationsTab } from '@/components/dashboard/event/RegistrationsTab';
 import {
   POPVERSE_QUIZ_QUESTIONS,
   MOCK_PHOTO_WALL_UPLOADS,
-  MOCK_REGISTRATIONS,
 } from '@/lib/mockData';
-import { Guest, PhotoWallUpload } from '@/lib/types';
+import { PhotoWallUpload } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
 import {
-  useEventConfig, useGuests, useHydrated, writeGuests, formatGuestNumber, numberDigits, resetEventSection, makePassToken, newId, DEFAULT_ACCESS,
+  useEventConfig, useHydrated, resetEventSection, DEFAULT_ACCESS,
   useOrgEventsCache, type EventInfo,
 } from '@/lib/eventStore';
 import { BASE_EVENTS, isSlugTaken } from '@/lib/events';
 import { slugProblem, updateOrgEvent, venueTimestamp } from '@/lib/orgEvents';
-import { downloadBlob, toCsv } from '@/lib/image';
-import * as XLSX from 'xlsx';
 import {
   LayoutDashboard,
   Users,
@@ -51,9 +50,6 @@ import {
   Globe,
   Sliders,
   Send,
-  Plus,
-  Trash2,
-  Download,
   Share2,
   Lock,
   Mail,
@@ -63,15 +59,12 @@ import {
   QrCode,
   Shield,
   Eye,
-  CheckCircle2,
-  XCircle,
   HelpCircle,
   ArrowRight,
   TrendingUp,
   Heart,
   Briefcase,
   Smartphone,
-  Upload,
   RotateCcw,
   KeyRound,
   EyeOff,
@@ -163,113 +156,12 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedEmbed, setCopiedEmbed] = useState<string | null>(null);
 
-  // Guests are shared with the gate desk and the full guest manager.
-  const guestsList = useGuests(eventId);
-  const setGuestsList = (next: Guest[]) => writeGuests(eventId, next);
-  const [searchGuest, setSearchGuest] = useState('');
-  const [showAddGuest, setShowAddGuest] = useState(false);
-  const [newGuest, setNewGuest] = useState({ name: '', contact: '', category: isWedding ? 'Guest' : 'VIP Delegate', table: '' });
-  const [importStatus, setImportStatus] = useState<string | null>(null);
-  const csvInputRef = React.useRef<HTMLInputElement>(null);
-
-  const makeGuest = (name: string, contact: string, category: string, table: string): Guest => {
-    const now = new Date().toISOString();
-    const isEmail = contact.includes('@');
-    return {
-      id: newId('g'),
-      event_id: eventId,
-      name,
-      email: isEmail ? contact : null,
-      phone: !isEmail && contact ? contact : null,
-      category: category || 'Guest',
-      table_number: table || null,
-      plus_one_count: 0,
-      rsvp_status: 'attending',
-      rsvp_notes: null,
-      custom_fields: {},
-      qr_code_token: makePassToken(),
-      is_checked_in: false,
-      checked_in_at: null,
-      checked_in_by: null,
-      photos_uploaded_count: 0,
-      emails_sent_count: 0,
-      whatsapp_sent_count: 0,
-      created_at: now,
-      updated_at: now,
-    };
-  };
-
-  const handleAddGuest = () => {
-    if (!newGuest.name.trim()) return;
-    setGuestsList([...guestsList, makeGuest(newGuest.name.trim(), newGuest.contact.trim(), newGuest.category, newGuest.table.trim())]);
-    setNewGuest((g) => ({ ...g, name: '', contact: '', table: '' }));
-    setShowAddGuest(false);
-  };
-
-  const handleExportGuests = () => {
-    const rows = [
-      ['No.', 'Name', 'Email', 'Phone', 'Category', 'Table', 'QR Token', 'Checked in'],
-      ...guestsList.map((g) => [formatGuestNumber(g.guest_number, numberDigits(guestsList, info.capacity)), g.name, g.email ?? '', g.phone ?? '', g.category, g.table_number ?? '', g.qr_code_token, g.is_checked_in ? 'Yes' : 'No']),
-    ];
-    downloadBlob(`${info.slug}-guests.csv`, new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' }));
-  };
-
-  const handleDownloadTemplate = () => {
-    const rows = [['Name', 'Phone / Email', 'Category', 'Table No.'], ['Jane Doe', 'jane@example.com', 'VIP', 'Table 05']];
-    downloadBlob('dayoneproject-guest-template.csv', new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' }));
-  };
-
-  const handleImportGuests = async (file: File | undefined) => {
-    if (!file) return;
-    try {
-      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: '' });
-      const pick = (row: Record<string, string>, keys: string[]) => {
-        const k = Object.keys(row).find((h) => keys.some((key) => h.toLowerCase().includes(key)));
-        return k ? String(row[k]).trim() : '';
-      };
-      const existing = new Set(guestsList.map((g) => `${g.name.toLowerCase()}|${(g.email ?? g.phone ?? '').toLowerCase()}`));
-      const added: Guest[] = [];
-      let skipped = 0;
-      for (const row of rows) {
-        const name = pick(row, ['name']);
-        if (!name) continue;
-        const contact = pick(row, ['phone', 'email', 'contact', 'whatsapp']);
-        const key = `${name.toLowerCase()}|${contact.toLowerCase()}`;
-        if (existing.has(key)) {
-          skipped++;
-          continue;
-        }
-        existing.add(key);
-        added.push(makeGuest(name, contact, pick(row, ['category', 'type']) || 'Guest', pick(row, ['table', 'seat'])));
-      }
-      setGuestsList([...guestsList, ...added]);
-      setImportStatus(`Imported ${added.length} guest${added.length === 1 ? '' : 's'}${skipped ? ` · ${skipped} duplicate${skipped === 1 ? '' : 's'} skipped` : ''}.`);
-      setGuestsSubTab('list');
-    } catch {
-      setImportStatus('That file could not be read. Use a .csv or .xlsx with a Name column.');
-    } finally {
-      if (csvInputRef.current) csvInputRef.current.value = '';
-    }
-  };
-
-  const filteredGuests = guestsList.filter((g) =>
-    `${g.guest_number ?? ''} ${g.name} ${g.email ?? ''} ${g.phone ?? ''} ${g.category} ${g.table_number ?? ''}`.toLowerCase().includes(searchGuest.toLowerCase()),
-  );
-  const [registrations, setRegistrations] = useState(
-    MOCK_REGISTRATIONS[eventId] ?? MOCK_REGISTRATIONS['evt-techunite-2026']
-  );
-
   // Photos & Moderation state
   const [photosList, setPhotosList] = useState<PhotoWallUpload[]>(MOCK_PHOTO_WALL_UPLOADS);
   const [captionsOn, setCaptionsOn] = useState(true);
 
   // Games sub-tab
   const [gamesSubTab, setGamesSubTab] = useState<'quiz' | 'scavenger' | 'link'>('quiz');
-
-  // Guests sub-tab
-  const [guestsSubTab, setGuestsSubTab] = useState<'list' | 'invitation' | 'import'>('list');
 
   // Module config for sidebar visibility
   const TOGGLEABLE_MODULES = [
@@ -335,18 +227,6 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
       setCopiedEmbed(id);
       setTimeout(() => setCopiedEmbed(null), 2000);
     }
-  };
-
-  const handleApproveRegistration = (regId: string) => {
-    setRegistrations((prev) =>
-      prev.map((r) => (r.id === regId ? { ...r, status: 'approved' } : r))
-    );
-  };
-
-  const handleDeclineRegistration = (regId: string) => {
-    setRegistrations((prev) =>
-      prev.map((r) => (r.id === regId ? { ...r, status: 'rejected' } : r))
-    );
   };
 
   return (
@@ -690,310 +570,13 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
             MENU 3: GUESTS (Roster, Seating Table, VIP Badges, CSV)
            ========================================================================= */}
         {activeTab === 'guests' && (
-          <div className="space-y-6 animate-in fade-in duration-200">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-2xl font-display font-bold text-white">Guests</h3>
-                <p className="text-xs text-zinc-400">Total {guestsList.length} VIP delegates enrolled • Gate Check-in Active</p>
-              </div>
-
-              {guestsSubTab === 'list' && (
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleExportGuests}
-                    className="px-4 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-xs font-bold text-white hover:border-premium-gold scale-on-click flex items-center gap-2"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Export CSV</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddGuest((v) => !v)}
-                    className="px-5 py-2.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-bold text-xs shadow-gold scale-on-click flex items-center gap-2"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Attendee</span>
-                  </button>
-                </div>
-              )}
-              {guestsSubTab === 'import' && (
-                <button
-                  type="button"
-                  onClick={() => csvInputRef.current?.click()}
-                  className="px-5 py-2.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-bold text-xs shadow-gold scale-on-click flex items-center gap-2"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Upload CSV</span>
-                </button>
-              )}
-              <input
-                ref={csvInputRef}
-                type="file"
-                accept=".csv,.xlsx,.xls"
-                className="hidden"
-                onChange={(e) => handleImportGuests(e.target.files?.[0])}
-              />
-            </div>
-
-            {importStatus && (
-              <div className="p-3 rounded-xl bg-premium-surfaceDark border border-premium-gold/40 text-xs text-white flex items-center justify-between gap-3">
-                <span>{importStatus}</span>
-                <button type="button" onClick={() => setImportStatus(null)} className="text-zinc-500 hover:text-white scale-on-click" aria-label="Dismiss">
-                  <XCircle className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-
-            {guestsSubTab === 'list' && showAddGuest && (
-              <div className="p-5 rounded-[2rem] bg-premium-charcoal border border-premium-gold/40 grid grid-cols-1 sm:grid-cols-5 gap-3 items-end text-xs">
-                <div className="sm:col-span-2">
-                  <label className="text-zinc-400 font-bold block mb-1">Full name</label>
-                  <input
-                    autoFocus
-                    value={newGuest.name}
-                    onChange={(e) => setNewGuest((g) => ({ ...g, name: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddGuest(); }}
-                    className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white p-2.5 rounded-xl outline-none focus:border-premium-gold"
-                  />
-                </div>
-                <div>
-                  <label className="text-zinc-400 font-bold block mb-1">Phone or email</label>
-                  <input
-                    value={newGuest.contact}
-                    onChange={(e) => setNewGuest((g) => ({ ...g, contact: e.target.value }))}
-                    className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white p-2.5 rounded-xl outline-none focus:border-premium-gold"
-                  />
-                </div>
-                <div>
-                  <label className="text-zinc-400 font-bold block mb-1">Category · Table</label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <input
-                      value={newGuest.category}
-                      onChange={(e) => setNewGuest((g) => ({ ...g, category: e.target.value }))}
-                      className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white p-2.5 rounded-xl outline-none focus:border-premium-gold"
-                    />
-                    <input
-                      value={newGuest.table}
-                      placeholder="T-05"
-                      onChange={(e) => setNewGuest((g) => ({ ...g, table: e.target.value }))}
-                      className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white p-2.5 rounded-xl outline-none focus:border-premium-gold"
-                    />
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddGuest}
-                  disabled={!newGuest.name.trim()}
-                  className="py-2.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-bold scale-on-click disabled:opacity-40"
-                >
-                  Add guest
-                </button>
-              </div>
-            )}
-
-            {guestsSubTab === 'list' && (
-              <input
-                value={searchGuest}
-                onChange={(e) => setSearchGuest(e.target.value)}
-                placeholder="Search name, contact, category or table…"
-                className="w-full bg-premium-surfaceDark border border-premium-borderDark text-white p-3 rounded-xl text-xs outline-none focus:border-premium-gold"
-              />
-            )}
-
-            {/* Sub-tab pills */}
-            <div className="flex items-center gap-2 overflow-x-auto">
-              {([
-                { id: 'list', label: 'Guest Roster' },
-                { id: 'invitation', label: 'Invitation Form' },
-                { id: 'import', label: 'Import CSV' },
-              ] as const).map((st) => (
-                <button
-                  key={st.id}
-                  type="button"
-                  onClick={() => setGuestsSubTab(st.id)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap scale-on-click transition-all ${
-                    guestsSubTab === st.id
-                      ? 'bg-premium-gold/15 text-white border border-premium-gold/40'
-                      : 'bg-premium-surfaceDark text-zinc-400 border border-premium-borderDark hover:text-white'
-                  }`}
-                >
-                  {st.label}
-                </button>
-              ))}
-            </div>
-
-            {/* ── Guest Roster sub-tab ── */}
-            {guestsSubTab === 'list' && (
-            <div className="rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark overflow-hidden shadow-2xl">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-premium-borderDark bg-premium-surfaceDark text-zinc-400 font-mono uppercase text-[10px] tracking-wider">
-                    <th className="p-4 pl-6 w-16">#</th>
-                    <th className="p-4">Attendee</th>
-                    <th className="p-4">Contact</th>
-                    <th className="p-4">Category</th>
-                    <th className="p-4">Table / Seat</th>
-                    <th className="p-4">QR Token</th>
-                    <th className="p-4 text-right">Gate Status</th>
-                    <th className="p-4 pr-6 w-10" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-premium-borderDark/60">
-                  {filteredGuests.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="p-6 text-center text-zinc-500">No guests match “{searchGuest}”.</td>
-                    </tr>
-                  )}
-                  {filteredGuests.map((g) => (
-                    <tr key={g.id} className="hover:bg-premium-surfaceDark/40 transition-colors">
-                      <td className="p-4 pl-6 font-mono text-premium-gold font-bold">{formatGuestNumber(g.guest_number, numberDigits(guestsList, info.capacity))}</td>
-                      <td className="p-4 font-bold text-white">{g.name}</td>
-                      <td className="p-4 text-zinc-400 font-mono text-[11px]">{g.phone || g.email}</td>
-                      <td className="p-4">
-                        <span className="px-2.5 py-1 rounded-full bg-premium-gold/15 text-premium-gold border border-premium-gold/30 font-bold uppercase text-[10px]">
-                          {g.category}
-                        </span>
-                      </td>
-                      <td className="p-4 text-zinc-300 font-medium">{g.table_number || 'General Seating'}</td>
-                      <td className="p-4 text-zinc-500 font-mono text-[10px]">{g.qr_code_token}</td>
-                      <td className="p-4 text-right">
-                        {g.is_checked_in ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-premium-success/15 text-premium-success font-bold text-[10px] border border-premium-success/30">
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span>Checked-in</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 font-mono text-[10px]">
-                            Awaiting
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-4 pr-6 text-right">
-                        <button
-                          type="button"
-                          onClick={() => { if (confirm(`Remove ${g.name} from the guest list?`)) setGuestsList(guestsList.filter((x) => x.id !== g.id)); }}
-                          className="text-zinc-600 hover:text-premium-danger scale-on-click"
-                          aria-label={`Remove ${g.name}`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            )}
-
-            {/* ── Invitation Form sub-tab ── */}
-            {guestsSubTab === 'invitation' && (
-              <div className="p-8 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark shadow-xl flex flex-col items-center gap-4 text-center">
-                <div className="w-14 h-14 rounded-2xl bg-premium-gold/15 flex items-center justify-center">
-                  <ClipboardCheck className="w-7 h-7 text-premium-gold" />
-                </div>
-                <div>
-                  <h4 className="font-display font-bold text-white text-base">Invitation & RSVP Form Builder</h4>
-                  <p className="text-xs text-zinc-400 mt-1 max-w-sm">Manage your Typeform-style registration form, field toggles, and RSVP confirmation flow.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => { setOverviewSubTab('invitation'); handleTabChange('overview'); }}
-                  className="px-5 py-2.5 rounded-xl bg-premium-gold text-black font-bold text-xs shadow-gold scale-on-click"
-                >
-                  Open Invitation Builder →
-                </button>
-              </div>
-            )}
-
-            {/* ── Import CSV sub-tab ── */}
-            {guestsSubTab === 'import' && (
-              <div className="p-8 rounded-[2.5rem] bg-premium-charcoal border border-dashed border-premium-borderDark shadow-xl flex flex-col items-center gap-4 text-center">
-                <div className="w-14 h-14 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark flex items-center justify-center">
-                  <Download className="w-7 h-7 text-zinc-400" />
-                </div>
-                <div>
-                  <h4 className="font-display font-bold text-white text-base">Bulk Import via CSV</h4>
-                  <p className="text-xs text-zinc-400 mt-1 max-w-sm">Upload a CSV with columns: Name, Phone / Email, Category, Table No. Duplicate check runs automatically.</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => csvInputRef.current?.click()}
-                    className="px-5 py-2.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-bold text-xs shadow-gold scale-on-click flex items-center gap-2"
-                  >
-                    <Upload className="w-3.5 h-3.5" /> Choose CSV / Excel file
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDownloadTemplate}
-                    className="text-[11px] font-mono text-premium-neon hover:underline scale-on-click"
-                  >
-                    Download CSV template ↓
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          <GuestsTab eventId={eventId} onOpenInvitationBuilder={() => { setOverviewSubTab('invitation'); handleTabChange('overview'); }} />
         )}
 
         {/* =========================================================================
             MENU 3: REGISTRATIONS (Public Inbound RSVP Queue & Approval)
            ========================================================================= */}
-        {activeTab === 'registrations' && (
-          <div className="space-y-6 animate-in fade-in duration-200">
-            <div>
-              <h3 className="text-2xl font-display font-bold text-white">Public RSVP Registrations</h3>
-              <p className="text-xs text-zinc-400">Review inbound registrations, approve seats, and trigger automatic QR tickets.</p>
-            </div>
-
-            <div className="space-y-4">
-              {registrations.map((reg) => (
-                <div key={reg.id} className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-3">
-                      <h4 className="text-base font-display font-bold text-white">{reg.name}</h4>
-                      <span className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold uppercase ${
-                        reg.status === 'approved'
-                          ? 'bg-premium-success/15 text-premium-success border border-premium-success/30'
-                          : reg.status === 'rejected'
-                          ? 'bg-premium-danger/15 text-premium-danger border border-premium-danger/30'
-                          : 'bg-premium-gold/15 text-premium-gold border border-premium-gold/30'
-                      }`}>
-                        {reg.status}
-                      </span>
-                    </div>
-                    <div className="text-xs text-zinc-400 font-mono">
-                      {reg.email} • {reg.phone} • Submitted {reg.submittedAt}
-                    </div>
-                    <div className="text-xs text-zinc-300 pt-1">
-                      Organization: <strong>{reg.answers.company}</strong> • Dietary: <strong>{reg.answers.dietary}</strong>
-                    </div>
-                  </div>
-
-                  {reg.status === 'pending' && (
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleDeclineRegistration(reg.id)}
-                        className="px-4 py-2 rounded-xl bg-transparent border border-zinc-700 text-zinc-400 hover:text-white text-xs font-bold scale-on-click"
-                      >
-                        Decline
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleApproveRegistration(reg.id)}
-                        className="px-5 py-2 rounded-xl bg-premium-gold text-black text-xs font-bold shadow-gold scale-on-click"
-                      >
-                        Approve & Issue Pass
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {activeTab === 'registrations' && <RegistrationsTab eventId={eventId} />}
 
         {/* =========================================================================
             MENU 4: BROADCAST (Email, WhatsApp, Embed Tools)
@@ -1212,6 +795,20 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                   desc: 'The big-screen view of the games set up in the Live Games tab.',
                   badge: 'Game Arena',
                   color: 'text-premium-neon',
+                },
+                {
+                  title: 'Register Desk',
+                  url: `/events/${event.slug}/gate`,
+                  desc: 'Check guests in by scanning their QR pass with the camera, or by name or guest number. Several desks can run at once.',
+                  badge: 'Check-in',
+                  color: 'text-premium-success',
+                },
+                {
+                  title: 'Walk-up Registration',
+                  url: `/events/${event.slug}/invitation`,
+                  desc: 'The invitation form on a tablet kiosk: walk-up guests register and get their QR pass at once.',
+                  badge: 'Kiosk',
+                  color: 'text-premium-gold',
                 },
               ].map((launcher, idx) => (
                 <div
