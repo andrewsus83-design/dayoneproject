@@ -4,7 +4,9 @@
 
 ## 1. Project Identity & Commands
 - **Project:** **dayoneproject.xyz** (renamed from all41.app on 2026-10-30; all41.app is retired and 308-redirects) — Luxury All-in-One Event Experience Platform (Corporate Summits & Luxury Weddings).
-- **Hosts:** app at `app.dayoneproject.xyz` (dashboard, `/admin`, events at `/events/<slug>`). The root `dayoneproject.xyz` and its `*.dayoneproject.xyz` wildcard belong to the separate Day One Project wedding site / RSVP app (Vercel project `dayoneproject`) — never take them over.
+- **Hosts:** app at `app.dayoneproject.xyz` (dashboard, `/admin`, events at `/events/<slug>`), Vercel project `all41-u356`. Since 2026-10-30 this platform is the new Day One Project: `dayoneproject.xyz` and `www.dayoneproject.xyz` are domains of `all41-u356` that 308-redirect to `app.dayoneproject.xyz` (path kept). The old wedding site / RSVP app (Vercel project `dayoneproject`) is archived — paused, not deleted — and still holds the `*.dayoneproject.xyz` wildcard, which now shows "deployment paused".
+- **Source:** GitHub `andrewsus83-design/dayoneproject`, branch **`app`** (local `main` pushes with `git push origin main:app`). Never push to that repo's `main`: it is the production branch of the paused old `dayoneproject` Vercel project.
+- **Deploy:** only on the user's explicit "deploy", from a clean export of `HEAD` (`git archive HEAD | tar -x -C <dir>`, copy `.vercel/project.json`, then `vercel deploy --prod --yes`), so other sessions' uncommitted work never ships.
 - **Backend:** Supabase project **dayoneproject** (`pmuryumfyekjwqntcypo`). Use only the `a41_` tables/functions (other prefixes `cf_`, `wos_` belong to other products).
 - **Root Path:** `/Users/drew83/Projects/all41`
 - **Dev Server:** `pnpm dev` (Runs Next.js 16.4.2 Turbopack on `http://localhost:3000`)
