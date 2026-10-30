@@ -1115,40 +1115,42 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
         {/* =========================================================================
             MENU 8: INSIGHTS (Analytics, Velocity, Turnout)
            ========================================================================= */}
-        {activeTab === 'insights' && (
-          <div className="space-y-6 animate-in fade-in duration-200">
-            <div>
-              <h3 className="text-2xl font-display font-bold text-white">Event Intelligence & Real-time Insights</h3>
-              <p className="text-xs text-zinc-400">Audited telemetry on check-in velocity, crowd engagement, and photo wall activity.</p>
+        {activeTab === 'insights' && (() => {
+          // Counted from this event's guest list; nothing here is estimated.
+          const total = guestsList.length;
+          const attending = guestsList.filter((g) => g.rsvp_status === 'attending').length;
+          const declined = guestsList.filter((g) => g.rsvp_status === 'declined').length;
+          const checkedIn = guestsList.filter((g) => g.is_checked_in).length;
+          const pct = (n: number, of: number) => (of > 0 ? `${Math.round((n / of) * 100)}%` : '–');
+          const cards = [
+            { label: 'Guest list', value: String(total), sub: total === 1 ? '1 guest invited' : `${total} guests invited`, color: 'text-white' },
+            { label: 'Attending', value: String(attending), sub: `${pct(attending, total)} of the guest list said yes`, color: 'text-premium-gold' },
+            { label: 'Declined', value: String(declined), sub: `${total - attending - declined} have not replied yet`, color: 'text-zinc-300' },
+            { label: 'Checked in', value: String(checkedIn), sub: attending > 0 ? `${pct(checkedIn, attending)} of guests attending` : 'Scanned at the register desk', color: 'text-premium-success' },
+          ];
+          return (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              <div>
+                <h3 className="text-2xl font-display font-bold text-white">Insights</h3>
+                <p className="text-xs text-zinc-400">RSVP replies and check-ins, counted from this event&apos;s guest list.</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {cards.map((c) => (
+                  <div key={c.label} className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-2">
+                    <span className="text-xs font-bold text-zinc-400 uppercase font-mono">{c.label}</span>
+                    <div className={`text-3xl font-display font-bold ${c.color}`}>{c.value}</div>
+                    <div className="text-[11px] text-zinc-500">{c.sub}</div>
+                  </div>
+                ))}
+              </div>
+
+              {total === 0 && (
+                <p className="text-xs text-zinc-500">Add guests or share the invitation to start seeing numbers here.</p>
+              )}
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-2">
-                <span className="text-xs font-bold text-zinc-400 uppercase font-mono">Check-in Turnout</span>
-                <div className="text-3xl font-display font-bold text-premium-success">64.3%</div>
-                <div className="text-[11px] text-zinc-500">418 of 650 attendees admitted</div>
-              </div>
-
-              <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-2">
-                <span className="text-xs font-bold text-zinc-400 uppercase font-mono">Scanner Velocity</span>
-                <div className="text-3xl font-display font-bold text-premium-neon">0.6s</div>
-                <div className="text-[11px] text-zinc-500">Average QR gate scan admission</div>
-              </div>
-
-              <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-2">
-                <span className="text-xs font-bold text-zinc-400 uppercase font-mono">Photo Wall Uploads</span>
-                <div className="text-3xl font-display font-bold text-premium-gold">238 Media</div>
-                <div className="text-[11px] text-zinc-500">92% WebP, 8% HD 720p Video</div>
-              </div>
-
-              <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-2">
-                <span className="text-xs font-bold text-zinc-400 uppercase font-mono">Game Participation</span>
-                <div className="text-3xl font-display font-bold text-white">88.4%</div>
-                <div className="text-[11px] text-zinc-500">Active live mobile buzzers</div>
-              </div>
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* =========================================================================
             MENU 9: LIVE (Launchers for All Active Event URLs - Open New Tab)
@@ -1156,21 +1158,17 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
         {activeTab === 'live' && (
           <div className="space-y-6 animate-in fade-in duration-200">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-premium-success/15 text-premium-success border border-premium-success/30 text-xs font-bold font-mono mb-2">
-                <span className="w-2 h-2 rounded-full bg-premium-success animate-ping" />
-                <span>All Operational Rails Active</span>
-              </div>
-              <h3 className="text-2xl font-display font-bold text-white">LIVE Launchers Command Board</h3>
-              <p className="text-xs text-zinc-400">Click any launcher to immediately open the live screen or interface in a new window/tab.</p>
+              <h3 className="text-2xl font-display font-bold text-white">LIVE Launchers</h3>
+              <p className="text-xs text-zinc-400">Open any event screen in a new tab.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[
                 {
-                  title: 'Guest Portal Mobile PWA',
+                  title: 'Event Page',
                   url: `/events/${event.slug}`,
-                  desc: 'Mobile-optimized attendee portal (Rundown, Table Pass, Photo Wall, Digital Angpao/Speakers).',
-                  badge: 'PWA Web App',
+                  desc: 'The landing page your guests open, built in Overview → Landing Page Builder.',
+                  badge: 'Guest Page',
                   color: 'text-premium-neon',
                 },
                 {
@@ -1188,9 +1186,9 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                   color: 'text-premium-success',
                 },
                 {
-                  title: 'Ballroom Stage LED Screen (7 Modules)',
+                  title: 'Stage LED Screen',
                   url: `/events/${event.slug}/stage`,
-                  desc: 'Fullscreen stage display with Welcome, Rundown, Photo Wall, Quiz, and Sponsor rotations.',
+                  desc: 'Fullscreen stage display that rotates through the stage modules. Press H for the controls, F for fullscreen.',
                   badge: 'Big Screen LED',
                   color: 'text-premium-gold',
                 },
@@ -1202,39 +1200,18 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                   color: 'text-premium-gold',
                 },
                 {
-                  title: '3D Door Prize Raffle Machine',
+                  title: 'Door Prize Draw',
                   url: `/events/${event.slug}/doorprize`,
-                  desc: 'Interactive 3D slot machine, spinning wheel, and arcade claw raffle draw.',
+                  desc: 'Slot machine, spinning wheel, name picker or claw draw for the door prizes set up in the Door Prize tab.',
                   badge: 'Raffle Stage',
                   color: 'text-premium-gold',
                 },
                 {
-                  title: 'Arena Trivia Game Stage',
+                  title: 'Trivia Big Screen',
                   url: `/events/${event.slug}/games`,
-                  desc: 'Synchronized Kahoot-style quiz question arena with real-time leaderboard podium.',
+                  desc: 'The big-screen view of the games set up in the Live Games tab.',
                   badge: 'Game Arena',
                   color: 'text-premium-neon',
-                },
-                {
-                  title: 'Gate Camera QR Scanner Desk',
-                  url: `/dashboard/events/${eventId}/checkin`,
-                  desc: 'High-speed attendee QR ticket scanner with 4 gold corner brackets and laser beam.',
-                  badge: 'Gate Operations',
-                  color: 'text-premium-success',
-                },
-                {
-                  title: 'Live Operator Control Desk',
-                  url: `/dashboard/events/${eventId}/operator`,
-                  desc: 'Centralized crew cockpit for stage control, photo moderation, and trivia master.',
-                  badge: 'Crew Cockpit',
-                  color: 'text-premium-neon',
-                },
-                {
-                  title: 'Registration Desk PWA',
-                  url: `/events/${event.slug}/register`,
-                  desc: 'Tablet kiosk for walk-in guest registration and RSVP approval queue with instant QR pass issuance.',
-                  badge: 'Register Desk',
-                  color: 'text-premium-gold',
                 },
               ].map((launcher, idx) => (
                 <div
@@ -1247,7 +1224,6 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                       <span className={`text-[10px] font-mono font-bold uppercase tracking-wider ${launcher.color}`}>
                         {launcher.badge}
                       </span>
-                      <span className="w-2 h-2 rounded-full bg-premium-success shadow-[0_0_8px_#00E676] animate-pulse" />
                     </div>
                     <h4 className="text-xl font-display font-bold text-white group-hover:text-premium-gold transition-colors flex items-center justify-between">
                       <span>{launcher.title}</span>

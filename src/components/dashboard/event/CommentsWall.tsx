@@ -2,18 +2,15 @@
 
 import React, { useState } from 'react';
 import {
-  MessageSquare, Heart, Flag, Trash2, Check, Eye, EyeOff,
-  Plus, Send, Copy, QrCode, Download, Filter, Star,
-  ThumbsUp, AlertTriangle, X, Link2, ExternalLink,
+  MessageSquare, Heart, Flag, Trash2, Check, Send, Filter, AlertTriangle, Info,
 } from 'lucide-react';
 
-type CommentSubTab = 'wall' | 'moderate' | 'settings' | 'link';
+type CommentSubTab = 'wall' | 'moderate' | 'settings';
 
 interface Comment {
   id: string;
   guest: string;
   initials: string;
-  avatarColor: string;
   message: string;
   time: string;
   approved: boolean;
@@ -23,32 +20,34 @@ interface Comment {
   pinned: boolean;
 }
 
-const SAMPLE_COMMENTS: Comment[] = [
-  { id: 'c1', guest: 'Alicia Santos', initials: 'AS', avatarColor: '#C5A059', message: 'Incredible event — the keynote was absolutely inspiring! Already looking forward to next year. 🙌', time: '2m ago', approved: true, flagged: false, likes: 14, liked: false, pinned: true },
-  { id: 'c2', guest: 'Marcus Tan', initials: 'MT', avatarColor: '#00F0FF', message: 'The networking lunch was incredible — met some amazing founders. Thank you dayoneproject.xyz team! 🚀', time: '8m ago', approved: true, flagged: false, likes: 9, liked: false, pinned: false },
-  { id: 'c3', guest: 'Priya Sharma', initials: 'PS', avatarColor: '#FF3366', message: 'First time attending and I\'m blown away by the production quality. The LED stage is stunning.', time: '12m ago', approved: true, flagged: false, likes: 6, liked: false, pinned: false },
-  { id: 'c4', guest: 'Rafael Cruz', initials: 'RC', avatarColor: '#8B5CF6', message: 'Loved the door prize segment — congrats to all the winners!', time: '18m ago', approved: false, flagged: false, likes: 0, liked: false, pinned: false },
-  { id: 'c5', guest: 'Hana Kim', initials: 'HK', avatarColor: '#10B981', message: 'The photo wall is such a fun touch. Already shared mine on Instagram!', time: '25m ago', approved: true, flagged: false, likes: 11, liked: false, pinned: false },
-  { id: 'c6', guest: 'Jordan Reyes', initials: 'JR', avatarColor: '#F59E0B', message: 'This is my third dayoneproject.xyz event and honestly they keep getting better. Truly world-class.', time: '31m ago', approved: false, flagged: true, likes: 0, liked: false, pinned: false },
-];
-
 const COMMENT_THEMES = [
   { id: 'dark', label: 'Midnight Dark', bg: '#09090B', text: '#fff', accent: '#C5A059' },
   { id: 'glass', label: 'Glass Panel', bg: 'rgba(18,18,20,0.85)', text: '#fff', accent: '#00F0FF' },
   { id: 'warm', label: 'Warm Ivory', bg: '#FBF8F0', text: '#3D2B1F', accent: '#C5A059' },
-  { id: 'neon', label: 'Neon Cyber', bg: '#0A0A14', text: '#fff', accent: '#00F0FF' },
+  { id: 'neon', label: 'Neon Cyber', bg: '#09090B', text: '#fff', accent: '#00F0FF' },
 ];
 
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="p-6 rounded-2xl border border-dashed border-premium-borderDark bg-premium-surfaceDark text-center text-xs text-zinc-500">
+      {text}
+    </div>
+  );
+}
+
+/**
+ * Preview only: guests cannot post comments yet, and nothing on this screen is saved or shown to guests.
+ * The test box lets the organizer see how the wall and moderation will look.
+ */
 export function CommentsWall({ isWedding }: { isWedding: boolean }) {
   const [subTab, setSubTab] = useState<CommentSubTab>('wall');
-  const [comments, setComments] = useState<Comment[]>(SAMPLE_COMMENTS);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [commentTheme, setCommentTheme] = useState('dark');
   const [requireApproval, setRequireApproval] = useState(true);
   const [profanityFilter, setProfanityFilter] = useState(true);
   const [showGuestNames, setShowGuestNames] = useState(true);
   const [maxChars, setMaxChars] = useState('280');
   const [newMessage, setNewMessage] = useState('');
-  const [copiedLink, setCopiedLink] = useState(false);
   const [filterMode, setFilterMode] = useState<'all' | 'approved' | 'pending' | 'flagged'>('all');
 
   const approved = comments.filter((c) => c.approved && !c.flagged);
@@ -77,11 +76,18 @@ export function CommentsWall({ isWedding }: { isWedding: boolean }) {
     { id: 'wall', label: 'Comments Wall', icon: MessageSquare },
     { id: 'moderate', label: 'Moderate', icon: Filter },
     { id: 'settings', label: 'Settings', icon: AlertTriangle },
-    { id: 'link', label: 'Link URL', icon: Link2 },
   ];
 
   return (
     <div className="space-y-5">
+      <div className="flex items-start gap-3 p-4 rounded-2xl bg-premium-gold/10 border border-premium-gold/30">
+        <Info className="w-4 h-4 text-premium-gold flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-zinc-300 leading-relaxed">
+          <strong className="text-premium-gold font-display">Preview.</strong> Guests can&apos;t post comments yet, and nothing on this
+          screen is saved or shown to guests. Send a test comment to see how the wall and moderation will work.
+        </p>
+      </div>
+
       {/* Sub-tab nav */}
       <div className="flex items-center gap-2 flex-wrap">
         {SUB_TABS.map(({ id, label, icon: Icon }) => (
@@ -112,7 +118,7 @@ export function CommentsWall({ isWedding }: { isWedding: boolean }) {
             {[
               { label: 'Total Comments', value: comments.length, color: 'text-white' },
               { label: 'Approved', value: approved.length, color: 'text-premium-success' },
-              { label: 'Pending Review', value: pending.length, color: 'text-amber-400' },
+              { label: 'Pending Review', value: pending.length, color: 'text-premium-warning' },
             ].map((s) => (
               <div key={s.label} className="p-4 rounded-2xl bg-premium-charcoal border border-premium-borderDark text-center">
                 <div className={`text-2xl font-display font-bold ${s.color}`}>{s.value}</div>
@@ -142,30 +148,26 @@ export function CommentsWall({ isWedding }: { isWedding: boolean }) {
             </div>
           </div>
 
-          {/* Live comments preview */}
+          {/* Comments preview */}
           <div className="p-5 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Live Comments ({approved.length})</p>
-              <div className="flex items-center gap-1.5">
-                {pending.length > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 text-[10px] font-bold">
-                    {pending.length} awaiting review
-                  </span>
-                )}
-              </div>
+              <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Comments ({approved.length})</p>
+              {pending.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-premium-warning/20 border border-premium-warning/40 text-premium-warning text-[10px] font-bold">
+                  {pending.length} awaiting review
+                </span>
+              )}
             </div>
             <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-              {[...comments.filter((c) => c.pinned && c.approved), ...comments.filter((c) => !c.pinned && c.approved)].map((comment) => (
+              {approved.length === 0 && <EmptyState text="No comments yet. Send a test comment below to preview the wall." />}
+              {[...approved.filter((c) => c.pinned), ...approved.filter((c) => !c.pinned)].map((comment) => (
                 <div
                   key={comment.id}
                   className={`flex items-start gap-3 p-4 rounded-2xl border group transition-all ${
                     comment.pinned ? 'border-premium-gold/40 bg-premium-gold/5' : 'border-premium-borderDark bg-premium-surfaceDark'
                   }`}
                 >
-                  <div
-                    className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-black font-bold text-xs"
-                    style={{ backgroundColor: comment.avatarColor }}
-                  >
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-premium-gold text-black font-bold text-xs">
                     {comment.initials}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -183,7 +185,7 @@ export function CommentsWall({ isWedding }: { isWedding: boolean }) {
                       <button type="button" onClick={() => togglePin(comment.id)} className={`text-[10px] scale-on-click ${comment.pinned ? 'text-premium-gold' : 'text-zinc-600 hover:text-zinc-400'}`}>
                         {comment.pinned ? 'Unpin' : 'Pin'}
                       </button>
-                      <button type="button" onClick={() => removeComment(comment.id)} className="text-[10px] text-zinc-600 hover:text-premium-danger scale-on-click ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button type="button" onClick={() => removeComment(comment.id)} className="text-[10px] text-zinc-600 hover:text-premium-danger scale-on-click ml-auto opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Delete comment">
                         <Trash2 className="w-3 h-3" />
                       </button>
                     </div>
@@ -209,12 +211,11 @@ export function CommentsWall({ isWedding }: { isWedding: boolean }) {
                   if (!newMessage.trim()) return;
                   setComments((prev) => [{
                     id: `c${Date.now()}`,
-                    guest: 'Admin Preview',
-                    initials: 'AP',
-                    avatarColor: '#C5A059',
+                    guest: 'Test comment',
+                    initials: 'T',
                     message: newMessage,
                     time: 'Just now',
-                    approved: true,
+                    approved: !requireApproval,
                     flagged: false,
                     likes: 0,
                     liked: false,
@@ -222,12 +223,13 @@ export function CommentsWall({ isWedding }: { isWedding: boolean }) {
                   }, ...prev]);
                   setNewMessage('');
                 }}
-                className="px-4 py-2.5 rounded-xl bg-premium-gold text-black font-bold text-xs scale-on-click shadow-gold flex items-center gap-1.5"
+                className="px-4 py-2.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-xs scale-on-click shadow-gold flex items-center gap-1.5"
               >
                 <Send className="w-3.5 h-3.5" />
                 Send
               </button>
             </div>
+            {requireApproval && <p className="text-[10px] text-zinc-500">Admin approval is on, so test comments wait in Moderate.</p>}
           </div>
         </div>
       )}
@@ -252,23 +254,24 @@ export function CommentsWall({ isWedding }: { isWedding: boolean }) {
                 }`}
               >
                 {label}
-                <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${filterMode === id ? 'bg-premium-gold text-black' : 'bg-zinc-700 text-zinc-400'}`}>{count}</span>
+                <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${filterMode === id ? 'bg-premium-gold text-black' : 'bg-premium-borderDark text-zinc-400'}`}>{count}</span>
               </button>
             ))}
           </div>
 
           <div className="space-y-3">
+            {displayed.length === 0 && <EmptyState text="Nothing to moderate." />}
             {displayed.map((comment) => (
               <div key={comment.id} className={`flex items-start gap-3 p-4 rounded-2xl border ${
-                comment.flagged ? 'border-premium-danger/30 bg-premium-danger/5' : comment.approved ? 'border-premium-borderDark bg-premium-charcoal' : 'border-amber-500/30 bg-amber-950/20'
+                comment.flagged ? 'border-premium-danger/30 bg-premium-danger/5' : comment.approved ? 'border-premium-borderDark bg-premium-charcoal' : 'border-premium-warning/30 bg-premium-warning/5'
               }`}>
-                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-black font-bold text-[10px]" style={{ backgroundColor: comment.avatarColor }}>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-premium-gold text-black font-bold text-[10px]">
                   {comment.initials}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <span className="text-xs font-bold text-white">{comment.guest}</span>
-                    {!comment.approved && <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-400 text-[9px] font-bold">Pending</span>}
+                    {!comment.approved && <span className="px-1.5 py-0.5 rounded-md bg-premium-warning/20 text-premium-warning text-[9px] font-bold">Pending</span>}
                     {comment.flagged && <span className="px-1.5 py-0.5 rounded-md bg-premium-danger/20 text-premium-danger text-[9px] font-bold">Flagged</span>}
                     <span className="text-[10px] text-zinc-600 ml-auto">{comment.time}</span>
                   </div>
@@ -285,7 +288,11 @@ export function CommentsWall({ isWedding }: { isWedding: boolean }) {
                       Delete
                     </button>
                     {comment.approved && !comment.flagged && (
-                      <button type="button" className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-zinc-400 text-[10px] font-bold scale-on-click hover:text-white">
+                      <button
+                        type="button"
+                        onClick={() => setComments((prev) => prev.map((c) => c.id === comment.id ? { ...c, flagged: true } : c))}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-zinc-400 text-[10px] font-bold scale-on-click hover:text-white"
+                      >
                         <Flag className="w-3 h-3" />
                         Flag
                       </button>
@@ -301,19 +308,19 @@ export function CommentsWall({ isWedding }: { isWedding: boolean }) {
       {/* Settings tab */}
       {subTab === 'settings' && (
         <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-5">
-          <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Comment Wall Settings</p>
+          <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Comment Wall Settings (preview, not saved)</p>
           <div className="space-y-4">
             {[
               { label: 'Require admin approval', desc: 'Comments appear only after you approve them.', val: requireApproval, set: setRequireApproval },
-              { label: 'Profanity filter', desc: 'Automatically flags potentially inappropriate content.', val: profanityFilter, set: setProfanityFilter },
-              { label: 'Show guest names', desc: 'Display commenter\'s name on the public wall.', val: showGuestNames, set: setShowGuestNames },
+              { label: 'Profanity filter', desc: 'Flag potentially inappropriate content for review.', val: profanityFilter, set: setProfanityFilter },
+              { label: 'Show guest names', desc: 'Display the commenter\'s name on the wall.', val: showGuestNames, set: setShowGuestNames },
             ].map(({ label, desc, val, set }) => (
               <div key={label} className="flex items-center justify-between p-4 bg-premium-surfaceDark border border-premium-borderDark rounded-2xl">
                 <div>
                   <div className="text-xs font-bold text-white">{label}</div>
                   <div className="text-[10px] text-zinc-500 mt-0.5">{desc}</div>
                 </div>
-                <button type="button" onClick={() => set(!val)} className={`w-11 h-6 rounded-full flex-shrink-0 scale-on-click transition-colors ${val ? 'bg-premium-success' : 'bg-zinc-700'} flex items-center ${val ? 'justify-end pr-0.5' : 'pl-0.5'}`}>
+                <button type="button" onClick={() => set(!val)} aria-pressed={val} aria-label={label} className={`w-11 h-6 rounded-full flex-shrink-0 scale-on-click transition-colors ${val ? 'bg-premium-success' : 'bg-premium-borderDark'} flex items-center ${val ? 'justify-end pr-0.5' : 'pl-0.5'}`}>
                   <div className="w-5 h-5 rounded-full bg-white shadow" />
                 </button>
               </div>
@@ -327,46 +334,6 @@ export function CommentsWall({ isWedding }: { isWedding: boolean }) {
                   {n} chars
                 </button>
               ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Link URL tab */}
-      {subTab === 'link' && (
-        <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark space-y-5">
-          <div>
-            <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-1">Comment Wall URLs</p>
-            <p className="text-xs text-zinc-400">Share with guests so they can leave comments and see the live wall on screen.</p>
-          </div>
-          <div className="space-y-3">
-            <div>
-              <p className="text-[10px] text-zinc-500 mb-1.5 font-mono">Guest Submit URL</p>
-              <div className="flex items-center gap-2 bg-premium-surfaceDark border border-premium-borderDark rounded-2xl px-4 py-3">
-                <span className="text-premium-neon font-mono text-sm flex-1 truncate">https://app.dayoneproject.xyz/events/your-event-slug/comments</span>
-                <button type="button" onClick={() => { setCopiedLink(true); setTimeout(() => setCopiedLink(false), 2000); }} className="p-2 rounded-xl bg-premium-black border border-premium-borderDark scale-on-click">
-                  {copiedLink ? <Check className="w-4 h-4 text-premium-success" /> : <Copy className="w-4 h-4 text-zinc-400" />}
-                </button>
-              </div>
-            </div>
-            <div>
-              <p className="text-[10px] text-zinc-500 mb-1.5 font-mono">Stage Display Wall URL</p>
-              <div className="flex items-center gap-2 bg-premium-surfaceDark border border-premium-borderDark rounded-2xl px-4 py-3">
-                <span className="text-premium-neon font-mono text-sm flex-1 truncate">https://app.dayoneproject.xyz/events/your-event-slug/comments/live</span>
-                <ExternalLink className="w-4 h-4 text-zinc-500 flex-shrink-0" />
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center">
-              <QrCode className="w-14 h-14 text-black" />
-            </div>
-            <div className="space-y-2">
-              <p className="text-xs text-zinc-400">QR for table tents / place cards</p>
-              <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 bg-premium-gold text-black rounded-xl text-xs font-bold scale-on-click shadow-gold">
-                <Download className="w-3.5 h-3.5" />
-                Download PNG
-              </button>
             </div>
           </div>
         </div>
