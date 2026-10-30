@@ -194,7 +194,7 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
         <header className="px-5 pt-10 sm:pt-7 pb-4 flex justify-between items-center bg-premium-black border-b border-premium-borderDark flex-shrink-0 z-20">
           <div className="flex items-center gap-3">
             <Link
-              href={`/dashboard/events/${event.id}/operator`}
+              href={`/dashboard/events/${event.id}?tab=live`}
               className="w-8 h-8 rounded-full bg-premium-charcoal border border-premium-borderDark flex items-center justify-center text-zinc-400 hover:text-white scale-on-click"
             >
               <ArrowLeft className="w-4 h-4" />
