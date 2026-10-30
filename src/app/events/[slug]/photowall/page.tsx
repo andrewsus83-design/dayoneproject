@@ -156,7 +156,11 @@ function GuestPhotoWall({ slug, token, fallbackName }: { slug: string; token: st
     };
   }, [refresh, needsPoll]);
 
-  const { feed } = useWallFeed(slug, state?.wall_key ?? null, 6000);
+  const { feed, state: feedState } = useWallFeed(slug, state?.wall_key ?? null, 6000);
+  // The host made a new wall key: fetch it so the album keeps working.
+  useEffect(() => {
+    if (feedState === 'missing' && state?.wall_key) refresh();
+  }, [feedState, state?.wall_key, refresh]);
   const title = 'Photo wall';
   const subtitle = state?.event_name || fallbackName;
 
