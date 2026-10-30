@@ -18,6 +18,7 @@ import { CommentsWall } from '@/components/dashboard/event/CommentsWall';
 import { PublishButton } from '@/components/dashboard/event/PublishButton';
 import { GuestsTab } from '@/components/dashboard/event/GuestsTab';
 import { RegistrationsTab } from '@/components/dashboard/event/RegistrationsTab';
+import { TeamMembers } from '@/components/dashboard/TeamMembers';
 import {
   POPVERSE_QUIZ_QUESTIONS,
   MOCK_PHOTO_WALL_UPLOADS,
@@ -882,19 +883,19 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
           <div className="space-y-6 animate-in fade-in duration-200">
             <div>
               <h3 className="text-2xl font-display font-bold text-white">Event Settings</h3>
-              <p className="text-xs text-zinc-400">Register desk access, which modules this event uses, and the terms guests agree to.</p>
+              <p className="text-xs text-zinc-400">Screen manager and register desk access, which modules this event uses, and the terms guests agree to.</p>
             </div>
 
-            {/* Register desk access: everyone signs in with their own account */}
+            {/* Staff access: screen managers and the register desk sign in with their own email and access code */}
             <div className="p-6 rounded-[2.5rem] bg-premium-charcoal border border-premium-gold/30 space-y-3 shadow-xl">
-              <div className="flex items-start justify-between gap-3">
-                <div>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
                   <span className="text-[10px] font-mono uppercase text-premium-gold font-bold flex items-center gap-1.5">
-                    <KeyRound className="w-3.5 h-3.5" /> Register Desk Access
+                    <KeyRound className="w-3.5 h-3.5" /> Screen Manager & Register Desk Access
                   </span>
                   <p className="text-[11px] text-zinc-500 mt-1 leading-relaxed">
-                    The Register screen (door check-in) opens only for people on your team. Desk staff sign in with their own email and the
-                    access code you give them; organizers sign in with their emailed code. Add or remove people in{' '}
+                    Add the people who run the stage screen and the door. They sign in with their own email and the access code you give
+                    them, and work every event in your organization. Admin organizers are added in{' '}
                     <Link href="/dashboard/settings" className="text-premium-gold font-bold hover:underline">Settings</Link>.
                   </p>
                 </div>
@@ -908,6 +909,7 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                 </a>
               </div>
             </div>
+            <TeamMembers roles={['screen', 'desk']} title="Screen managers & register desk" />
 
             {/* Module Visibility */}
             <div className="p-6 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark space-y-4 shadow-xl">
