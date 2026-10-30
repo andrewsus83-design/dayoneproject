@@ -10,6 +10,7 @@ import { MOCK_GUESTS } from '@/lib/mockData';
 import { Guest } from '@/lib/types';
 import { getClientDomain } from '@/lib/domain';
 import { GuestShot } from '@/components/events/GuestShot';
+import { paletteColors } from '@/lib/eventTheme';
 import {
   MapPin,
   Calendar,
@@ -339,7 +340,18 @@ function GuestAppContent({ slug }: { slug: string }) {
           {shown === 'qr' && qrBody}
 
           {/* ── Shot (after check-in) ── */}
-          {shown === 'shot' && <GuestShot slug={slug} token={sample ? null : mine.token} eventName={info.name || event.name} sample={sample} />}
+          {shown === 'shot' && (
+            <GuestShot
+              slug={slug}
+              token={sample ? null : mine.token}
+              eventName={info.name || event.name}
+              dateLabel={info.startDate ? formatEventDate(info.startDate, 'short') : ''}
+              primary={paletteColors(config.design).primary}
+              logoRef={config.design.logoUrl}
+              shot={config.design.shot}
+              sample={sample}
+            />
+          )}
 
           {/* ── Event ── */}
           {shown === 'event' && (

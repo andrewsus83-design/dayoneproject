@@ -7,8 +7,8 @@ import type { PhotoWallUpload } from '@/lib/types';
 /**
  * The real photo wall (Supabase project dayoneproject, a41_photo* tables and the public `a41_photos` bucket).
  *
- * Guest upload: consent (first time) → upload ticket → compress to WebP ≤ 2 MB → upload to the ticket's path →
- * register. The event's moderation switch decides whether the photo goes straight onto the wall or waits for
+ * Guest upload: consent (first time) → upload ticket → compress photos to WebP ≤ 2 MB (videos come from the Shot
+ * camera as 720p MP4/WebM ≤ 20 MB) → upload to the ticket's path → register. The event's moderation switch decides whether the photo goes straight onto the wall or waits for
  * the organizer. The live wall and the guests' album read approved photos through /api/photowall/<slug>,
  * which the CDN caches for a few seconds.
  */
@@ -16,6 +16,7 @@ import type { PhotoWallUpload } from '@/lib/types';
 export const PHOTO_BUCKET = 'a41_photos';
 export const PHOTO_QUOTA = 10;
 export const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
+export const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
 export const MAX_CAPTION = 300;
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
@@ -101,6 +102,11 @@ export function photoUrl(path: string): string {
   return `${SUPABASE_URL}/storage/v1/object/public/${PHOTO_BUCKET}/${path}`;
 }
 
+/** Videos are stored as .mp4 / .webm; everything else on the wall is a photo. */
+export function isVideoPath(urlOrPath: string): boolean {
+  return /\.(mp4|webm)(\?|#|$)/i.test(urlOrPath);
+}
+
 /** Where a guest's phone keeps its pass token after RSVP. */
 export const passStorageKey = (slug: string) => `d1-pass-${slug}`;
 
@@ -121,8 +127,9 @@ const MESSAGES: Record<string, string> = {
   consent_required: 'Please agree to share your photos first.',
   quota_reached: `You've shared ${PHOTO_QUOTA} photos, the most allowed. Remove one to add another.`,
   too_many_uploads: 'Let your current uploads finish, then try again.',
-  unsupported_format: 'That photo format is not supported. Try a JPG or PNG photo.',
-  file_too_large: 'That photo is still over 2 MB after compressing. Try another one.',
+  unsupported_format: 'That file format is not supported. Use a photo or a video from the Shot camera.',
+  file_too_large: 'That file is too big. Photos can be up to 2 MB and videos up to 20 MB.',
+  video_too_large: 'That video is over 20 MB. Record a shorter one (up to about 60 seconds).',
   caption_too_long: `Keep the caption to ${MAX_CAPTION} characters.`,
   ticket_not_found: 'The upload did not finish. Please try again.',
   upload_not_found: 'The upload did not finish. Please try again.',
@@ -209,15 +216,20 @@ export const guestPhotoApi = {
     job: UploadJob,
     onStep?: (step: 'compressing' | 'uploading' | 'saving') => void,
   ): Promise<GuestPhoto> {
+    const video = file.type.startsWith('video/');
     if (!job.blob) {
-      onStep?.('compressing');
-      job.blob = await compressPhoto(file);
+      if (video) {
+        if (!/mp4|webm/i.test(file.type)) throw new Error('unsupported_format');
+        if (file.size > MAX_VIDEO_BYTES) throw new Error('video_too_large');
+        job.blob = file;
+      } else {
+        onStep?.('compressing');
+        job.blob = await compressPhoto(file);
+      }
     }
     if (!job.path || !job.contentType) {
-      const ticket = await rpc<{ path: string; content_type: string }>('a41_photo_ticket', {
-        p_token: token,
-        p_ext: job.blob.type === 'image/webp' ? 'webp' : 'jpg',
-      });
+      const ext = video ? (/mp4/i.test(job.blob.type) ? 'mp4' : 'webm') : job.blob.type === 'image/webp' ? 'webp' : 'jpg';
+      const ticket = await rpc<{ path: string; content_type: string }>('a41_photo_ticket', { p_token: token, p_ext: ext });
       job.path = ticket.path;
       job.contentType = ticket.content_type;
     }
@@ -363,9 +375,9 @@ export function feedToUploads(photos: WallPhoto[], eventId = ''): PhotoWallUploa
     id: p.id,
     event_id: eventId,
     guest_id: '',
-    media_type: 'image',
+    media_type: isVideoPath(p.url) ? 'video' : 'image',
     image_url: p.url,
-    video_url: null,
+    video_url: isVideoPath(p.url) ? p.url : null,
     thumbnail_url: null,
     filter_used: null,
     frame_used: null,

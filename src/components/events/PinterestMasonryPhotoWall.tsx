@@ -115,12 +115,25 @@ export function PinterestMasonryPhotoWall({
             >
               {/* Media Container */}
               <div className={`relative w-full ${aspectClass} overflow-hidden bg-premium-surfaceDark`}>
-                <img
-                  src={item.image_url}
-                  alt={item.caption || 'Event capture'}
-                  loading="lazy"
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
+                {isVideo && item.video_url ? (
+                  // Guest videos play silently on the wall; the lightbox has sound and controls.
+                  <video
+                    src={item.video_url}
+                    muted
+                    loop
+                    autoPlay
+                    playsInline
+                    preload="metadata"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                ) : (
+                  <img
+                    src={item.image_url}
+                    alt={item.caption || 'Event capture'}
+                    loading="lazy"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                )}
 
                 {/* Subtle dark gradient overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-black/30 pointer-events-none" />
@@ -138,9 +151,11 @@ export function PinterestMasonryPhotoWall({
                 {/* Video Play Badge if media is video */}
                 {isVideo && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-12 h-12 rounded-full bg-black/60 backdrop-blur-md border border-premium-neon/60 flex items-center justify-center text-premium-neon shadow-neon group-hover:scale-110 transition-transform">
-                      <Play className="w-5 h-5 fill-premium-neon ml-0.5" />
-                    </div>
+                    {!item.video_url && (
+                      <div className="w-12 h-12 rounded-full bg-black/60 backdrop-blur-md border border-premium-neon/60 flex items-center justify-center text-premium-neon shadow-neon group-hover:scale-110 transition-transform">
+                        <Play className="w-5 h-5 fill-premium-neon ml-0.5" />
+                      </div>
+                    )}
                     <span className="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-black/70 backdrop-blur-sm text-[10px] font-mono text-premium-neon border border-premium-neon/30 flex items-center gap-1">
                       <Video className="w-3 h-3" />
                       <span>720p HD</span>

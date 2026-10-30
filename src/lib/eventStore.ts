@@ -4,6 +4,7 @@ import { getBaseEvent, isSampleEventId, resolveEventIdFromSlug, SLUG_INDEX_KEY, 
 import { MOCK_GUESTS, POPVERSE_QUIZ_QUESTIONS } from './mockData';
 import { buildDefaultBlocks, legacyToBlocks, type LandingBlock } from './landingBlocks';
 import { defaultBroadcast } from './broadcastTemplates';
+import { SHOT_EFFECTS, SHOT_FILTERS, SHOT_FRAMES } from './shotLooks';
 import { cachedGuests, isServerEventId, useServerGuestList } from './guestsApi';
 
 /* ───────────────────────── Types ───────────────────────── */
@@ -113,6 +114,27 @@ export interface DesignConfig {
   pageWidth: PageWidthId;
   logoUrl: string;
   logoSize: 's' | 'm' | 'l';
+  /** What guests' Shot camera offers once they are checked in. */
+  shot: ShotConfig;
+}
+
+/** A frame the organizer uploaded for the Shot camera (url is an "asset:" ref until the event is saved). */
+export interface ShotFrameUpload {
+  id: string;
+  name: string;
+  url: string;
+}
+
+/**
+ * The looks guests can pick in Shot (ids from lib/shotLooks). Normal, no effect and no frame are always there;
+ * uploaded frames are listed in frames as "custom:<id>". defaultFrame is the frame the camera opens with.
+ */
+export interface ShotConfig {
+  filters: string[];
+  effects: string[];
+  frames: string[];
+  defaultFrame: string;
+  customFrames: ShotFrameUpload[];
 }
 
 export interface ClosingCopy {
@@ -438,6 +460,13 @@ export function buildDefaults(base: Event): EventConfig {
       spacingCards: '',
       spacingLetters: '',
       pageWidth: 'standard',
+      shot: {
+        filters: SHOT_FILTERS.map((f) => f.id),
+        effects: SHOT_EFFECTS.map((f) => f.id),
+        frames: SHOT_FRAMES.map((f) => f.id),
+        defaultFrame: 'event',
+        customFrames: [],
+      },
       logoUrl: '',
       logoSize: 'm',
     },

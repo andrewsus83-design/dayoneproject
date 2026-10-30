@@ -15,6 +15,7 @@ import {
   organizerPhotoApi,
   photoErrorMessage,
   photoUrl,
+  isVideoPath,
   type Moderation,
   type PhotoSettings,
   type PhotoStats,
@@ -257,7 +258,11 @@ function PhotoGrid({
             return (
               <div key={item.id} className="rounded-2xl overflow-hidden bg-premium-surfaceDark border border-premium-borderDark flex flex-col">
                 <a href={item.url} target="_blank" rel="noopener noreferrer" className="relative block aspect-square bg-premium-black">
-                  <img src={item.url} alt={item.caption || `Photo by ${item.guestName}`} loading="lazy" className="w-full h-full object-cover" />
+                  {isVideoPath(item.url) ? (
+                    <video src={item.url} muted loop autoPlay playsInline preload="metadata" className="w-full h-full object-cover" />
+                  ) : (
+                    <img src={item.url} alt={item.caption || `Photo by ${item.guestName}`} loading="lazy" className="w-full h-full object-cover" />
+                  )}
                   {item.status === 'pending' && (
                     <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-premium-gold text-black text-[9px] font-bold flex items-center gap-1">
                       <Clock className="w-2.5 h-2.5" /> Pending

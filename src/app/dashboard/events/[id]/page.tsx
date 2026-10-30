@@ -18,6 +18,7 @@ import { CommentsWall } from '@/components/dashboard/event/CommentsWall';
 import { PublishButton } from '@/components/dashboard/event/PublishButton';
 import { GuestsTab } from '@/components/dashboard/event/GuestsTab';
 import { RegistrationsTab } from '@/components/dashboard/event/RegistrationsTab';
+import { ShotSettings } from '@/components/dashboard/event/ShotSettings';
 import { TeamMembers } from '@/components/dashboard/TeamMembers';
 import {
   POPVERSE_QUIZ_QUESTIONS,
@@ -691,6 +692,7 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
               </div>
             </div>
             <PhotoWallManager eventId={eventId} slug={event.slug} sample={BASE_EVENTS.some((e) => e.id === eventId)} />
+            <ShotSettings eventId={eventId} />
           </div>
         )}
 

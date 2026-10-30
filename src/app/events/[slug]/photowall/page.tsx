@@ -29,6 +29,7 @@ import {
   guestPhotoApi,
   photoErrorMessage,
   photoUrl,
+  isVideoPath,
   readStoredPass,
   useWallFeed,
   type GuestPhoto,
@@ -489,7 +490,11 @@ function MyPhotos({ token, photos, onChange }: { token: string; photos: GuestPho
           return (
             <div key={photo.id} className="rounded-2xl overflow-hidden bg-premium-charcoal border border-premium-borderDark">
               <div className="relative aspect-square bg-premium-surfaceDark">
-                <img src={photoUrl(photo.storage_path)} alt={photo.caption || 'Your photo'} loading="lazy" className="w-full h-full object-cover" />
+                {isVideoPath(photo.storage_path) ? (
+                  <video src={photoUrl(photo.storage_path)} muted loop autoPlay playsInline preload="metadata" className="w-full h-full object-cover" />
+                ) : (
+                  <img src={photoUrl(photo.storage_path)} alt={photo.caption || 'Your photo'} loading="lazy" className="w-full h-full object-cover" />
+                )}
                 <button
                   type="button"
                   onClick={() => remove(photo)}
