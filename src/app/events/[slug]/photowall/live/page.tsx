@@ -11,6 +11,7 @@ import { PinterestMasonryPhotoWall } from '@/components/events/PinterestMasonryP
 import { ScreenControls } from '@/components/screens/ScreenControls';
 import { Camera, Maximize2, Minimize2, QrCode, WifiOff } from 'lucide-react';
 import QRCode from 'qrcode';
+import { BrandMark } from '@/components/BrandMark';
 
 const SAMPLE_PHOTOS = MOCK_PHOTO_WALL_UPLOADS.filter((p) => p.is_approved);
 
@@ -117,9 +118,7 @@ function LivePhotoWallContent({ slug }: { slug: string }) {
 
       <header className="h-20 px-8 flex items-center justify-between z-20 backdrop-blur-md bg-premium-surfaceDark/80 border-b border-premium-borderDark">
         <div className="flex items-center gap-4 min-w-0">
-          <div className="w-10 h-10 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-xl shadow-gold flex-shrink-0">
-            D1
-          </div>
+          <BrandMark size={40} />
           <div className="min-w-0">
             <h1 className="text-xl font-display font-bold text-white flex items-center gap-2 truncate">
               <span className="truncate">{title}</span>

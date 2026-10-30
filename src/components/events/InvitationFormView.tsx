@@ -13,6 +13,7 @@ import {
 import { alpha, type ResolvedTheme } from '@/lib/eventTheme';
 import { downloadBlob, downloadDataUrl } from '@/lib/image';
 import { passCode } from '@/lib/guestsApi';
+import { BrandMark } from '@/components/BrandMark';
 
 export type PreviewScreen = 'cover' | 'page' | 'review' | 'confirmed' | 'declined' | 'closed' | 'upcoming';
 
@@ -810,7 +811,7 @@ export function InvitationFormView({
             </a>
           ) : <span />}
           {logoRef ? <LogoMark refId={logoRef} size="s" /> : (
-            <div className="w-8 h-8 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-sm shadow-gold">D1</div>
+            <BrandMark size={32} />
           )}
         </nav>
       )}

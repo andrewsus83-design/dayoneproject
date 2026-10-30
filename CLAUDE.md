@@ -42,9 +42,10 @@ ALWAYS use the official `@theme` tokens defined in `src/app/globals.css`:
   - Primary Gold CTA buttons use: `bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold shadow-gold scale-on-click`.
   - Digital QR passes use `.ticket-cutout`. Floating mobile nav bars use `.glass-panel`. QR scanners use `.animate-scan-line`.
 - **Signature Brand Mark:**
-  - Always use the circular gold `D1` badge:
+  - Always use the real Day One Project logo through the shared component (the copper "dp" mark, `public/brand/dayone-mark.png`; the full logo with lettering is `public/brand/dayone-logo.png`). The old gold `D1` badge is retired:
     ```tsx
-    <div className="w-10 h-10 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-xl shadow-gold">D1</div>
+    import { BrandMark } from '@/components/BrandMark';
+    <BrandMark size={40} />
     ```
 - **Card Radii:** Major containers use `rounded-[2rem]` or `rounded-[2.5rem]`. Inputs/buttons use `rounded-xl` or `rounded-2xl`.
 

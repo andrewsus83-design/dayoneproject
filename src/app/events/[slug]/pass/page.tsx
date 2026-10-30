@@ -34,6 +34,7 @@ import {
   Globe,
 } from 'lucide-react';
 import QRCode from 'qrcode';
+import { BrandMark } from '@/components/BrandMark';
 
 /*
  * The guest app (PWA) a guest lands in after registering: Event · Activity · QR · Prize · Setting, with the QR pass
@@ -325,7 +326,7 @@ function GuestAppContent({ slug }: { slug: string }) {
         {/* Top app bar */}
         <header className="px-5 pt-6 pb-4 flex justify-between items-center gap-3 bg-premium-black/90 backdrop-blur border-b border-premium-borderDark sticky top-0 z-20">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-xl shadow-gold flex-shrink-0">D1</div>
+            <BrandMark size={40} />
             <div className="min-w-0">
               <p className="text-premium-gold text-[9px] font-mono font-bold uppercase tracking-[0.2em] leading-none mb-1 truncate">{getClientDomain(slug)}</p>
               <h1 className="font-display font-bold text-base text-white leading-tight truncate">{info.name || event.name}</h1>

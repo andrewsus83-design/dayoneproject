@@ -4,6 +4,7 @@ import React, { Suspense, use, useCallback, useEffect, useState } from 'react';
 import { DESIGN_HEIGHT, FitBox, SourceView, designWidth } from '@/components/screens/ScreenView';
 import { ScreenControls } from '@/components/screens/ScreenControls';
 import { useScreenFeed, type ScreenFeed } from '@/lib/screensApi';
+import { BrandMark } from '@/components/BrandMark';
 
 interface Layer {
   /** A new key means a different source (or a new version of the scene): it loads underneath and fades in. */
@@ -142,7 +143,7 @@ function ScreenOutput({ screenId }: { screenId: string }) {
       {!started && feed && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="px-8 py-6 rounded-[2rem] bg-premium-charcoal border border-premium-gold/40 text-center space-y-2 shadow-gold">
-            <div className="w-10 h-10 mx-auto bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-lg">D1</div>
+            <BrandMark size={40} className="mx-auto" />
             <div className="text-xl font-display font-bold text-white">{feed.screen.name}</div>
             <div className="text-xs font-mono text-zinc-400">{width} × {height}</div>
             <div className="text-sm text-premium-gold font-bold pt-2">Click anywhere to start this screen</div>

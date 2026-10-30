@@ -22,6 +22,7 @@ import { getClientDomain } from '@/lib/domain';
 import { type SlotResult } from '@/components/raffle/SlotMachine';
 import { DrawMachine, DRAW_STYLES } from '@/components/raffle/DrawMachine';
 import { PinterestMasonryPhotoWall } from '@/components/events/PinterestMasonryPhotoWall';
+import { BrandMark } from '@/components/BrandMark';
 
 const SAMPLE_PHOTOS = MOCK_PHOTO_WALL_UPLOADS.filter((p) => p.is_approved);
 const KEY_MODULES: Record<string, StageModuleId> = { '1': 'welcome', '2': 'photowall', '3': 'quiz', '4': 'raffle' };
@@ -205,9 +206,7 @@ function StageBigScreenContent({ slug }: { slug: string }) {
       {/* Top Ballroom Stage Header */}
       <header className="h-20 px-8 sm:px-12 flex items-center justify-between z-20 backdrop-blur-md bg-premium-surfaceDark/80 border-b border-premium-borderDark">
         <div className="flex items-center gap-4 min-w-0">
-          <div className="w-10 h-10 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-xl shadow-gold flex-shrink-0">
-            D1
-          </div>
+          <BrandMark size={40} />
           <div className="min-w-0">
             <h1 className="text-xl font-display font-bold text-white flex items-center gap-2">
               <span className="truncate">{event.name}</span>

@@ -17,6 +17,7 @@ import { updateEventConfig, writeGuests, type ThemeMode } from '@/lib/eventStore
 import { isSlugTaken, type OrgEventRow } from '@/lib/events';
 import { createOrgEvent, slugProblem } from '@/lib/orgEvents';
 import { APP_HOST } from '@/lib/domain';
+import { BrandMark } from '@/components/BrandMark';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type WizardStep = 1 | 2 | 3 | 4 | 5;
@@ -266,7 +267,7 @@ export default function NewEventPage() {
         )}
 
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-premium-gold rounded-full text-black font-display font-bold text-sm flex items-center justify-center shadow-gold">D1</div>
+          <BrandMark size={32} />
           <span className="font-display font-bold text-sm text-white">New Event</span>
         </div>
 

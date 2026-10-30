@@ -3,6 +3,7 @@
 import React from 'react';
 import { POPVERSE_STAGE_FRAME, useAssetUrl, type FramePreset, type StageFrame } from '@/lib/eventStore';
 import { PRISM_COLORS } from '@/lib/eventTheme';
+import { BrandMark } from '@/components/BrandMark';
 
 export const FRAME_PRESETS: { id: FramePreset; label: string; desc: string }[] = [
   { id: 'none', label: 'None', desc: 'Clean screen' },
@@ -32,7 +33,7 @@ const CONFETTI = Array.from({ length: 64 }, (_, i) => {
 function FooterLogo({ refId }: { refId?: string }) {
   const url = useAssetUrl(refId);
   if (!url) {
-    return <span className="w-7 h-7 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-xs shadow-gold shrink-0">D1</span>;
+    return <BrandMark size={28} />;
   }
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={url} alt="" className="h-7 w-auto object-contain shrink-0" />;

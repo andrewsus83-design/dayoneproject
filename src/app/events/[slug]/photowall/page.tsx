@@ -36,6 +36,7 @@ import {
   type GuestPhotoState,
   type UploadJob,
 } from '@/lib/photoWallApi';
+import { BrandMark } from '@/components/BrandMark';
 
 const noopSubscribe = () => () => {};
 const REFRESH_MS = 20_000;
@@ -64,9 +65,7 @@ function Shell({ slug, title, subtitle, children }: { slug: string; title: strin
             <h1 className="text-sm font-display font-bold text-white truncate">{title}</h1>
             {subtitle && <p className="text-[11px] text-zinc-400 truncate">{subtitle}</p>}
           </div>
-          <div className="w-8 h-8 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-sm shadow-gold flex-shrink-0">
-            D1
-          </div>
+          <BrandMark size={32} />
         </header>
         <main className="p-4 space-y-4 flex-1">{children}</main>
       </div>

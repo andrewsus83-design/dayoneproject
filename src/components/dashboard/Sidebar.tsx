@@ -26,6 +26,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useEventConfig } from '@/lib/eventStore';
 import { UserMenu } from '@/components/auth/UserMenu';
+import { BrandMark } from '@/components/BrandMark';
 
 const WORKSPACE_NAV = [
   { label: 'My Events', href: '/dashboard', icon: Calendar, exact: true },
@@ -108,9 +109,7 @@ export function Sidebar() {
         href="/"
         className="flex items-center gap-3 px-5 h-16 border-b border-premium-borderDark flex-shrink-0 group"
       >
-        <div className="w-8 h-8 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-base shadow-gold group-hover:scale-105 transition-transform">
-          D1
-        </div>
+        <BrandMark size={32} className="group-hover:scale-105 transition-transform" />
         <div>
           <div className="font-display font-bold text-[17px] text-white tracking-tight leading-none">dayoneproject<span className="text-premium-gold">.xyz</span></div>
           <div className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest mt-0.5">Event Platform</div>

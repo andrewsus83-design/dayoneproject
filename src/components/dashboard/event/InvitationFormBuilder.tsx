@@ -18,6 +18,7 @@ import { compressImage, downloadBlob, downloadDataUrl, toCsv } from '@/lib/image
 import { isServerEventId, passCode } from '@/lib/guestsApi';
 import { InvitationFormView, type PreviewScreen } from '@/components/events/InvitationFormView';
 import { EventFonts } from '@/components/events/EventFonts';
+import { BrandMark } from '@/components/BrandMark';
 
 const TYPE_ICONS: Record<QuestionType, React.ComponentType<{ className?: string }>> = {
   text: AlignLeft, long_text: AlignLeft, yes_no: CheckSquare,
@@ -1162,9 +1163,7 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
             </div>
 
             <div className="p-6 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark text-center space-y-4">
-              <div className="w-16 h-16 bg-premium-gold rounded-full flex items-center justify-center mx-auto shadow-gold">
-                <span className="text-premium-black font-display font-bold text-2xl">D1</span>
-              </div>
+              <BrandMark size={64} className="mx-auto" />
               <div>
                 <div className="text-sm font-bold text-white">dayoneproject.xyz Register Desk</div>
                 <div className="text-xs text-zinc-400 mt-0.5">Check in guests, scan QR passes, add walk-ins</div>

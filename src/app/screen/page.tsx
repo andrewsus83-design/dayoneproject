@@ -10,6 +10,7 @@ import { listOrgEvents } from '@/lib/orgEvents';
 import type { OrgEventRow } from '@/lib/events';
 import { StageLedEditor } from '@/components/dashboard/StageLedEditor';
 import { LiveScreenSwitcher } from '@/components/screens/LiveScreenSwitcher';
+import { BrandMark } from '@/components/BrandMark';
 
 /** Landing page for screen managers: pick the event, then switch what its stage screen shows. Nothing else. */
 export default function ScreenHome() {
@@ -44,7 +45,7 @@ export default function ScreenHome() {
       <div className="max-w-5xl mx-auto space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-lg shadow-gold">D1</div>
+            <BrandMark size={40} />
             <div>
               <h1 className="text-xl font-display font-bold text-white tracking-tight">Screen switcher</h1>
               <p className="text-xs text-zinc-500">{user ? `Signed in as ${displayName(user)}` : 'Loading…'}</p>

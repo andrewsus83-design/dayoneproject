@@ -7,6 +7,7 @@ import confetti from 'canvas-confetti';
 import { formatEventTime, useAssetUrl, type EventInfo, type LandingConfig, type DesignConfig } from '@/lib/eventStore';
 import type { LandingBlock, HeroBlock, CtaTarget } from '@/lib/landingBlocks';
 import { alpha, gradientText, PRISM_COLORS, type ResolvedTheme } from '@/lib/eventTheme';
+import { BrandMark } from '@/components/BrandMark';
 
 interface RendererProps {
   slug: string;
@@ -65,7 +66,7 @@ function Logo({ refId, size, fallback }: { refId: string; size: 's' | 'm' | 'l';
   const h = size === 's' ? 32 : size === 'l' ? 64 : 44;
   if (!url) {
     return fallback ? (
-      <div className="w-10 h-10 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-lg shadow-gold">D1</div>
+      <BrandMark size={40} />
     ) : null;
   }
   // eslint-disable-next-line @next/next/no-img-element
@@ -583,7 +584,7 @@ export function LandingRenderer(p: RendererProps) {
         {landing.footerText && <p className="text-xs mb-4" style={{ color: theme.subtle }}>{landing.footerText}</p>}
         <div className="flex flex-col @md:flex-row items-center justify-between gap-4 pt-2" style={column}>
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-sm shadow-gold">D1</div>
+            <BrandMark size={32} />
             <span className="text-xs" style={{ color: theme.subtle }}>Powered by dayoneproject.xyz</span>
           </div>
           <div className="flex items-center gap-4 text-xs" style={{ color: theme.subtle }}>

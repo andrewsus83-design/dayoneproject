@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { ArrowLeft, BarChart3, Calendar, KeyRound, Layers, MessageSquare, Shield, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserMenu } from '@/components/auth/UserMenu';
+import { BrandMark } from '@/components/BrandMark';
 
 const ADMIN_NAV = [
   { label: 'Overview', href: '/admin', icon: BarChart3, exact: true },
@@ -21,7 +22,7 @@ export function AdminSidebar() {
     <aside className="w-64 flex-shrink-0 bg-premium-black border-r border-premium-borderDark flex-col justify-between hidden md:flex min-h-screen">
       <div>
         <div className="h-16 flex items-center gap-3 px-5 border-b border-premium-borderDark">
-          <div className="w-8 h-8 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-sm shadow-gold">D1</div>
+          <BrandMark size={32} />
           <div className="leading-none">
             <div className="font-display font-bold text-[15px] text-white tracking-tight">dayoneproject<span className="text-premium-gold">.xyz</span></div>
             <div className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest mt-1 flex items-center gap-1"><Shield className="w-2.5 h-2.5" /> Admin</div>

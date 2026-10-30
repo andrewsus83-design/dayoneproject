@@ -4,19 +4,7 @@ import { Calendar, Camera, Gamepad2, Gift, Lock, QrCode, Settings } from 'lucide
 /** Page gutter and width shared by every section of the home page. */
 export const CONTAINER = 'max-w-6xl mx-auto px-5 sm:px-8';
 
-/** The copper "dp" mark of the Day One Project logo. */
-export function BrandMark({ size = 32, priority = false }: { size?: number; priority?: boolean }) {
-  return (
-    <Image
-      src="/brand/dayone-mark.png"
-      alt="Day One Project"
-      width={Math.round(size * (520 / 476))}
-      height={size}
-      priority={priority}
-      className="shrink-0"
-    />
-  );
-}
+export { BrandMark } from '@/components/BrandMark';
 
 export function Eyebrow({ children, tone = 'text-premium-gold' }: { children: React.ReactNode; tone?: string }) {
   return <p className={`text-[11px] font-bold uppercase tracking-[0.2em] ${tone}`}>{children}</p>;

@@ -4,6 +4,7 @@ import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { hasLocalEvent, isSampleSlug } from '@/lib/events';
 import { readSyncState } from '@/lib/eventStore';
 import { eventVersion, syncEventBySlug, type LiveCopy } from '@/lib/eventSync';
+import { BrandMark } from '@/components/BrandMark';
 
 /** How often an open page checks for a newer save (a tiny request; the event downloads only when it changed). */
 const REFRESH_MS = 30_000;
@@ -13,7 +14,7 @@ function Notice({ title, children }: { title: string; children?: React.ReactNode
   return (
     <div className="min-h-screen bg-premium-black text-zinc-100 font-sans flex items-center justify-center px-6">
       <div className="max-w-sm text-center space-y-4">
-        <div className="w-12 h-12 mx-auto bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-xl shadow-gold">D1</div>
+        <BrandMark size={48} className="mx-auto" />
         <h1 className="text-xl font-display font-bold text-white">{title}</h1>
         {children}
       </div>

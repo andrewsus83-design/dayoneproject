@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { appRole, assignedRole, canUseDashboard, homePath, isPlatformAdmin } from '@/lib/auth';
 import { authApi } from '@/lib/authApi';
 import { AuthenticatorQr } from '@/components/auth/AuthenticatorQr';
+import { BrandMark } from '@/components/BrandMark';
 
 type Method = 'organizer' | 'desk' | 'owner';
 type Step = 'start' | 'code' | 'setup' | 'setup-scan';
@@ -183,7 +184,7 @@ function LoginForm() {
     <div className="min-h-screen bg-premium-black text-zinc-100 font-sans flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm space-y-6">
         <div className="flex flex-col items-center text-center gap-3">
-          <div className="w-12 h-12 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-xl shadow-gold">D1</div>
+          <BrandMark size={48} />
           <div>
             <h1 className="text-2xl font-display font-bold text-white tracking-tight">Sign in</h1>
             <p className="text-xs text-zinc-500 mt-1">dayoneproject<span className="text-premium-gold">.xyz</span></p>

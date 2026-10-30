@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { ArrowLeft, EyeOff, Gift, Trophy, WifiOff } from 'lucide-react';
 import { guestAppPath } from '@/lib/guestsApi';
 import { publicWinnerLabel, usePublicDoorPrizes, type ServerWinner } from '@/lib/doorPrizeApi';
+import { BrandMark } from '@/components/BrandMark';
 
 const REVEAL_MS = 12_000;
 
@@ -14,7 +15,7 @@ function Notice({ title, children }: { title: string; children?: React.ReactNode
   return (
     <div className="guest-app min-h-screen bg-premium-black text-zinc-100 font-sans flex items-center justify-center px-6">
       <div className="max-w-sm text-center space-y-4">
-        <div className="w-12 h-12 mx-auto bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-xl shadow-gold">D1</div>
+        <BrandMark size={48} className="mx-auto" />
         <h1 className="text-xl font-display font-bold text-white">{title}</h1>
         {children}
       </div>
@@ -91,7 +92,7 @@ export function DoorPrizeViewer({ slug, initialId }: { slug: string; initialId?:
           <Link href={guestAppPath(slug, 'prize')} className="p-2 rounded-xl bg-premium-charcoal border border-premium-borderDark text-zinc-400 hover:text-white scale-on-click shrink-0" aria-label="Back to the guest app">
             <ArrowLeft className="w-4 h-4" />
           </Link>
-          <div className="w-10 h-10 bg-premium-gold rounded-full flex items-center justify-center text-premium-black font-display font-bold text-xl shadow-gold shrink-0">D1</div>
+          <BrandMark size={40} />
           <div className="min-w-0">
             <h1 className="text-lg sm:text-xl font-display font-medium text-white truncate">{data.event.name}</h1>
             <p className="text-xs text-zinc-400 font-mono flex items-center gap-2">

@@ -1,7 +1,7 @@
 /*
  * Day One guest app offline support (registered by the guest app and the invitation, scope /events/).
  * - Guest pages: always the latest from the network; the last copy this phone saw when there is no signal.
- * - Built files (/_next/static, icons, fonts) never change under the same name: cache first.
+ * - Built files (/_next/static, resized images, icons, fonts) never change under the same name: cache first.
  * - Everything else (Supabase, /api) goes straight to the network; the app keeps its own copies of the pass.
  */
 const VERSION = 'd1-guest-v1';
@@ -33,7 +33,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  if (url.pathname.startsWith('/_next/static/') || /\.(png|ico|svg|woff2?)$/.test(url.pathname)) {
+  if (url.pathname.startsWith('/_next/static/') || url.pathname.startsWith('/_next/image') || /\.(png|ico|svg|woff2?)$/.test(url.pathname)) {
     event.respondWith(
       (async () => {
         const cache = await caches.open(STATIC);
