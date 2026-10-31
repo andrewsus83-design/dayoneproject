@@ -324,16 +324,16 @@ function GuestAppContent({ slug }: { slug: string }) {
     <div className="guest-app min-h-screen bg-premium-black text-zinc-100 flex justify-center font-sans selection:bg-premium-gold selection:text-premium-black">
       <div className="w-full max-w-[420px] min-h-screen bg-premium-black relative flex flex-col sm:border-x sm:border-premium-borderDark">
         {/* Top app bar */}
-        <header className="px-[5%] pt-6 pb-4 flex justify-between items-center gap-3 bg-premium-black/90 backdrop-blur border-b border-premium-borderDark sticky top-0 z-20">
-          <div className="flex items-center gap-3 min-w-0">
-            <BrandMark size={40} />
+        <header className="px-[5%] pt-3 pb-2.5 flex justify-between items-center gap-3 bg-premium-black/90 backdrop-blur border-b border-premium-borderDark sticky top-0 z-20">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <BrandMark size={32} />
             <div className="min-w-0">
               <p className="text-premium-gold text-[9px] font-mono font-bold uppercase tracking-[0.2em] leading-none mb-1 truncate">{getClientDomain(slug)}</p>
               <h1 className="font-display font-bold text-base text-white leading-tight truncate">{info.name || event.name}</h1>
             </div>
           </div>
           {checkedIn && (
-            <span className="flex-shrink-0 flex items-center gap-1.5 text-[10px] font-bold text-premium-success bg-premium-success/10 border border-premium-success/25 px-2.5 py-1 rounded-full">
+            <span className="flex-shrink-0 flex items-center gap-1.5 text-[9px] font-bold text-premium-success bg-premium-success/10 border border-premium-success/25 px-2 py-0.5 rounded-full">
               <span className="w-1.5 h-1.5 rounded-full bg-premium-success animate-pulse" /> Checked in
             </span>
           )}

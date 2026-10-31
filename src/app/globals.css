@@ -171,19 +171,19 @@ body {
   100% { transform: translate(-50%, 0) scale(1); opacity: 1; }
 }
 
-/* Guest app (PWA) on phones: larger type, icons and touch targets. Rem-based sizes follow the root font size (125%);
-   the fixed-pixel labels move up 3 px. Big screens (stage, door prize board) are wider and keep their sizes. */
+/* Guest app (PWA) on phones: larger type, icons and touch targets. Rem-based sizes follow the root font size (137.5%);
+   the fixed-pixel labels move up 4 px. Big screens (stage, door prize board) are wider and keep their sizes. */
 @media (max-width: 640px) {
-  html:has(.guest-app) { font-size: 125%; }
-  .guest-app .text-\[7px\] { font-size: 10px; }
-  .guest-app .text-\[8px\] { font-size: 11px; }
-  .guest-app .text-\[9px\] { font-size: 12px; }
-  .guest-app .text-\[10px\] { font-size: 13px; }
-  .guest-app .text-\[11px\] { font-size: 14px; }
-  .guest-app .text-\[12px\] { font-size: 15px; }
-  .guest-app .text-\[13px\] { font-size: 16px; }
-  .guest-app .text-\[14px\] { font-size: 17px; }
-  .guest-app .text-\[15px\] { font-size: 18px; }
+  html:has(.guest-app) { font-size: 137.5%; }
+  .guest-app .text-\[7px\] { font-size: 11px; }
+  .guest-app .text-\[8px\] { font-size: 12px; }
+  .guest-app .text-\[9px\] { font-size: 13px; }
+  .guest-app .text-\[10px\] { font-size: 14px; }
+  .guest-app .text-\[11px\] { font-size: 15px; }
+  .guest-app .text-\[12px\] { font-size: 16px; }
+  .guest-app .text-\[13px\] { font-size: 17px; }
+  .guest-app .text-\[14px\] { font-size: 18px; }
+  .guest-app .text-\[15px\] { font-size: 19px; }
 }
 
 /* Big-screen controls (ScreenControls) keep a pointer even where the screen hides it on air. */
