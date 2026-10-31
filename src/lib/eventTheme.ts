@@ -223,6 +223,11 @@ export function fontsHref(ids: { heading?: string; body?: string; accent?: strin
   return `https://fonts.googleapis.com/css2?${[...new Set(families)].map((f) => `family=${f}`).join('&')}&display=swap`;
 }
 
+/** An invitation form's look: the event's design, on the form's own background colour when it has one. */
+export function resolveFormTheme(design: DesignConfig, background: string): ResolvedTheme {
+  return resolveTheme(/^#[0-9a-f]{6}$/i.test(background) ? { ...design, background, mode: modeForBackground(background) } : design);
+}
+
 export function resolveTheme(design: DesignConfig): ResolvedTheme {
   const bg = design.background || (design.mode === 'light' ? '#FBF8F1' : '#09090B');
   const mode = design.mode;

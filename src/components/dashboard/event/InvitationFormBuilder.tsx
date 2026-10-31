@@ -4,21 +4,24 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import QRCode from 'qrcode';
 import {
-  AlignLeft, ArrowDown, ArrowUp, Check, CheckSquare, ChevronDown, Copy, Download, ExternalLink, Eye, FileText, GripVertical,
-  Hash, Image as ImageIcon, KeyRound, Link as LinkIcon, List, Mail, Move, Phone, Plus, QrCode, RotateCcw, Scissors, Settings2,
-  Share2, Smartphone, Trash2, Upload, X,
+  AlignCenter, AlignLeft, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Bold, Check, CheckSquare, ChevronDown, Copy, Download, ExternalLink,
+  Eye, FileText, GripVertical, Hash, Heading1, Heading2, Image as ImageIcon, Italic, KeyRound, Layers, Link as LinkIcon, List,
+  ListOrdered, Mail, Move, Palette, Phone, Plus, QrCode, RotateCcw, Scissors, Settings2, Share2, Smartphone, Trash2, Type, Upload, X,
 } from 'lucide-react';
 import {
-  addResponse, deleteAsset, deleteResponse, findQuestion, formatEventDate, getQuestions, isQuestion, newId, resetEventSection, saveAsset,
-  useAssetUrl, useEventConfig, useGuests, useResponses, withPageBreaks, numberDigits, formatGuestNumber, ESSENTIALS_CORPORATE, ESSENTIALS_WEDDING,
-  type FormItem, type FormQuestion, type InvitationConfig, type QuestionType, type ClosingCopy, type EventInfo,
+  addResponse, deleteAsset, deleteResponse, findForm, findQuestion, formatEventDate, formIdFromName, formLabel, formPath, getQuestions,
+  isQuestion, listForms, newId, newInvitationForm, resetEventSection, saveAsset, useAssetUrl, useEventConfig, useGuests, useResponses,
+  withPageBreaks, numberDigits, formatGuestNumber, ESSENTIALS_CORPORATE, ESSENTIALS_WEDDING, MAIN_FORM_ID,
+  type FormItem, type FormQuestion, type InvitationConfig, type InvitationForm, type QuestionType, type ClosingCopy, type EventInfo,
 } from '@/lib/eventStore';
-import { DARK_BACKGROUNDS, LIGHT_BACKGROUNDS, PALETTES, resolveTheme } from '@/lib/eventTheme';
+import { DARK_BACKGROUNDS, LIGHT_BACKGROUNDS, PALETTES, resolveFormTheme } from '@/lib/eventTheme';
 import { compressImage, downloadBlob, downloadDataUrl, toCsv } from '@/lib/image';
 import { isServerEventId, passCode } from '@/lib/guestsApi';
 import { InvitationFormView, type PreviewScreen } from '@/components/events/InvitationFormView';
 import { EventFonts } from '@/components/events/EventFonts';
 import { BrandMark } from '@/components/BrandMark';
+import { richTextSummary } from '@/components/events/RichText';
+import { BuilderSaveButton } from './BuilderSaveButton';
 
 const TYPE_ICONS: Record<QuestionType, React.ComponentType<{ className?: string }>> = {
   text: AlignLeft, long_text: AlignLeft, yes_no: CheckSquare,
@@ -94,13 +97,109 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
+type RichTool = 'h1' | 'h2' | 'bold' | 'italic' | 'ul' | 'ol' | 'link';
+const RICH_TOOLS: { id: RichTool; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: 'h1', label: 'Heading', icon: Heading1 },
+  { id: 'h2', label: 'Small heading', icon: Heading2 },
+  { id: 'bold', label: 'Bold', icon: Bold },
+  { id: 'italic', label: 'Italic', icon: Italic },
+  { id: 'ul', label: 'Bulleted list', icon: List },
+  { id: 'ol', label: 'Numbered list', icon: ListOrdered },
+  { id: 'link', label: 'Link', icon: LinkIcon },
+];
+
+/** The text block's editor: a toolbar that writes the marks RichText understands, around the selection. */
+function RichTextEditor({ value, onChange }: { value: string; onChange: (text: string) => void }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const apply = (edit: (text: string, start: number, end: number) => { text: string; start: number; end: number }) => {
+    const el = ref.current;
+    const next = edit(value, el?.selectionStart ?? value.length, el?.selectionEnd ?? value.length);
+    onChange(next.text);
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(next.start, next.end);
+    });
+  };
+  const wrap = (mark: string, placeholder: string) =>
+    apply((t, s, e) => {
+      const sel = t.slice(s, e) || placeholder;
+      return { text: t.slice(0, s) + mark + sel + mark + t.slice(e), start: s + mark.length, end: s + mark.length + sel.length };
+    });
+  // Marks every selected line as a heading or list item (replacing any mark it had).
+  const lines = (mark: (i: number) => string) =>
+    apply((t, s, e) => {
+      const from = t.lastIndexOf('\n', s - 1) + 1;
+      const endAt = t.indexOf('\n', e);
+      const to = endAt < 0 ? t.length : endAt;
+      const block = t.slice(from, to).split('\n').map((l, i) => mark(i) + l.replace(/^\s*(#{1,2}|[-•*]|\d+[.)])\s+/, '')).join('\n');
+      return { text: t.slice(0, from) + block + t.slice(to), start: from, end: from + block.length };
+    });
+  const link = () =>
+    apply((t, s, e) => {
+      const label = t.slice(s, e) || 'link text';
+      const at = s + label.length + 3;
+      return { text: `${t.slice(0, s)}[${label}](https://)${t.slice(e)}`, start: at, end: at + 'https://'.length };
+    });
+  const run = (tool: RichTool) => {
+    if (tool === 'h1') lines(() => '# ');
+    else if (tool === 'h2') lines(() => '## ');
+    else if (tool === 'bold') wrap('**', 'bold text');
+    else if (tool === 'italic') wrap('*', 'italic text');
+    else if (tool === 'ul') lines(() => '- ');
+    else if (tool === 'ol') lines((i) => `${i + 1}. `);
+    else link();
+  };
+  return (
+    <div className="rounded-xl border border-premium-borderDark bg-premium-surfaceDark focus-within:border-premium-gold overflow-hidden">
+      <div className="flex items-center gap-0.5 p-1 border-b border-premium-borderDark overflow-x-auto">
+        {RICH_TOOLS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            title={t.label}
+            aria-label={t.label}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => run(t.id)}
+            className="w-8 h-8 shrink-0 rounded-lg text-zinc-400 hover:text-white hover:bg-premium-charcoal flex items-center justify-center scale-on-click"
+          >
+            <t.icon className="w-3.5 h-3.5" />
+          </button>
+        ))}
+      </div>
+      <textarea
+        ref={ref}
+        rows={6}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={'# Lomba rules\nBring your own **crayons**.\n- Ages 5–12\n- Starts at 10:00'}
+        className="w-full bg-transparent text-white px-3 py-2.5 text-xs leading-relaxed outline-none resize-y font-mono"
+      />
+    </div>
+  );
+}
+
+/** Deletes the pictures and files a form uploaded on this device (a form being removed). */
+function deleteFormAssets(form: InvitationConfig) {
+  if (form.photoUrl) deleteAsset(form.photoUrl);
+  for (const it of form.items) if ((it.kind === 'image' || it.kind === 'file') && it.url) deleteAsset(it.url);
+}
+
 export function InvitationFormBuilder({ eventId }: { eventId: string }) {
-  const { config, event, update, savedAt } = useEventConfig(eventId);
+  const { base, config, event, update } = useEventConfig(eventId);
   // Saved events: replies come from the server's guest list (read-only here); samples keep them on this device.
   const serverReplies = isServerEventId(eventId);
-  const responses = useResponses(eventId);
+  const allResponses = useResponses(eventId);
   const guests = useGuests(eventId);
-  const inv = config.invitation;
+  // The event's forms: the first one is config.invitation (id ''), the others config.forms.items. The tabs below edit
+  // the form picked in the list.
+  const forms = useMemo(() => listForms(config), [config]);
+  const [activeFormId, setActiveFormId] = useState<string>(MAIN_FORM_ID);
+  const inv: InvitationForm = useMemo(
+    () => findForm(config, activeFormId) ?? { ...config.invitation, id: MAIN_FORM_ID },
+    [config, activeFormId],
+  );
+  const formId = inv.id;
+  const responses = useMemo(() => allResponses.filter((r) => (r.formId ?? '') === formId), [allResponses, formId]);
   const info = config.info;
   const isWedding = event.event_type === 'wedding';
   const slug = info.slug;
@@ -120,15 +219,18 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
   const [qrPng, setQrPng] = useState('');
   const [expandedResponse, setExpandedResponse] = useState<string | null>(null);
   const [origin, setOrigin] = useState('');
+  const [newFormName, setNewFormName] = useState<string | null>(null);
+  const formStripRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const closingRefs = useRef<Partial<Record<ClosingField, HTMLInputElement | HTMLTextAreaElement | null>>>({});
   const [activeField, setActiveField] = useState<ClosingField>('message');
 
   useEffect(() => setOrigin(window.location.origin), []);
 
-  const formUrl = `${origin}/events/${slug}/invitation`;
+  const formHref = formPath(slug, formId);
+  const formUrl = `${origin}${formHref}`;
   // The invitation always uses the event's colors from Design Studio, like the landing page.
-  const theme = useMemo(() => resolveTheme(config.design), [config.design]);
+  const theme = useMemo(() => resolveFormTheme(config.design, inv.background), [config.design, inv.background]);
   const paletteLabel = PALETTES.find((p) => p.id === config.design.palette)?.label ?? 'Custom';
   const photo = useAssetUrl(inv.photoUrl);
   const heroBlock = config.landing.blocks.find((b) => b.type === 'hero');
@@ -140,10 +242,52 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
     QRCode.toDataURL(formUrl, { width: 1024, margin: 2, color: { dark: '#09090B', light: '#FFFFFF' } }).then(setQrPng).catch(() => setQrPng(''));
   }, [formUrl, origin]);
 
-  useEffect(() => setPreviewOverride(null), [formTab, closingView]);
+  useEffect(() => setPreviewOverride(null), [formTab, closingView, formId]);
+  // The picked form's pill stays in view in the scrolling strip (phones), also after moving it.
+  useEffect(() => {
+    const strip = formStripRef.current;
+    const pill = strip?.querySelector<HTMLElement>(`[data-form="${formId || 'first'}"]`);
+    if (strip && pill) strip.scrollTo({ left: pill.offsetLeft - strip.offsetLeft - 8, behavior: 'smooth' });
+  }, [formId, forms]);
 
   const report = (res: { ok: boolean; error?: string }) => setStorageError(res.ok ? null : res.error ?? 'Could not save.');
-  const setInv = (patch: Partial<InvitationConfig>) => report(update('invitation', patch));
+  const setInv = (patch: Partial<InvitationConfig>) =>
+    report(formId
+      ? update('forms', { items: config.forms.items.map((f) => (f.id === formId ? { ...f, ...patch } : f)) })
+      : update('invitation', patch));
+
+  /* ── Forms ── */
+  const pickForm = (id: string) => {
+    setActiveFormId(id);
+    setSelectedQ(null);
+  };
+  const addForm = () => {
+    const name = (newFormName ?? '').trim();
+    if (!name) return;
+    const id = formIdFromName(name, forms.map((f) => f.id));
+    const res = update('forms', { items: [...config.forms.items, newInvitationForm(base, name, id)], order: [...forms.map((f) => f.id), id] });
+    report(res);
+    if (!res.ok) return;
+    setNewFormName(null);
+    pickForm(id);
+    setFormTab('cover');
+  };
+  const moveForm = (dir: -1 | 1) => {
+    const ids = forms.map((f) => f.id);
+    const at = ids.indexOf(formId);
+    const to = at + dir;
+    if (at < 0 || to < 0 || to >= ids.length) return;
+    [ids[at], ids[to]] = [ids[to], ids[at]];
+    report(update('forms', { order: ids }));
+  };
+  const removeForm = () => {
+    if (!formId) return;
+    const replies = responses.length;
+    if (!confirm(`Remove the form "${formLabel(inv)}"? Its link stops working.${replies ? ` The ${replies} guest${replies === 1 ? '' : 's'} who replied keep their passes and stay on the guest list.` : ''}`)) return;
+    deleteFormAssets(inv);
+    report(update('forms', { items: config.forms.items.filter((f) => f.id !== formId), order: config.forms.order.filter((id) => id !== formId) }));
+    pickForm(MAIN_FORM_ID);
+  };
   const setInfo = (patch: Partial<EventInfo>) => report(update('info', patch));
   const items = inv.items;
   const questions = useMemo(() => getQuestions(items), [items]);
@@ -341,14 +485,14 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
       r.token,
       ...questions.map((q) => r.answers[q.id] ?? ''),
     ]);
-    downloadBlob(`${slug}-responses.csv`, new Blob([toCsv([header, ...rows])], { type: 'text/csv;charset=utf-8' }));
+    downloadBlob(`${slug}${formId ? `-${formId}` : ''}-responses.csv`, new Blob([toCsv([header, ...rows])], { type: 'text/csv;charset=utf-8' }));
   };
 
   /* ── Share ── */
   const shareText = `${isWedding ? "You're invited to" : 'Register for'} ${info.name} — ${formatEventDate(info.startDate)}. ${formUrl}`;
   const downloadSvg = async () => {
     const svg = await QRCode.toString(formUrl, { type: 'svg', margin: 2, color: { dark: '#09090B', light: '#FFFFFF' } });
-    downloadBlob(`${slug}-rsvp-qr.svg`, new Blob([svg], { type: 'image/svg+xml' }));
+    downloadBlob(`${slug}${formId ? `-${formId}` : ''}-rsvp-qr.svg`, new Blob([svg], { type: 'image/svg+xml' }));
   };
 
   /* ── Preview screen ── */
@@ -377,6 +521,102 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
 
       {/* Left: builder */}
       <div className="space-y-4 min-w-0">
+        {/* Forms: each has its own link, questions, limits and closing pages, and gives its own QR passes. */}
+        <div className="p-3 rounded-2xl bg-premium-charcoal border border-premium-borderDark space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-premium-gold" /> {forms.length > 1 ? `${forms.length} forms` : 'Form'}
+            </span>
+            {newFormName === null && (
+              <button
+                type="button"
+                onClick={() => setNewFormName('')}
+                className="px-3 py-1.5 rounded-xl border border-premium-borderDark text-[11px] font-bold text-premium-gold hover:border-premium-gold/50 scale-on-click flex items-center gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" /> {forms.length > 1 ? 'Add form' : 'Add another form'}
+              </button>
+            )}
+          </div>
+
+          <div ref={formStripRef} className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+            {forms.map((f, i) => {
+              const active = f.id === formId;
+              return (
+                <button
+                  key={f.id || 'first'}
+                  type="button"
+                  data-form={f.id || 'first'}
+                  onClick={() => pickForm(f.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 border scale-on-click transition-all ${
+                    active ? 'bg-premium-gold text-black border-premium-gold shadow-gold' : 'bg-premium-surfaceDark text-zinc-400 border-premium-borderDark hover:text-white'
+                  }`}
+                >
+                  {forms.length > 1 && <span className={`font-mono mr-1.5 ${active ? 'text-black/60' : 'text-zinc-600'}`}>{i + 1}</span>}
+                  {formLabel(f)}
+                  {!f.accepting && <span className={`ml-1.5 text-[10px] font-mono ${active ? 'text-black/60' : 'text-premium-danger'}`}>paused</span>}
+                </button>
+              );
+            })}
+          </div>
+
+          {newFormName !== null && (
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                autoFocus
+                value={newFormName}
+                onChange={(e) => setNewFormName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') addForm(); if (e.key === 'Escape') setNewFormName(null); }}
+                placeholder="Form name, e.g. Lomba Painting"
+                maxLength={60}
+                className={inputCls}
+              />
+              <div className="flex gap-2 shrink-0">
+                <button type="button" onClick={addForm} disabled={!newFormName.trim()} className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black text-xs font-display font-bold shadow-gold scale-on-click disabled:opacity-40">
+                  Add form
+                </button>
+                <button type="button" onClick={() => setNewFormName(null)} className="px-4 py-2 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-zinc-400 text-xs font-bold scale-on-click">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {forms.length > 1 && (
+            <div className="pt-3 border-t border-premium-borderDark/60 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  value={inv.formName}
+                  onChange={(e) => setInv({ formName: e.target.value })}
+                  aria-label="Form name"
+                  placeholder="Form name"
+                  maxLength={60}
+                  className={`${inputCls} flex-1 min-w-[10rem]`}
+                />
+                <div className="flex items-center gap-1 shrink-0">
+                  <button type="button" onClick={() => moveForm(-1)} disabled={forms[0]?.id === formId} className="w-8 h-8 rounded-xl border border-premium-borderDark text-zinc-400 hover:text-white disabled:opacity-25 flex items-center justify-center scale-on-click" aria-label="Move form earlier">
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                  </button>
+                  <button type="button" onClick={() => moveForm(1)} disabled={forms[forms.length - 1]?.id === formId} className="w-8 h-8 rounded-xl border border-premium-borderDark text-zinc-400 hover:text-white disabled:opacity-25 flex items-center justify-center scale-on-click" aria-label="Move form later">
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                  {formId && (
+                    <button type="button" onClick={removeForm} className="w-8 h-8 rounded-xl border border-premium-borderDark text-zinc-500 hover:text-premium-danger hover:border-premium-danger/40 flex items-center justify-center scale-on-click" aria-label="Remove form">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <p className="text-[10px] text-zinc-500 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
+                <span className="flex items-center gap-1.5 min-w-0 max-w-full">
+                  <LinkIcon className="w-3 h-3 text-premium-neon shrink-0" />
+                  <span className="font-mono text-premium-neon truncate">{formHref}</span>
+                </span>
+                <span>· {responses.length} {responses.length === 1 ? 'reply' : 'replies'} · each reply gets its own QR pass</span>
+              </p>
+            </div>
+          )}
+        </div>
+
         <div className="flex items-center gap-0.5 p-1 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark overflow-x-auto">
           {TABS.map((t) => {
             const active = formTab === t.id;
@@ -400,13 +640,8 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
           })}
         </div>
 
-        <div className="flex items-center justify-between gap-3 text-[11px] font-mono px-1">
-          <span className="text-zinc-500">Changes save automatically.</span>
-          {savedAt && (
-            <span className="inline-flex items-center gap-1 text-premium-success">
-              <Check className="w-3 h-3" /> Saved {new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          )}
+        <div className="px-1">
+          <BuilderSaveButton eventId={eventId} />
         </div>
 
         {storageError && (
@@ -463,6 +698,57 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
                       {m === 'dark' ? 'Dark' : 'Light'}
                     </button>
                   ))}
+                </div>
+              </div>
+              <div className="p-3 rounded-2xl bg-premium-surfaceDark border border-premium-borderDark space-y-2.5">
+                <div>
+                  <div className="text-xs font-bold text-white">Form background</div>
+                  <div className="text-[10px] text-zinc-500 mt-0.5">
+                    {inv.background ? 'This form only. Text turns dark or light to stay readable; Page mode no longer applies here.' : 'Uses the event colours. Pick a colour to give this form its own background.'}
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setInv({ background: '' })}
+                    className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border scale-on-click ${!inv.background ? 'bg-premium-gold text-black border-premium-gold' : 'bg-premium-charcoal text-zinc-400 border-premium-borderDark hover:text-white'}`}
+                  >
+                    Event colours
+                  </button>
+                  {[...DARK_BACKGROUNDS, ...LIGHT_BACKGROUNDS].map((sw) => {
+                    const active = inv.background.toLowerCase() === sw.hex.toLowerCase();
+                    return (
+                      <button
+                        key={sw.id}
+                        type="button"
+                        title={sw.label}
+                        aria-label={`Background ${sw.label}`}
+                        aria-pressed={active}
+                        onClick={() => setInv({ background: sw.hex })}
+                        className={`w-7 h-7 rounded-full border scale-on-click ${active ? 'border-premium-gold ring-2 ring-premium-gold/60' : 'border-white/15'}`}
+                        style={{ backgroundColor: sw.hex }}
+                      />
+                    );
+                  })}
+                  <label
+                    title="Any colour"
+                    className={`relative w-7 h-7 rounded-full border flex items-center justify-center cursor-pointer scale-on-click overflow-hidden ${
+                      inv.background && ![...DARK_BACKGROUNDS, ...LIGHT_BACKGROUNDS].some((sw) => sw.hex.toLowerCase() === inv.background.toLowerCase())
+                        ? 'border-premium-gold ring-2 ring-premium-gold/60'
+                        : 'border-premium-borderDark bg-premium-charcoal'
+                    }`}
+                    style={inv.background ? { backgroundColor: inv.background } : undefined}
+                  >
+                    <Palette className="w-3.5 h-3.5 text-zinc-300 mix-blend-difference" />
+                    <input
+                      type="color"
+                      aria-label="Any background colour"
+                      value={/^#[0-9a-f]{6}$/i.test(inv.background) ? inv.background : theme.bg}
+                      onChange={(e) => setInv({ background: e.target.value })}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                    />
+                  </label>
+                  {inv.background && <span className="font-mono text-[10px] text-zinc-400 ml-1">{inv.background.toUpperCase()}</span>}
                 </div>
               </div>
             </div>
@@ -675,6 +961,46 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
                       );
                     }
 
+                    if (it.kind === 'text') {
+                      return (
+                        <div key={it.id} {...dragProps} className={`rounded-2xl border transition-colors bg-premium-surfaceDark ${open ? 'border-premium-gold/50' : 'border-premium-borderDark'} ${dragId === it.id ? 'opacity-50' : ''}`}>
+                          <div className="p-3 flex items-center gap-2.5">
+                            <GripVertical className="w-3.5 h-3.5 text-zinc-600 shrink-0 cursor-grab" />
+                            <button type="button" onClick={() => setSelectedQ(open ? null : it.id)} className="flex-1 min-w-0 flex items-center gap-2.5 text-left">
+                              <Type className="w-4 h-4 text-premium-gold shrink-0" />
+                              <span className="min-w-0">
+                                <span className="block text-xs font-bold text-white truncate">{richTextSummary(it.text) || 'Empty text'}</span>
+                                <span className="block text-[10px] text-zinc-500">Text</span>
+                              </span>
+                            </button>
+                            {rowControls}
+                          </div>
+                          {open && (
+                            <div className="px-4 pb-4 pt-1 space-y-3 border-t border-premium-borderDark/60">
+                              <RichTextEditor value={it.text} onChange={(text) => patchItem(it.id, { text })} />
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-[10px] text-zinc-500">Select text, then tap a button. Variables like {'{event}'} and {'{date}'} work too.</p>
+                                <div className="flex items-center gap-1 bg-premium-black p-1 rounded-xl border border-premium-borderDark">
+                                  {([['left', AlignLeft, 'Align left'], ['center', AlignCenter, 'Center']] as const).map(([a, Icon, label]) => (
+                                    <button
+                                      key={a}
+                                      type="button"
+                                      aria-label={label}
+                                      title={label}
+                                      onClick={() => patchItem(it.id, { align: a })}
+                                      className={`w-8 h-7 rounded-lg flex items-center justify-center scale-on-click ${it.align === a ? 'bg-premium-gold text-black' : 'text-zinc-400 hover:text-white'}`}
+                                    >
+                                      <Icon className="w-3.5 h-3.5" />
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+
                     const q = it as FormQuestion;
                     qNo += 1;
                     const Icon = TYPE_ICONS[q.type];
@@ -772,9 +1098,16 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
               </div>
             )}
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
               <button type="button" onClick={() => setShowAdd((v) => !v)} className="py-3 rounded-2xl border-2 border-dashed border-premium-borderDark text-zinc-300 text-xs font-bold hover:border-premium-gold/50 flex items-center justify-center gap-1.5 scale-on-click">
                 <Plus className="w-4 h-4" /> Question
+              </button>
+              <button
+                type="button"
+                onClick={() => { const id = newId('txt'); insertItems([{ kind: 'text', id, text: '', align: 'left' }]); setSelectedQ(id); }}
+                className="py-3 rounded-2xl border-2 border-dashed border-premium-borderDark text-zinc-300 text-xs font-bold hover:border-premium-gold/50 flex items-center justify-center gap-1.5 scale-on-click"
+              >
+                <Type className="w-4 h-4" /> Text
               </button>
               <button type="button" onClick={() => pickContent('image')} className="py-3 rounded-2xl border-2 border-dashed border-premium-borderDark text-zinc-300 text-xs font-bold hover:border-premium-gold/50 flex items-center justify-center gap-1.5 scale-on-click">
                 <ImageIcon className="w-4 h-4" /> {uploading && contentUploadKind === 'image' ? 'Uploading…' : 'Image'}
@@ -950,6 +1283,7 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
               <div className="space-y-1 pt-2">
                 <div className="text-[10px] font-mono uppercase text-zinc-500 tracking-widest mb-1">What guests can do</div>
                 {([
+                  { key: 'sendConfirmation', label: 'Send a confirmation email', sub: 'Guests who say they’re coming get the Confirmed heading and message by email, with their QR pass and a calendar file.' },
                   { key: 'showTicket', label: 'Show the ticket with QR code', sub: 'The QR is what you scan at the door.' },
                   { key: 'guestNumbers', label: 'Show the guest number on the ticket', sub: 'Every guest gets a number (001, 002…). Door prize draws use it.' },
                   { key: 'showCalendar', label: '"Add to calendar" button', sub: 'Downloads an .ics file.' },
@@ -964,6 +1298,13 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
                     <Toggle on={inv[item.key]} label={item.label} onClick={() => setInv({ [item.key]: !inv[item.key] } as Partial<InvitationConfig>)} />
                   </div>
                 ))}
+                {inv.sendConfirmation && (!findQuestion(questions, 'email') || !serverReplies) && (
+                  <p className="text-[11px] text-premium-gold bg-premium-gold/10 border border-premium-gold/30 rounded-xl px-3 py-2">
+                    {!serverReplies
+                      ? 'Sample events don’t send emails. Saved events do.'
+                      : 'This form has no email question, so there is nowhere to send it. Add “Your email address” from the Essentials on the Questions tab.'}
+                  </p>
+                )}
                 {inv.guestNumbers && (
                   <Field label="Number label on the ticket">
                     <input value={inv.numberLabel} onChange={(e) => setInv({ numberLabel: e.target.value })} placeholder="Guest No." className={inputCls} />
@@ -1009,7 +1350,7 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
                 <button type="button" onClick={() => copy(formUrl, 'link')} className="px-3 py-1.5 rounded-xl bg-premium-gold text-black font-bold text-[10px] scale-on-click">
                   {copied === 'link' ? 'Copied!' : 'Copy'}
                 </button>
-                <a href={`/events/${slug}/invitation`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-xl bg-premium-charcoal border border-premium-borderDark text-white font-bold text-[10px] scale-on-click flex items-center gap-1">
+                <a href={formHref} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-xl bg-premium-charcoal border border-premium-borderDark text-white font-bold text-[10px] scale-on-click flex items-center gap-1">
                   Open <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
@@ -1026,7 +1367,7 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
                   <div className="text-xs text-zinc-400 mt-0.5">Print it on invitation cards. Guests scan it to open the RSVP form.</div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <button type="button" disabled={!qrPng} onClick={() => downloadDataUrl(`${slug}-rsvp-qr.png`, qrPng)} className="px-4 py-2 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-bold text-xs scale-on-click flex items-center gap-1.5 disabled:opacity-40">
+                  <button type="button" disabled={!qrPng} onClick={() => downloadDataUrl(`${slug}${formId ? `-${formId}` : ''}-rsvp-qr.png`, qrPng)} className="px-4 py-2 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-bold text-xs scale-on-click flex items-center gap-1.5 disabled:opacity-40">
                     <Download className="w-3.5 h-3.5" /> Download PNG
                   </button>
                   <button type="button" disabled={!origin} onClick={downloadSvg} className="px-4 py-2 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-white font-bold text-xs scale-on-click disabled:opacity-40">
@@ -1088,7 +1429,7 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
               <div className="p-8 rounded-2xl border-2 border-dashed border-premium-borderDark text-center space-y-3">
                 <div className="text-sm font-bold text-white">No replies yet</div>
                 <p className="text-xs text-zinc-500">Open the live form and send a test reply — it will appear here instantly.</p>
-                <a href={`/events/${slug}/invitation`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-premium-gold text-black font-bold text-xs scale-on-click">
+                <a href={formHref} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-premium-gold text-black font-bold text-xs scale-on-click">
                   Open live form <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               </div>
@@ -1135,7 +1476,7 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
                   report(addResponse(eventId, {
                     id: newId('rsp'), submittedAt: new Date().toISOString(),
                     answers: nameQ ? { [nameQ.id]: 'Test Guest' } : {},
-                    name: 'Test Guest', email: '', phone: '', attending: true, party: 1, token: 'D1-TEST0001',
+                    name: 'Test Guest', email: '', phone: '', attending: true, party: 1, token: 'D1-TEST0001', formId,
                   }));
                 }}
                 className="w-full text-[11px] text-zinc-500 hover:text-white font-bold"
@@ -1242,7 +1583,7 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
               )}
             </div>
 
-            <Field label="Form name" hint="Only you see this.">
+            <Field label="Form name" hint={forms.length > 1 ? 'Guests see it on the landing page buttons and their pass, and replies are tagged with it.' : 'Only you see this, until the event has more than one form.'}>
               <input value={inv.formName} onChange={(e) => setInv({ formName: e.target.value })} className={inputCls} />
             </Field>
 
@@ -1282,7 +1623,17 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
             <div className="pt-3 border-t border-premium-borderDark/60 flex justify-end">
               <button
                 type="button"
-                onClick={() => { if (confirm('Reset the whole invitation form (cover, questions, closing, settings) to defaults?')) { if (inv.photoUrl) deleteAsset(inv.photoUrl); report(resetEventSection(eventId, 'invitation')); setSelectedQ(null); } }}
+                onClick={() => {
+                  if (!confirm('Reset this form (cover, questions, closing, settings) to defaults?')) return;
+                  if (inv.photoUrl) deleteAsset(inv.photoUrl);
+                  if (formId) {
+                    const fresh = newInvitationForm(base, inv.formName, formId);
+                    report(update('forms', { items: config.forms.items.map((f) => (f.id === formId ? fresh : f)) }));
+                  } else {
+                    report(resetEventSection(eventId, 'invitation'));
+                  }
+                  setSelectedQ(null);
+                }}
                 className="px-4 py-2 rounded-xl border border-premium-danger/40 text-premium-danger text-xs font-bold scale-on-click flex items-center gap-1.5 hover:bg-premium-danger/10"
               >
                 <RotateCcw className="w-3.5 h-3.5" /> Reset form to defaults
@@ -1373,7 +1724,7 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
               {copied === 'side' ? <Check className="w-3.5 h-3.5 text-premium-success" /> : <Copy className="w-3.5 h-3.5" />}
             </button>
           </div>
-          <a href={`/events/${slug}/invitation`} target="_blank" rel="noopener noreferrer" className="text-[11px] font-bold text-premium-neon flex items-center gap-1 hover:underline">
+          <a href={formHref} target="_blank" rel="noopener noreferrer" className="text-[11px] font-bold text-premium-neon flex items-center gap-1 hover:underline">
             <ExternalLink className="w-3 h-3" /> Open live form
           </a>
         </div>

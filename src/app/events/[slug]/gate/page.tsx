@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useRef, useEffect, use, Suspense } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, use, Suspense } from 'react';
 import Link from 'next/link';
-import { formatGuestNumber, useEventConfigBySlug } from '@/lib/eventStore';
+import { findForm, formatGuestNumber, formLabel, listForms, useEventConfigBySlug } from '@/lib/eventStore';
 import { RegisterDeskLock } from '@/components/events/RegisterDeskLock';
 import { QrScanner } from '@/components/events/QrScanner';
 import { useDesk, type DeskGuest, type ScanResult } from './useDesk';
@@ -26,14 +26,31 @@ import {
 
 type GateTab = 'scan' | 'guests';
 
+/** The activity (invitation form) this desk admits, remembered per event on this device. */
+const deskFormKey = (eventId: string) => `d1-desk-form-${eventId}`;
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => void }) {
   const { eventId, event, config } = useEventConfigBySlug(slug);
   const isWedding = event.event_type === 'wedding';
 
   const [activeTab, setActiveTab] = useState<GateTab>('scan');
+  // An event with several forms checks in per activity: the desk picks one form, or admits every form.
+  const forms = useMemo(() => listForms(config), [config]);
+  const [deskForm, setDeskForm] = useState<string | null>(null);
+  useEffect(() => {
+    // Restores the activity this device picked before.
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem(deskFormKey(eventId));
+    } catch {}
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDeskForm(saved);
+  }, [eventId]);
+  const activity = forms.length > 1 && deskForm !== null && forms.some((f) => f.id === deskForm) ? deskForm : null;
+  const nameOf = useCallback((id: string) => formLabel(findForm(config, id)), [config]);
   // Saved events check in on the server, so every desk at the door sees the same list and counts.
-  const desk = useDesk(eventId, activeTab === 'guests');
+  const desk = useDesk(eventId, activeTab === 'guests', activity, nameOf);
   const digits = Math.max(3, String(Math.max(desk.total, config.info.capacity || 0, 1)).length);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchHits, setSearchHits] = useState<{ query: string; guests: DeskGuest[] | null } | null>(null);
@@ -172,6 +189,17 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
     return a.name.localeCompare(b.name);
   });
 
+  const chooseActivity = (id: string | null) => {
+    setDeskForm(id);
+    try {
+      if (id === null) localStorage.removeItem(deskFormKey(eventId));
+      else localStorage.setItem(deskFormKey(eventId), id);
+    } catch {}
+    setSearchHits(null);
+    setScanResult(null);
+    setRecentScans([]);
+  };
+
   const checkedInCount = desk.checkedIn;
   const totalCount = desk.total;
 
@@ -241,6 +269,30 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
             </button>
           </div>
         </header>
+
+        {/* Activity: which form's passes this desk admits */}
+        {forms.length > 1 && (
+          <div className="px-5 py-2.5 flex items-center gap-1.5 overflow-x-auto hide-scrollbar bg-premium-black border-b border-premium-borderDark flex-shrink-0" role="tablist" aria-label="Activity">
+            <span className="text-[9px] font-mono font-bold uppercase tracking-[0.2em] text-zinc-500 shrink-0 mr-1">Activity</span>
+            {[{ id: null as string | null, label: 'All' }, ...forms.map((f) => ({ id: f.id as string | null, label: formLabel(f) }))].map((a) => {
+              const active = activity === a.id;
+              return (
+                <button
+                  key={a.id ?? 'all'}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => !active && chooseActivity(a.id)}
+                  className={`px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap shrink-0 border scale-on-click transition-all ${
+                    active ? 'bg-premium-gold text-black border-premium-gold shadow-gold' : 'bg-premium-charcoal text-zinc-400 border-premium-borderDark hover:text-white'
+                  }`}
+                >
+                  {a.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Progress bar */}
         <div className="h-0.5 bg-premium-surfaceDark flex-shrink-0">
@@ -654,7 +706,10 @@ function GateRegisterContent({ slug, onLock }: { slug: string; onLock: () => voi
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-[17px] font-display font-bold text-white">Add Walk-in Guest</h3>
-                  <p className="text-[11px] text-zinc-500 mt-0.5">Guest not on roster — add &amp; admit now</p>
+                  <p className="text-[11px] text-zinc-500 mt-0.5">
+                    Guest not on roster — add &amp; admit now
+                    {activity !== null && <> · joins <span className="text-premium-gold font-bold">{nameOf(activity)}</span></>}
+                  </p>
                 </div>
                 <button
                   type="button"

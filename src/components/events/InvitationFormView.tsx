@@ -14,6 +14,7 @@ import { alpha, type ResolvedTheme } from '@/lib/eventTheme';
 import { downloadBlob, downloadDataUrl } from '@/lib/image';
 import { passCode } from '@/lib/guestsApi';
 import { BrandMark } from '@/components/BrandMark';
+import { RichText } from '@/components/events/RichText';
 
 export type PreviewScreen = 'cover' | 'page' | 'review' | 'confirmed' | 'declined' | 'closed' | 'upcoming';
 
@@ -604,6 +605,9 @@ export function InvitationFormView({
               isQuestion(it) ? renderQuestion(it, index, !embedded && it.id === firstQuestion?.id)
               : it.kind === 'image' ? <ImageItem key={it.id} item={it} theme={theme} />
               : it.kind === 'file' ? <FileItem key={it.id} item={it} theme={theme} />
+              : it.kind === 'text' ? (
+                <RichText key={it.id} text={fill(it.text)} align={it.align} headingStyle={headingStyle} linkColor={theme.primaryText} mutedColor={theme.muted} />
+              )
               : null,
             )}
           </div>

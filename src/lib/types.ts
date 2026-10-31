@@ -161,6 +161,8 @@ export interface Guest {
   party_size?: number;
   /** When the guest last sent the invitation form. */
   responded_at?: string | null;
+  /** The invitation form the guest belongs to ('' or missing: the first form). Each form's guests have their own passes. */
+  form_id?: string;
 }
 
 export interface PhotoWallUpload {

@@ -3,8 +3,11 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronDown, Download, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { MOCK_REGISTRATIONS } from '@/lib/mockData';
-import { formatGuestNumber, getQuestions, numberDigits, useEventConfig, useGuestList } from '@/lib/eventStore';
+import {
+  findForm, formatGuestNumber, formLabel, formPath, getQuestions, listForms, numberDigits, useEventConfig, useGuestList, type FormQuestion,
+} from '@/lib/eventStore';
 import { downloadBlob, toCsv } from '@/lib/image';
+import { FormFilter, inForm } from './FormFilter';
 
 type Filter = 'all' | 'attending' | 'declined';
 
@@ -56,22 +59,34 @@ function SampleRegistrations({ eventId }: { eventId: string }) {
   );
 }
 
-/** Registrations tab: every reply to the invitation form, with the form's answers. */
+/** Registrations tab: every reply to the invitation forms, with each form's answers. */
 export function RegistrationsTab({ eventId }: { eventId: string }) {
   const { config } = useEventConfig(eventId);
   const list = useGuestList(eventId, 30_000);
   const [filter, setFilter] = useState<Filter>('all');
+  const [formFilter, setFormFilter] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
-  const questions = useMemo(() => getQuestions(config.invitation.items), [config.invitation.items]);
+  const forms = useMemo(() => listForms(config), [config]);
+  const multi = forms.length > 1;
+  // One form's questions, or every form's (first appearance wins) when showing all forms.
+  const questions = useMemo(() => {
+    const out = new Map<string, FormQuestion>();
+    for (const f of formFilter === null ? forms : forms.filter((x) => x.id === formFilter)) {
+      for (const q of getQuestions(f.items)) if (!out.has(q.id)) out.set(q.id, q);
+    }
+    return Array.from(out.values());
+  }, [forms, formFilter]);
   const digits = numberDigits(list.guests, list.capacity ?? config.info.capacity);
 
-  const replies = useMemo(
+  const allReplies = useMemo(
     () => list.guests
       .filter((g) => g.rsvp_status !== 'pending')
       .sort((a, b) => (b.responded_at ?? '').localeCompare(a.responded_at ?? '')),
     [list.guests],
   );
+  const replies = useMemo(() => allReplies.filter((g) => inForm(g, formFilter)), [allReplies, formFilter]);
   const shown = filter === 'all' ? replies : replies.filter((g) => g.rsvp_status === filter);
+  const formOf = (id: string | undefined) => formLabel(findForm(config, id ?? ''));
   const attendingPeople = replies.filter((g) => g.rsvp_status === 'attending').reduce((s, g) => s + (g.party_size || 1), 0);
   const declined = replies.filter((g) => g.rsvp_status === 'declined').length;
 
@@ -81,9 +96,10 @@ export function RegistrationsTab({ eventId }: { eventId: string }) {
   const exportCsv = () => {
     const ids = Array.from(new Set([...questions.map((q) => q.id), ...replies.flatMap((g) => Object.keys(g.custom_fields))]));
     const rows = [
-      ['Submitted', 'Guest No.', 'Name', 'Attending', 'Party', 'Email', 'Phone', ...ids.map(labelFor)],
+      ['Submitted', ...(multi ? ['Form'] : []), 'Guest No.', 'Name', 'Attending', 'Party', 'Email', 'Phone', ...ids.map(labelFor)],
       ...replies.map((g) => [
         g.responded_at ? new Date(g.responded_at).toLocaleString() : '',
+        ...(multi ? [formOf(g.form_id)] : []),
         formatGuestNumber(g.guest_number, digits),
         g.name,
         g.rsvp_status === 'attending' ? 'Yes' : 'No',
@@ -93,7 +109,7 @@ export function RegistrationsTab({ eventId }: { eventId: string }) {
         ...ids.map((id) => String(g.custom_fields[id] ?? '')),
       ].map(cell)),
     ];
-    downloadBlob(`${config.info.slug}-registrations.csv`, new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' }));
+    downloadBlob(`${config.info.slug}${formFilter ? `-${formFilter}` : ''}-registrations.csv`, new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' }));
   };
 
   return (
@@ -110,7 +126,7 @@ export function RegistrationsTab({ eventId }: { eventId: string }) {
         {!list.isSample && (
           <div className="flex items-center gap-2">
             <a
-              href={`/events/${config.info.slug}/invitation`}
+              href={formPath(config.info.slug, formFilter ?? '')}
               target="_blank"
               rel="noopener noreferrer"
               className="px-4 py-2.5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark text-xs font-bold text-white hover:border-premium-gold scale-on-click flex items-center gap-2"
@@ -145,6 +161,8 @@ export function RegistrationsTab({ eventId }: { eventId: string }) {
               </div>
             ))}
           </div>
+
+          <FormFilter forms={forms} guests={allReplies} value={formFilter} onChange={setFormFilter} />
 
           <div className="flex items-center gap-2">
             {(['all', 'attending', 'declined'] as const).map((f) => (
@@ -202,6 +220,9 @@ export function RegistrationsTab({ eventId }: { eventId: string }) {
                           </span>
                           {g.is_checked_in && (
                             <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold uppercase border bg-premium-success/10 text-premium-success border-premium-success/30">Checked in</span>
+                          )}
+                          {multi && formFilter === null && (
+                            <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold border bg-premium-gold/10 text-premium-gold border-premium-gold/30">{formOf(g.form_id)}</span>
                           )}
                         </div>
                         <div className="text-xs text-zinc-400 font-mono truncate">

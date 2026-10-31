@@ -46,7 +46,15 @@ export interface FormFile {
   label: string;
 }
 
-export type FormItem = FormQuestion | FormPageBreak | FormImage | FormFile;
+/** Formatted text guests read on the form (see components/events/RichText for the marks it understands). */
+export interface FormText {
+  kind: 'text';
+  id: string;
+  text: string;
+  align: 'left' | 'center';
+}
+
+export type FormItem = FormQuestion | FormPageBreak | FormImage | FormFile | FormText;
 
 export function isQuestion(item: FormItem): item is FormQuestion {
   return !item.kind || item.kind === 'question';
@@ -179,6 +187,26 @@ export interface InvitationConfig {
   sendLabel: string;
   guestNumbers: boolean;
   numberLabel: string;
+  /** The form page's own background colour ('' uses the event's colours from Design Studio). */
+  background: string;
+  /** Email the confirmation (Confirmed heading and message, with the QR pass) to guests who say they're coming. */
+  sendConfirmation: boolean;
+}
+
+/** A form after the first one: its own link (/events/<slug>/invitation/<id>), questions, cover, limits and pages. */
+export interface InvitationForm extends InvitationConfig {
+  /** Lower-case letters, digits and dashes; fixed once the form is made, since it is the link and the guests' form. */
+  id: string;
+}
+
+/**
+ * An event's invitation forms. The first one is config.invitation (id '', the event's /invitation link); more forms
+ * are listed here. Every reply to a form is its own guest with its own QR pass (Guest.form_id).
+ */
+export interface FormsConfig {
+  items: InvitationForm[];
+  /** The order of every form by id ('' is the first form); forms missing here follow in list order. */
+  order: string[];
 }
 
 export interface AccessConfig {
@@ -344,6 +372,7 @@ export interface EventConfig {
   landing: LandingConfig;
   design: DesignConfig;
   invitation: InvitationConfig;
+  forms: FormsConfig;
   access: AccessConfig;
   policy: PolicyConfig;
   raffle: RaffleConfig;
@@ -380,6 +409,8 @@ export interface FormResponse {
   party: number;
   token: string;
   number?: number;
+  /** The form replied to ('' or missing: the first form). */
+  formId?: string;
 }
 
 /* ───────────────────────── Storage keys ───────────────────────── */
@@ -524,7 +555,10 @@ export function buildDefaults(base: Event): EventConfig {
       sendLabel: isWedding ? 'Send RSVP' : 'Register Now',
       guestNumbers: true,
       numberLabel: 'Guest No.',
+      background: '',
+      sendConfirmation: false,
     },
+    forms: { items: [], order: [] },
     access: { ...DEFAULT_ACCESS },
     policy: {
       customDomain: base.custom_domain ?? '',
@@ -603,6 +637,15 @@ function normalizeInvitation(defaults: InvitationConfig, stored: Partial<Invitat
   const { questions: _legacyQuestions, ...rest } = legacy;
   void _legacyQuestions;
   return { ...defaults, ...rest, items };
+}
+
+/** Every form gets the settings added since it was saved, like the first form. */
+function normalizeForms(invitationDefaults: InvitationConfig, stored: Partial<FormsConfig> | undefined): FormsConfig {
+  const items = Array.isArray(stored?.items) ? stored.items.filter((f) => f && typeof f.id === 'string' && f.id) : [];
+  return {
+    items: items.map((f) => ({ ...normalizeInvitation(invitationDefaults, f), id: f.id })),
+    order: Array.isArray(stored?.order) ? stored.order.filter((id) => typeof id === 'string') : [],
+  };
 }
 
 export function defaultFrame(base?: Event): StageFrame {
@@ -744,6 +787,7 @@ function mergeConfig(defaults: EventConfig, stored: StoredConfig | null): EventC
     landing: normalizeLanding(defaults.landing, stored.landing),
     design: { ...defaults.design, ...stored.design },
     invitation: normalizeInvitation(defaults.invitation, stored.invitation),
+    forms: normalizeForms(defaults.invitation, stored.forms),
     access: { ...defaults.access, ...stored.access },
     policy: { ...defaults.policy, ...stored.policy },
     raffle: { ...defaults.raffle, ...stored.raffle },
@@ -1083,6 +1127,7 @@ function replyFromGuest(g: Guest): FormResponse {
     party: attending ? g.party_size || 1 : 0,
     token: g.qr_code_token,
     number: g.guest_number,
+    formId: g.form_id ?? '',
   };
 }
 
@@ -1222,6 +1267,81 @@ export function findQuestion(questions: FormQuestion[], role: QuestionRole): For
     case 'phone':
       return questions.find((q) => q.type === 'phone');
   }
+}
+
+/* ───────────────────────── Invitation forms ───────────────────────── */
+
+/** The first form's id: the event's own invitation (config.invitation, /events/<slug>/invitation). */
+export const MAIN_FORM_ID = '';
+
+/** Every invitation form in the organizer's order, the first form included (id ''). Memoize the result. */
+export function listForms(config: Pick<EventConfig, 'invitation' | 'forms'>): InvitationForm[] {
+  const all: InvitationForm[] = [{ ...config.invitation, id: MAIN_FORM_ID }, ...config.forms.items];
+  const rank = new Map(config.forms.order.map((id, i) => [id, i]));
+  const at = (f: InvitationForm, i: number) => rank.get(f.id) ?? config.forms.order.length + i;
+  return all.map((f, i) => ({ f, r: at(f, i) })).sort((a, b) => a.r - b.r).map((x) => x.f);
+}
+
+/** One form by id ('' is the first form), or undefined when the event has no such form. */
+export function findForm(config: Pick<EventConfig, 'invitation' | 'forms'>, id: string): InvitationForm | undefined {
+  return id ? config.forms.items.find((f) => f.id === id) : { ...config.invitation, id: MAIN_FORM_ID };
+}
+
+/** What organizers and guests call a form (its formName). */
+export function formLabel(form: Pick<InvitationForm, 'id' | 'formName'> | undefined): string {
+  if (!form) return 'Removed form';
+  return form.formName.trim() || (form.id || 'Invitation');
+}
+
+export function formPath(slug: string, formId: string): string {
+  return formId ? `/events/${slug}/invitation/${formId}` : `/events/${slug}/invitation`;
+}
+
+/** A link id from a form name ("Lomba Painting" → "lomba-painting"), unique among the event's forms. */
+export function formIdFromName(name: string, taken: string[]): string {
+  const base = name
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .slice(0, 32)
+    .replace(/^-+|-+$/g, '') || 'form';
+  let id = base;
+  for (let n = 2; taken.includes(id); n++) id = `${base}-${n}`;
+  return id;
+}
+
+/** A new form with the default questions and pages, named by the organizer. */
+export function newInvitationForm(base: Event, name: string, id: string): InvitationForm {
+  return { ...buildDefaults(base).invitation, id, formName: name, subtitle: name };
+}
+
+/** Today on this device, as YYYY-MM-DD (what reply-by dates are compared with). */
+export function todayIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** The form is taking replies: not paused, not past its reply-by day (the server checks again, with seat limits). */
+export function formAcceptsReplies(form: InvitationConfig): boolean {
+  return form.accepting && !(form.replyBy && todayIso() > form.replyBy);
+}
+
+/** A form as a landing page button. */
+export interface FormButton {
+  id: string;
+  name: string;
+  href: string;
+}
+
+/**
+ * The forms taking replies, as landing page buttons, when the event has more than one form; undefined for an event
+ * with one form, whose invitation buttons stay as they are.
+ */
+export function landingFormButtons(config: Pick<EventConfig, 'invitation' | 'forms'>, slug: string): FormButton[] | undefined {
+  const forms = listForms(config);
+  if (forms.length < 2) return undefined;
+  return forms.filter(formAcceptsReplies).map((f) => ({ id: f.id, name: formLabel(f), href: formPath(slug, f.id) }));
 }
 
 export function formatEventDate(date: string, style: 'long' | 'short' = 'long'): string {

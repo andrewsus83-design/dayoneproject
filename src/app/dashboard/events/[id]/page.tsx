@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, use, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, use, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Header } from '@/components/dashboard/Header';
@@ -28,7 +28,7 @@ import {
 import { PhotoWallUpload } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
 import {
-  useEventConfig, useGuests, useHydrated, resetEventSection,
+  useEventConfig, useGuests, useHydrated, resetEventSection, listForms, formLabel, formPath,
   useOrgEventsCache, type EventInfo,
 } from '@/lib/eventStore';
 import { BASE_EVENTS, isSlugTaken } from '@/lib/events';
@@ -101,6 +101,7 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
 
   // Every edit is persisted to the browser-backed event store, so nothing snaps back to defaults.
   const { config, event, update, savedAt } = useEventConfig(eventId);
+  const forms = useMemo(() => listForms(config), [config]);
   // Server guest list for saved events (sample events keep their local list); Insights counts from it.
   const guestsList = useGuests(eventId);
   const hydrated = useHydrated();
@@ -781,13 +782,21 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                   badge: 'Guest Page',
                   color: 'text-premium-neon',
                 },
-                {
-                  title: 'Invitation Form (RSVP)',
-                  url: `/events/${event.slug}/invitation`,
-                  desc: 'The Typeform-style invitation you design in Overview → Invitation Form Builder.',
-                  badge: 'Invitation',
-                  color: 'text-premium-gold',
-                },
+                ...(forms.length > 1
+                  ? forms.map((f) => ({
+                      title: `Form · ${formLabel(f)}`,
+                      url: formPath(event.slug, f.id),
+                      desc: 'One of the event’s invitation forms, designed in Overview → Invitation Form Builder. Each reply gets its own QR pass.',
+                      badge: 'Invitation',
+                      color: 'text-premium-gold',
+                    }))
+                  : [{
+                      title: 'Invitation Form (RSVP)',
+                      url: `/events/${event.slug}/invitation`,
+                      desc: 'The Typeform-style invitation you design in Overview → Invitation Form Builder.',
+                      badge: 'Invitation',
+                      color: 'text-premium-gold',
+                    }]),
                 {
                   title: 'Register Desk (Locked)',
                   url: `/events/${event.slug}/gate`,

@@ -11,7 +11,7 @@ import { COLUMNS, readable, venueTimestamp } from '@/lib/orgEvents';
 const BUCKET = 'a41_event_assets';
 
 /** What guests may see. Register desk access, game answers and broadcasts stay with the organizers. */
-const PUBLIC_SECTIONS = ['info', 'landing', 'design', 'invitation', 'policy'] as const;
+const PUBLIC_SECTIONS = ['info', 'landing', 'design', 'invitation', 'forms', 'policy'] as const;
 
 const EXT: Record<string, string> = { 'image/webp': 'webp', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif' };
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import type { Guest } from '@/lib/types';
@@ -34,6 +34,8 @@ export interface ServerRsvp {
 export interface ServerGuest {
   id: string;
   event_id: string;
+  /** The invitation form the guest belongs to ('' is the first form); each form's guests have their own passes. */
+  form_id: string;
   guest_number: number;
   name: string;
   email: string | null;
@@ -53,6 +55,7 @@ export interface ServerGuest {
 /** What the register desk sees of a guest. */
 export interface DoorGuest {
   id: string;
+  form_id: string;
   guest_number: number;
   name: string;
   table_no: string | null;
@@ -62,7 +65,7 @@ export interface DoorGuest {
   party_size: number | null;
 }
 
-export type CheckInOutcome = 'checked_in' | 'already_checked_in' | 'unknown' | 'other_event' | 'invalid' | 'full';
+export type CheckInOutcome = 'checked_in' | 'already_checked_in' | 'unknown' | 'other_event' | 'other_form' | 'invalid' | 'full';
 
 export interface CheckInCard {
   outcome: CheckInOutcome;
@@ -70,8 +73,11 @@ export interface CheckInCard {
   guest?: Omit<DoorGuest, 'checked_in_at'>;
   /** other_event: the event the pass belongs to. */
   event_name?: string;
+  /** other_form: the form (activity) the pass belongs to, when the desk admits one form only. */
+  form_id?: string;
+  form_name?: string | null;
   /** invalid: which walk-in field was refused. */
-  field?: 'name' | 'email' | 'phone' | 'table_no';
+  field?: 'name' | 'email' | 'phone' | 'table_no' | 'form';
   /** Walk-in whose phone or email was already on the list: that guest was checked in. */
   matched?: boolean;
 }
@@ -142,7 +148,7 @@ export interface PublicEvent {
 
 export interface GuestPass {
   token: string;
-  guest: { name: string; guest_number: number; table_no: string | null; tags: string[] };
+  guest: { name: string; guest_number: number; table_no: string | null; tags: string[]; form_id?: string };
   event: PublicEvent;
   rsvp: { response: RsvpResponse; party_size: number; responded_at: string } | null;
   checked_in_at: string | null;
@@ -157,8 +163,10 @@ export interface RegisterInput {
   /** The form's answers, by question id. */
   answers: Record<string, string>;
   message?: string;
-  /** The pass this phone already holds for the event, so a second reply updates the same guest. */
+  /** The pass this phone already holds for this form, so a second reply updates the same guest. */
   token?: string | null;
+  /** The form replied to: '' (or left out) is the first form, else the id of one of the event's other forms. */
+  form?: string;
 }
 
 export type RegisterFailure = 'not_found' | 'closed' | 'paused' | 'not_open' | 'full' | 'invalid' | 'rate_limited';
@@ -174,6 +182,7 @@ export type RegisterResult =
       response: RsvpResponse;
       party_size: number;
       created: boolean;
+      form_id?: string;
     }
   /** A decline from someone new when the list is full: nothing to store, the closing screen still shows. */
   | { ok: true; stored: false; response: 'declined' }
@@ -266,6 +275,7 @@ export function toGuest(g: ServerGuest): Guest {
     name: g.name,
     email: g.email,
     phone: g.phone,
+    form_id: g.form_id ?? '',
     category: g.tags[0] ?? '',
     tags: g.tags,
     table_number: g.table_no,
@@ -296,16 +306,21 @@ export async function listGuests(eventId: string): Promise<{ guests: Guest[]; ca
   return { guests: data.guests.map(toGuest), capacity: data.capacity, packageTier: data.package };
 }
 
-/** Adds or updates many guests in one go (CSV/XLSX import). Matching email or phone updates that guest. */
-export async function importGuests(eventId: string, rows: GuestInput[], updateExisting = true): Promise<ImportResult> {
-  const result = await rpc<ImportResult>('a41_import_guests', { p_event: eventId, p_rows: rows, p_update_existing: updateExisting });
+/**
+ * Adds or updates many guests in one go (CSV/XLSX import). Matching email or phone updates that guest. form: the
+ * invitation form they join (left out: the first form); another form's guests also get its name as a tag.
+ */
+export async function importGuests(eventId: string, rows: GuestInput[], updateExisting = true, form?: string): Promise<ImportResult> {
+  const result = await rpc<ImportResult>('a41_import_guests', {
+    p_event: eventId, p_rows: rows, p_update_existing: updateExisting, ...(form ? { p_form: form } : {}),
+  });
   void refreshGuestList(eventId);
   return result;
 }
 
 /** Adds one guest; a guest whose email or phone is already on the list is reported as "exists". */
-export function addGuest(eventId: string, guest: GuestInput): Promise<ImportResult> {
-  return importGuests(eventId, [guest], false);
+export function addGuest(eventId: string, guest: GuestInput, form?: string): Promise<ImportResult> {
+  return importGuests(eventId, [guest], false, form);
 }
 
 export async function updateGuest(eventId: string, guestId: string, patch: GuestPatch): Promise<UpdateResult> {
@@ -329,9 +344,12 @@ export async function guestCounts(): Promise<Record<string, GuestCounts>> {
 }
 
 /* ───────────────────────── Register desk ───────────────────────── */
+// form: the activity (invitation form) this desk admits, '' for the first form; null or left out admits every form.
 
-export function checkInByToken(eventId: string, token: string): Promise<CheckInCard> {
-  return rpc<CheckInCard>('a41_check_in_by_token', { p_event: eventId, p_token: parsePassToken(token) });
+const formArg = (form: string | null | undefined) => (form === null || form === undefined ? {} : { p_form: form });
+
+export function checkInByToken(eventId: string, token: string, form?: string | null): Promise<CheckInCard> {
+  return rpc<CheckInCard>('a41_check_in_by_token', { p_event: eventId, p_token: parsePassToken(token), ...formArg(form) });
 }
 
 export function checkInGuest(eventId: string, guestId: string): Promise<CheckInCard> {
@@ -344,7 +362,7 @@ export function undoCheckIn(eventId: string, guestId: string): Promise<{ ok: tru
 
 export function addWalkIn(
   eventId: string,
-  walkIn: { name: string; phone?: string; email?: string; table_no?: string; tags?: string[] },
+  walkIn: { name: string; phone?: string; email?: string; table_no?: string; tags?: string[]; form?: string | null },
 ): Promise<CheckInCard> {
   return rpc<CheckInCard>('a41_add_walk_in', {
     p_event: eventId,
@@ -353,25 +371,26 @@ export function addWalkIn(
     p_email: walkIn.email || null,
     p_table_no: walkIn.table_no || null,
     p_tags: walkIn.tags?.length ? walkIn.tags : null,
+    ...formArg(walkIn.form),
   });
 }
 
-export async function deskGuests(eventId: string): Promise<DoorGuest[]> {
-  return (await rpc<DoorGuest[]>('a41_desk_guests', { p_event: eventId })) ?? [];
+export async function deskGuests(eventId: string, form?: string | null): Promise<DoorGuest[]> {
+  return (await rpc<DoorGuest[]>('a41_desk_guests', { p_event: eventId, ...formArg(form) })) ?? [];
 }
 
 /** By name, guest number ("12", "#12"), full email or 6+ digits of the phone. Up to 20. */
-export async function searchDeskGuests(eventId: string, query: string): Promise<DoorGuest[]> {
-  return (await rpc<DoorGuest[]>('a41_search_checkin_guests', { p_event: eventId, p_query: query })) ?? [];
+export async function searchDeskGuests(eventId: string, query: string, form?: string | null): Promise<DoorGuest[]> {
+  return (await rpc<DoorGuest[]>('a41_search_checkin_guests', { p_event: eventId, p_query: query, ...formArg(form) })) ?? [];
 }
 
-export function checkInStats(eventId: string, recent = 8): Promise<CheckInStats> {
-  return rpc<CheckInStats>('a41_checkin_stats', { p_event: eventId, p_recent: recent });
+export function checkInStats(eventId: string, recent = 8, form?: string | null): Promise<CheckInStats> {
+  return rpc<CheckInStats>('a41_checkin_stats', { p_event: eventId, p_recent: recent, ...formArg(form) });
 }
 
 /* ───────────────────────── Guests ───────────────────────── */
 
-/** Sends the public invitation form. On success the reply's pass is remembered on this phone. */
+/** Sends a public invitation form. On success the reply's pass is remembered on this phone (as that form's pass). */
 export async function registerGuest(slug: string, input: RegisterInput): Promise<RegisterResult> {
   const result = await rpc<RegisterResult>('a41_register', {
     p_slug: slug,
@@ -383,8 +402,10 @@ export async function registerGuest(slug: string, input: RegisterInput): Promise
     p_answers: input.answers,
     p_message: input.message || null,
     p_token: input.token || null,
+    // The first form is called without p_form, as before forms existed.
+    ...(input.form ? { p_form: input.form } : {}),
   });
-  if (result.ok && result.stored) storePass(slug, result.token);
+  if (result.ok && result.stored) storePass(slug, result.token, input.form ?? '');
   return result;
 }
 
@@ -405,44 +426,45 @@ export function isOfflineError(e: unknown): boolean {
   return /no connection|failed to fetch|networkerror|network|load failed/i.test(msg);
 }
 
-const replyKey = (slug: string) => `d1-reply-${slug}`;
+/** One reply waits per form: the first form keeps the original key. */
+const replyKey = (slug: string, form = '') => (form ? `d1-reply-${slug}~${form}` : `d1-reply-${slug}`);
 
-/** Keeps a reply on this phone until it can be sent (the latest reply replaces an earlier one). */
+/** Keeps a reply on this phone until it can be sent (the latest reply to the same form replaces an earlier one). */
 export function queueReply(slug: string, input: RegisterInput) {
   try {
-    localStorage.setItem(replyKey(slug), JSON.stringify({ input, at: new Date().toISOString() }));
+    localStorage.setItem(replyKey(slug, input.form), JSON.stringify({ input, at: new Date().toISOString() }));
   } catch {}
 }
 
-export function readQueuedReply(slug: string): { input: RegisterInput; at: string } | null {
+export function readQueuedReply(slug: string, form = ''): { input: RegisterInput; at: string } | null {
   try {
-    const raw = localStorage.getItem(replyKey(slug));
+    const raw = localStorage.getItem(replyKey(slug, form));
     return raw ? (JSON.parse(raw) as { input: RegisterInput; at: string }) : null;
   } catch {
     return null;
   }
 }
 
-function clearQueuedReply(slug: string) {
+function clearQueuedReply(slug: string, form = '') {
   try {
-    localStorage.removeItem(replyKey(slug));
+    localStorage.removeItem(replyKey(slug, form));
   } catch {}
 }
 
 /**
- * Sends the reply saved on this phone. Null when there is none or the phone is still offline (it stays saved);
- * otherwise the server's answer and the reply it was for (the saved copy is then dropped).
+ * Sends the reply to a form saved on this phone. Null when there is none or the phone is still offline (it stays
+ * saved); otherwise the server's answer and the reply it was for (the saved copy is then dropped).
  */
-export async function sendQueuedReply(slug: string): Promise<{ result: RegisterResult; input: RegisterInput } | null> {
-  const saved = readQueuedReply(slug);
+export async function sendQueuedReply(slug: string, form = ''): Promise<{ result: RegisterResult; input: RegisterInput } | null> {
+  const saved = readQueuedReply(slug, form);
   if (!saved) return null;
   try {
-    const result = await registerGuest(slug, saved.input);
-    clearQueuedReply(slug);
+    const result = await registerGuest(slug, { ...saved.input, form });
+    clearQueuedReply(slug, form);
     return { result, input: saved.input };
   } catch (e) {
     if (isOfflineError(e)) return null;
-    clearQueuedReply(slug);
+    clearQueuedReply(slug, form);
     throw e;
   }
 }
@@ -463,7 +485,7 @@ function emitPass() {
 function subscribePass(cb: () => void) {
   passListeners.add(cb);
   const onStorage = (e: StorageEvent) => {
-    if (!e.key || e.key.startsWith('d1-pass-')) cb();
+    if (!e.key || e.key.startsWith('d1-pass')) cb();
   };
   window.addEventListener('storage', onStorage);
   return () => {
@@ -489,16 +511,50 @@ export function readStoredPass(slug: string): string | null {
   }
 }
 
-export function storePass(slug: string, token: string) {
+/*
+ * Each invitation form gives its own pass, so a phone can hold several for one event: `d1-passes-<slug>` maps form
+ * id → token ('' is the first form). `d1-pass-<slug>` stays the pass the guest app shows and the day-of screens use.
+ */
+const passesKey = (slug: string) => `d1-passes-${slug}`;
+
+/** Every pass this phone holds for the event, by form id. */
+export function readStoredPasses(slug: string): Record<string, string> {
   try {
+    const raw = localStorage.getItem(passesKey(slug));
+    if (raw) return JSON.parse(raw) as Record<string, string>;
+    // A phone from before forms holds one pass, for the first form.
+    const only = localStorage.getItem(passKey(slug));
+    return only ? { '': only } : {};
+  } catch {
+    return {};
+  }
+}
+
+/** The pass this phone holds for one form (null when none). */
+export function readFormPass(slug: string, form: string): string | null {
+  return readStoredPasses(slug)[form] ?? null;
+}
+
+/** Makes token this phone's pass for the event; with form, also remembers it as that form's pass. */
+export function storePass(slug: string, token: string, form?: string) {
+  try {
+    if (form !== undefined) {
+      localStorage.setItem(passesKey(slug), JSON.stringify({ ...readStoredPasses(slug), [form]: token }));
+    }
     localStorage.setItem(passKey(slug), token);
   } catch {}
   emitPass();
 }
 
+/** Removes the pass the guest app shows from this phone; another pass of the event, if any, shows instead. */
 export function forgetPass(slug: string) {
   try {
-    localStorage.removeItem(passKey(slug));
+    const active = localStorage.getItem(passKey(slug));
+    const rest = Object.fromEntries(Object.entries(readStoredPasses(slug)).filter(([, t]) => t !== active));
+    localStorage.setItem(passesKey(slug), JSON.stringify(rest));
+    const next = Object.values(rest)[0];
+    if (next) localStorage.setItem(passKey(slug), next);
+    else localStorage.removeItem(passKey(slug));
   } catch {}
   emitPass();
 }
@@ -506,6 +562,20 @@ export function forgetPass(slug: string) {
 /** The pass token saved on this phone for the event (null before hydration or when there is none). */
 export function useStoredPass(slug: string): string | null {
   return useSyncExternalStore(subscribePass, () => readStoredPass(slug), () => null);
+}
+
+const passesSnapshot = (slug: string) => {
+  try {
+    return `${localStorage.getItem(passesKey(slug)) ?? ''}|${localStorage.getItem(passKey(slug)) ?? ''}`;
+  } catch {
+    return '|';
+  }
+};
+
+/** Every pass this phone holds for the event, by form id (empty before hydration). */
+export function useStoredPasses(slug: string): Record<string, string> {
+  const snapshot = useSyncExternalStore(subscribePass, () => passesSnapshot(slug), () => '|');
+  return useMemo(() => (snapshot === '|' ? {} : readStoredPasses(slug)), [snapshot, slug]);
 }
 
 interface PassState {

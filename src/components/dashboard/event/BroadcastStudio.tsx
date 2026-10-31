@@ -5,7 +5,8 @@ import {
   Check, Copy, Download, ExternalLink, Image as ImageIcon, Info, Loader2, Mail, MessageSquare, RotateCcw, Search, Send, Star, Trash2, Upload, X,
 } from 'lucide-react';
 import {
-  deleteAsset, deleteFeedback, formatGuestNumber, numberDigits, saveAsset, useAssetUrl, useEventConfig, useFeedback, useGuests, useOrgEventsCache,
+  deleteAsset, deleteFeedback, formatGuestNumber, listForms, numberDigits, saveAsset, useAssetUrl, useEventConfig, useFeedback, useGuests,
+  useOrgEventsCache,
   type BroadcastKind, type BroadcastTemplate, type FeedbackConfig,
 } from '@/lib/eventStore';
 import { whatsappApi, WA_PER_MINUTE, type EnqueueResult, type SendStats } from '@/lib/whatsappApi';
@@ -16,6 +17,7 @@ import { resolveTheme } from '@/lib/eventTheme';
 import { compressImage, downloadBlob, downloadDataUrl, toCsv } from '@/lib/image';
 import { useDoorPrizeItems } from '@/lib/doorPrizeApi';
 import { SendButtons, useOrigin } from './SendButtons';
+import { FormFilter, inForm } from './FormFilter';
 import type { Guest } from '@/lib/types';
 
 type Field = 'subject' | 'heading' | 'message' | 'whatsapp';
@@ -347,6 +349,9 @@ export function BroadcastStudio({ eventId }: { eventId: string }) {
   const bc = config.broadcast;
   const [kind, setKind] = useState<BroadcastKind>('invitation');
   const [filter, setFilter] = useState<Filter>(DEFAULT_FILTER.invitation);
+  // Events with several invitation forms can message one form's guests.
+  const forms = useMemo(() => listForms(config), [config]);
+  const [formFilter, setFormFilter] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [field, setField] = useState<Field>('message');
   const [previewId, setPreviewId] = useState<string>('');
@@ -396,6 +401,7 @@ export function BroadcastStudio({ eventId }: { eventId: string }) {
   }, [kind, guests, doorPrizes, config.games.activities]);
 
   const shown = recipients.filter(({ guest: g }) => {
+    if (!inForm(g, formFilter)) return false;
     if (filter === 'attending' && g.rsvp_status !== 'attending') return false;
     if (filter === 'checked_in' && !g.is_checked_in) return false;
     if (filter === 'not_checked_in' && g.is_checked_in) return false;
@@ -705,6 +711,8 @@ export function BroadcastStudio({ eventId }: { eventId: string }) {
             </button>
           </div>
         </div>
+
+        <FormFilter forms={forms} guests={guests} value={formFilter} onChange={setFormFilter} />
 
         <SendToEveryone key={bc.channel} channel={bc.channel} eventId={eventId} saved={!!savedEvents?.[eventId]} count={sendable.length} onSend={sendAll} />
 

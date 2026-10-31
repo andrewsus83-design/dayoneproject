@@ -1,10 +1,16 @@
 'use client';
 
-import { formatEventDate, formatEventTime, formatGuestNumber, numberDigits, useEventConfigBySlug, useHydrated, useSampleGuests } from '@/lib/eventStore';
-import { forgetPass, isServerEventId, passCode, readStoredPass, registerGuestOffline, storePass, useMyPass, type GuestTab } from '@/lib/guestsApi';
+import {
+  findForm, formatEventDate, formatEventTime, formatGuestNumber, formLabel, listForms, numberDigits, useEventConfigBySlug, useHydrated,
+  useSampleGuests,
+} from '@/lib/eventStore';
+import {
+  forgetPass, isServerEventId, passCode, readStoredPass, readStoredPasses, registerGuestOffline, storePass, useMyPass, useStoredPasses,
+  type GuestTab,
+} from '@/lib/guestsApi';
 import { publicWinnerLabel, usePublicDoorPrizes, type ServerWinner } from '@/lib/doorPrizeApi';
 import { useRouter, useSearchParams } from 'next/navigation';
-import React, { useState, useEffect, use, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, use, Suspense } from 'react';
 import Link from 'next/link';
 import { MOCK_GUESTS } from '@/lib/mockData';
 import { Guest } from '@/lib/types';
@@ -53,6 +59,8 @@ interface PassView {
   token: string;
   checkedInAt: string | null;
   preview: boolean;
+  /** The form (activity) the pass is for, when the event has more than one. */
+  form?: string;
 }
 
 function useQr(token: string) {
@@ -104,6 +112,7 @@ function PassCard({ view }: { view: PassView }) {
           </span>
         )}
 
+        {view.form && <p className="text-[11px] font-mono font-bold uppercase tracking-[0.2em] text-premium-gold mb-1.5">{view.form}</p>}
         <h3 className="text-2xl font-display font-medium text-white mb-1">{view.name}</h3>
         <p className="text-zinc-400 text-sm font-mono">
           {view.number && <span className="text-premium-gold font-bold">No. {view.number} • </span>}
@@ -222,6 +231,10 @@ function GuestAppContent({ slug }: { slug: string }) {
   const sample = !isServerEventId(eventId);
   const mine = useMyPass(slug, { token: sample ? null : linkToken, pollMs: sample ? 0 : 10_000 });
   const sampleGuests = useSampleGuests(eventId);
+  // Each invitation form gives its own pass, so a phone can hold several for this event.
+  const forms = useMemo(() => listForms(config), [config]);
+  const heldPasses = useStoredPasses(slug);
+  const formName = (id: string | undefined) => (forms.length > 1 ? formLabel(findForm(config, id ?? '')) : undefined);
 
   const requested = params.get('tab') as GuestTab | null;
   const [tab, setTabState] = useState<GuestTab>(requested && TABS.includes(requested) ? requested : 'qr');
@@ -238,11 +251,19 @@ function GuestAppContent({ slug }: { slug: string }) {
   // Next time, the guest app opens even with no signal.
   useEffect(() => registerGuestOffline(), []);
 
-  // A pass link opened on this phone becomes this phone's pass (for trivia and the photo wall).
-  const openedToken = !sample && linkToken && mine.status === 'ready' ? mine.pass?.token ?? null : null;
+  // A pass link opened on this phone becomes this phone's pass (for trivia and the photo wall), and every pass shown
+  // here is remembered as its form's pass (a phone from before forms learns which form its pass is for).
+  const loadedToken = !sample && mine.status === 'ready' ? mine.pass?.token ?? null : null;
+  const loadedForm = mine.pass?.guest.form_id ?? '';
   useEffect(() => {
-    if (openedToken && readStoredPass(slug) !== openedToken) storePass(slug, openedToken);
-  }, [openedToken, slug]);
+    if (!loadedToken) return;
+    if (readStoredPass(slug) !== loadedToken || readStoredPasses(slug)[loadedForm] !== loadedToken) storePass(slug, loadedToken, loadedForm);
+  }, [loadedToken, loadedForm, slug]);
+  const switchPass = (token: string, form: string) => {
+    storePass(slug, token, form);
+    if (linkToken) router.replace(`/events/${slug}/pass`, { scroll: false });
+  };
+  const otherPasses = Object.entries(heldPasses).filter(([, t]) => t);
 
   let view: PassView | null = null;
   let qrBody: React.ReactNode;
@@ -257,6 +278,7 @@ function GuestAppContent({ slug }: { slug: string }) {
       token: guest.qr_code_token,
       checkedInAt: guest.checked_in_at,
       preview: !linkToken,
+      form: found ? formName(found.form_id) : undefined,
     };
   } else if (mine.status === 'ready' && mine.pass) {
     const p = mine.pass;
@@ -267,13 +289,14 @@ function GuestAppContent({ slug }: { slug: string }) {
       token: p.token,
       checkedInAt: p.checked_in_at,
       preview: false,
+      form: formName(p.guest.form_id),
     };
   } else if (mine.status === 'none') {
     qrBody = (
       <Notice title="No pass on this phone yet">
         <p className="text-sm text-zinc-400 leading-relaxed">Reply to the invitation to get your QR pass, or open the pass link you were sent.</p>
-        <Link href={`/events/${slug}/invitation`} className="inline-flex px-5 py-3 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-sm shadow-gold scale-on-click">
-          Open the invitation
+        <Link href={forms.length > 1 ? `/events/${slug}` : `/events/${slug}/invitation`} className="inline-flex px-5 py-3 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-sm shadow-gold scale-on-click">
+          {forms.length > 1 ? 'See the forms' : 'Open the invitation'}
         </Link>
       </Notice>
     );
@@ -341,6 +364,29 @@ function GuestAppContent({ slug }: { slug: string }) {
         </header>
 
         <main className="flex-1 px-[5%] py-5 pb-32 space-y-5">
+          {/* Passes from more than one form on this phone: pick the one to show and use. */}
+          {!sample && otherPasses.length > 1 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto hide-scrollbar -mx-1 px-1" role="tablist" aria-label="Your passes">
+              {otherPasses.map(([form, token]) => {
+                const active = token === mine.token;
+                return (
+                  <button
+                    key={form || 'first'}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => !active && switchPass(token, form)}
+                    className={`px-3.5 py-2 rounded-xl text-[12px] font-bold whitespace-nowrap shrink-0 border scale-on-click transition-all ${
+                      active ? 'bg-premium-gold text-black border-premium-gold shadow-gold' : 'bg-premium-charcoal text-zinc-400 border-premium-borderDark hover:text-white'
+                    }`}
+                  >
+                    {formLabel(findForm(config, form))}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {/* ── QR (until check-in) ── */}
           {shown === 'qr' && qrBody}
 

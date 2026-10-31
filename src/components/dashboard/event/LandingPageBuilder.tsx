@@ -5,7 +5,9 @@ import {
   ArrowDown, ArrowUp, Check, Copy, Eye, EyeOff, ExternalLink, GripVertical, Image as ImageIcon, LayoutTemplate,
   Monitor, Plus, RotateCcw, Smartphone, Sparkles, Star, Trash2, Upload, X,
 } from 'lucide-react';
-import { deleteAsset, resetEventSection, saveAsset, useAssetUrl, useEventConfig, type LandingConfig, type Testimony } from '@/lib/eventStore';
+import {
+  deleteAsset, landingFormButtons, resetEventSection, saveAsset, useAssetUrl, useEventConfig, type LandingConfig, type Testimony,
+} from '@/lib/eventStore';
 import { BASE_EVENTS } from '@/lib/events';
 import {
   BLOCK_CATALOG, blockId, blockTitle, createBlock,
@@ -449,6 +451,8 @@ export function LandingPageBuilder({ eventId }: { eventId: string }) {
   const { landing, info } = config;
   const isWedding = event.event_type === 'wedding';
   const theme = useMemo(() => resolveTheme(config.design), [config.design]);
+  // Several invitation forms: the preview shows one button per open form, like the live page.
+  const formButtons = useMemo(() => landingFormButtons(config, config.info.slug), [config]);
 
   const [selected, setSelected] = useState<string | null>(landing.blocks[0]?.id ?? null);
   const [showCatalog, setShowCatalog] = useState(false);
@@ -632,6 +636,7 @@ export function LandingPageBuilder({ eventId }: { eventId: string }) {
               theme={theme}
               isWedding={isWedding}
               defaultCover={event.cover_image_url ?? ''}
+              forms={formButtons}
               selectedId={selected}
               onSelect={(id) => setSelected(id)}
             />

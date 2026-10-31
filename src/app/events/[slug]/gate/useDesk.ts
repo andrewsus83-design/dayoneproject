@@ -18,6 +18,8 @@ export interface DeskGuest {
   checkedInAt: string | null;
   /** Sample events only: the demo pass code. */
   token?: string;
+  /** The invitation form (activity) the guest belongs to; '' is the first form. */
+  form?: string;
 }
 
 export interface ScanResult {
@@ -44,7 +46,7 @@ const hhmm = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'earlier';
 
 function fromDoor(g: DoorGuest): DeskGuest {
-  return { id: g.id, number: g.guest_number, name: g.name, table: g.table_no, tags: g.tags, checkedInAt: g.checked_in_at };
+  return { id: g.id, number: g.guest_number, name: g.name, table: g.table_no, tags: g.tags, checkedInAt: g.checked_in_at, form: g.form_id ?? '' };
 }
 
 function fromSample(g: Guest): DeskGuest {
@@ -56,6 +58,7 @@ function fromSample(g: Guest): DeskGuest {
     tags: g.category ? [g.category] : [],
     checkedInAt: g.is_checked_in ? g.checked_in_at ?? new Date(0).toISOString() : null,
     token: g.qr_code_token,
+    form: g.form_id ?? '',
   };
 }
 
@@ -72,6 +75,8 @@ function fromCard(card: CheckInCard): ScanResult {
       return { status: 'duplicate', guest, message: `Already checked in at ${hhmm(card.checked_in_at)}`, timestamp };
     case 'other_event':
       return { status: 'invalid', message: `This pass is for ${card.event_name ?? 'another event'}`, timestamp };
+    case 'other_form':
+      return { status: 'invalid', message: `This pass is for ${card.form_name || 'another activity'}. Switch the desk's activity to admit it.`, timestamp };
     case 'full':
       return { status: 'invalid', message: 'The guest list is full (package limit). Ask the organizer.', timestamp };
     case 'invalid':
@@ -85,12 +90,13 @@ function fromCard(card: CheckInCard): ScanResult {
 
 /** A check-in made while the desk was offline, sent to the server in order once it is back. */
 type Pending =
-  | { kind: 'token'; token: string; at: string }
+  | { kind: 'token'; token: string; at: string; form?: string | null }
   | { kind: 'guest'; id: string; name: string; at: string }
-  | { kind: 'walkin'; id: string; input: { name: string; phone: string; table_no: string; tags: string[] }; at: string };
+  | { kind: 'walkin'; id: string; input: { name: string; phone: string; table_no: string; tags: string[]; form?: string | null }; at: string };
 
 const queueKey = (eventId: string) => `d1-desk-queue-${eventId}`;
-const listKey = (eventId: string) => `d1-desk-list-${eventId}`;
+/** The guest list this desk saved, per activity (the whole list when the desk admits every form). */
+const listKey = (eventId: string, form: string | null) => `d1-desk-list-${eventId}${form === null ? '' : `~${form || 'first'}`}`;
 
 function readStored<T>(key: string): T | null {
   try {
@@ -123,10 +129,16 @@ const offline = (e: unknown): ScanResult => ({
 /**
  * The register desk's data. Saved events check in on the server, so several desks can work at once (each one
  * polls the counts every few seconds); the sample events check in on this device.
+ * form: the activity (invitation form id, '' for the first form) this desk admits; null admits every form. The list,
+ * search, counts and walk-ins then cover that form only, and passes for another form are turned away.
  */
-export function useDesk(eventId: string, listOpen: boolean) {
+export function useDesk(eventId: string, listOpen: boolean, form: string | null = null, formName: (id: string) => string = () => 'another activity') {
   const sample = !isServerEventId(eventId);
-  const sampleGuests = useSampleGuests(eventId);
+  const allSampleGuests = useSampleGuests(eventId);
+  const sampleGuests = useMemo(
+    () => (form === null ? allSampleGuests : allSampleGuests.filter((g) => (g.form_id ?? '') === form)),
+    [allSampleGuests, form],
+  );
   const [stats, setStats] = useState<CheckInStats | null>(null);
   const [list, setList] = useState<DoorGuest[] | null>(null);
   const [connection, setConnection] = useState<'ok' | 'offline'>('ok');
@@ -153,31 +165,33 @@ export function useDesk(eventId: string, listOpen: boolean) {
     const saved = readStored<Pending[]>(queueKey(eventId)) ?? [];
     queueRef.current = saved;
     setQueueState(saved);
-    setList((prev) => prev ?? readStored<DoorGuest[]>(listKey(eventId)));
+    // A desk switching activity starts from that activity's saved list and counts.
+    setList(readStored<DoorGuest[]>(listKey(eventId, form)));
+    setStats(null);
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [sample, eventId]);
+  }, [sample, eventId, form]);
 
   const refreshStats = useCallback(async () => {
     if (sample) return;
     try {
-      setStats(await checkInStats(eventId, 6));
+      setStats(await checkInStats(eventId, 6, form));
       setConnection('ok');
     } catch {
       setConnection('offline');
     }
-  }, [eventId, sample]);
+  }, [eventId, sample, form]);
 
   const refreshList = useCallback(async () => {
     if (sample) return;
     try {
-      const next = await deskGuests(eventId);
+      const next = await deskGuests(eventId, form);
       setList(next);
-      writeStored(listKey(eventId), next);
+      writeStored(listKey(eventId, form), next);
       setConnection('ok');
     } catch {
       setConnection('offline');
     }
-  }, [eventId, sample]);
+  }, [eventId, sample, form]);
 
   useEffect(() => {
     if (sample) return;
@@ -215,11 +229,11 @@ export function useDesk(eventId: string, listOpen: boolean) {
     (id: string, at: string | null) => {
       setList((prev) => {
         const next = prev && prev.map((g) => (g.id === id ? { ...g, checked_in_at: at } : g));
-        if (next) writeStored(listKey(eventId), next);
+        if (next) writeStored(listKey(eventId, form), next);
         return next;
       });
     },
-    [eventId],
+    [eventId, form],
   );
 
   const afterCard = useCallback(
@@ -241,10 +255,10 @@ export function useDesk(eventId: string, listOpen: boolean) {
       const timestamp = clock();
       const earlier = queueRef.current.find((p) => p.kind === 'token' && p.token.toLowerCase() === token.toLowerCase());
       if (earlier) return { status: 'duplicate', message: `Already scanned offline at ${hhmm(earlier.at)}`, timestamp };
-      enqueue({ kind: 'token', token, at: new Date().toISOString() });
+      enqueue({ kind: 'token', token, at: new Date().toISOString(), form });
       return { status: 'queued', message: 'No internet: saved on this device. The pass is checked as soon as the desk is back online.', timestamp };
     },
-    [enqueue],
+    [enqueue, form],
   );
 
   /** Sends the saved check-ins in order. Stops at the first sign the internet is still down. */
@@ -258,7 +272,7 @@ export function useDesk(eventId: string, listOpen: boolean) {
         let result: ScanResult;
         try {
           const card =
-            item.kind === 'token' ? await checkInByToken(eventId, item.token)
+            item.kind === 'token' ? await checkInByToken(eventId, item.token, item.form)
             : item.kind === 'guest' ? await checkInGuest(eventId, item.id)
             : await addWalkIn(eventId, item.input);
           result = fromCard(card);
@@ -301,6 +315,9 @@ export function useDesk(eventId: string, listOpen: boolean) {
     (found: Guest | undefined): ScanResult => {
       const timestamp = clock();
       if (!found) return { status: 'invalid', message: 'Pass not found in roster', timestamp };
+      if (form !== null && (found.form_id ?? '') !== form) {
+        return { status: 'invalid', message: `This pass is for ${formName(found.form_id ?? '')}. Switch the desk's activity to admit it.`, timestamp };
+      }
       if (found.is_checked_in) {
         return { status: 'duplicate', guest: fromSample(found), message: `Already checked in at ${hhmm(found.checked_in_at)}`, timestamp };
       }
@@ -308,7 +325,7 @@ export function useDesk(eventId: string, listOpen: boolean) {
       writeGuests(eventId, readGuests(eventId).map((g) => (g.id === found.id ? updated : g)));
       return { status: 'success', guest: fromSample(updated), message: 'Admission verified', timestamp };
     },
-    [eventId],
+    [eventId, form, formName],
   );
 
   /* ── Actions ── */
@@ -320,14 +337,14 @@ export function useDesk(eventId: string, listOpen: boolean) {
         return sampleCheckIn(readGuests(eventId).find((g) => g.qr_code_token.toLowerCase() === token.toLowerCase()));
       }
       try {
-        return afterCard(await checkInByToken(eventId, token));
+        return afterCard(await checkInByToken(eventId, token, form));
       } catch (e) {
         if (!isNetworkError(e)) return offline(e);
         setConnection('offline');
         return queueToken(token);
       }
     },
-    [sample, eventId, sampleCheckIn, afterCard, queueToken],
+    [sample, eventId, form, sampleCheckIn, afterCard, queueToken],
   );
 
   const checkInById = useCallback(
@@ -402,13 +419,14 @@ export function useDesk(eventId: string, listOpen: boolean) {
           emails_sent_count: 0,
           whatsapp_sent_count: 0,
           custom_fields: {},
+          form_id: form ?? '',
           created_at: now,
           updated_at: now,
         };
         writeGuests(eventId, [guest, ...readGuests(eventId)]);
         return { status: 'success', guest: fromSample(guest), message: 'Walk-in admitted manually', timestamp: clock() };
       }
-      const payload = { name: input.name.trim(), phone: input.phone.trim(), table_no: input.table.trim(), tags };
+      const payload = { name: input.name.trim(), phone: input.phone.trim(), table_no: input.table.trim(), tags, form };
       try {
         const card = await addWalkIn(eventId, payload);
         const result = afterCard(card);
@@ -431,14 +449,14 @@ export function useDesk(eventId: string, listOpen: boolean) {
         };
       }
     },
-    [sample, eventId, afterCard, refreshList, enqueue],
+    [sample, eventId, form, afterCard, refreshList, enqueue],
   );
 
   const search = useCallback(
     async (query: string): Promise<DeskGuest[] | null> => {
       if (sample) return null;
       try {
-        return (await searchDeskGuests(eventId, query)).map(fromDoor);
+        return (await searchDeskGuests(eventId, query, form)).map(fromDoor);
       } catch (e) {
         if (!isNetworkError(e) || !list) return null;
         // Offline: search the list saved on this device.
@@ -449,7 +467,7 @@ export function useDesk(eventId: string, listOpen: boolean) {
           .map(fromDoor);
       }
     },
-    [sample, eventId, list],
+    [sample, eventId, form, list],
   );
 
   const guests = useMemo(() => (sample ? sampleGuests.map(fromSample) : (list ?? []).map(fromDoor)), [sample, sampleGuests, list]);

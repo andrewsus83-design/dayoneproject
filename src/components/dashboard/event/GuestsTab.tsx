@@ -1,19 +1,20 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import {
   CheckCircle2, ClipboardCheck, Download, Loader2, Pencil, Plus, RefreshCw, Trash2, Upload, XCircle,
 } from 'lucide-react';
 import type { Guest } from '@/lib/types';
 import {
-  formatGuestNumber, makePassToken, newId, numberDigits, readGuests, useEventConfig, useGuestList, writeGuests,
+  findForm, formatGuestNumber, formLabel, listForms, makePassToken, newId, numberDigits, readGuests, useEventConfig, useGuestList, writeGuests,
 } from '@/lib/eventStore';
 import {
   addGuest, deleteGuests, importGuests, passCode, SKIP_REASONS, splitContact, updateGuest,
   type GuestInput, type ImportResult,
 } from '@/lib/guestsApi';
 import { downloadBlob, toCsv } from '@/lib/image';
+import { FormFilter, inForm } from './FormFilter';
 
 type SubTab = 'list' | 'invitation' | 'import';
 
@@ -73,6 +74,12 @@ export function GuestsTab({ eventId, onOpenInvitationBuilder }: { eventId: strin
   const digits = numberDigits(guests, list.capacity ?? info.capacity);
 
   const [subTab, setSubTab] = useState<SubTab>('list');
+  // Events with several invitation forms: the list shows one form (or all), and guests added here join that form.
+  const forms = useMemo(() => listForms(config), [config]);
+  const multi = forms.length > 1;
+  const [formFilter, setFormFilter] = useState<string | null>(null);
+  const addTo = formFilter ?? '';
+  const addToLabel = formLabel(findForm(config, addTo));
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [draft, setDraft] = useState<Draft>({ name: '', contact: '', category: isWedding ? 'Guest' : 'VIP Delegate', table: '' });
@@ -91,7 +98,7 @@ export function GuestsTab({ eventId, onOpenInvitationBuilder }: { eventId: strin
     return {
       id: newId('g'), event_id: eventId, name: d.name.trim(), email, phone, category: d.category.trim() || 'Guest',
       table_number: d.table.trim() || null, plus_one_count: 0, rsvp_status: 'attending', rsvp_notes: null, custom_fields: {},
-      qr_code_token: makePassToken(), is_checked_in: false, checked_in_at: null, checked_in_by: null,
+      qr_code_token: makePassToken(), form_id: addTo, is_checked_in: false, checked_in_at: null, checked_in_by: null,
       photos_uploaded_count: 0, emails_sent_count: 0, whatsapp_sent_count: 0, created_at: now, updated_at: now,
     };
   };
@@ -105,12 +112,12 @@ export function GuestsTab({ eventId, onOpenInvitationBuilder }: { eventId: strin
     } else {
       setWorking(true);
       try {
-        const res = await addGuest(eventId, toInput(draft));
+        const res = await addGuest(eventId, toInput(draft), addTo || undefined);
         if (!res.ok || res.inserted === 0) {
           const skip = res.ok ? res.skipped[0] : undefined;
           return say(
             !res.ok ? importSummary(res)
-              : skip?.reason === 'exists' ? 'A guest with that email or phone is already on the list.'
+              : skip?.reason === 'exists' ? `A guest with that email or phone is already on the list${multi ? ` of ${addToLabel}` : ''}.`
               : `Not added: ${skip ? SKIP_REASONS[skip.reason] : 'please check the details'}.`,
             'error',
           );
@@ -178,14 +185,15 @@ export function GuestsTab({ eventId, onOpenInvitationBuilder }: { eventId: strin
 
   const handleExport = () => {
     const rows = [
-      ['No.', 'Name', 'Email', 'Phone', 'Category', 'Table', 'RSVP', 'Party', 'QR Token', 'Checked in'],
-      ...guests.map((g) => [
-        formatGuestNumber(g.guest_number, digits), g.name, g.email ?? '', g.phone ?? '', (g.tags ?? [g.category]).filter(Boolean).join(', '),
+      ['No.', ...(multi ? ['Form'] : []), 'Name', 'Email', 'Phone', 'Category', 'Table', 'RSVP', 'Party', 'QR Token', 'Checked in'],
+      ...guests.filter((g) => inForm(g, formFilter)).map((g) => [
+        formatGuestNumber(g.guest_number, digits), ...(multi ? [formLabel(findForm(config, g.form_id ?? ''))] : []),
+        g.name, g.email ?? '', g.phone ?? '', (g.tags ?? [g.category]).filter(Boolean).join(', '),
         g.table_number ?? '', g.rsvp_status, g.rsvp_status === 'attending' ? g.party_size || g.plus_one_count + 1 : '', g.qr_code_token,
         g.is_checked_in ? 'Yes' : 'No',
       ].map(cell)),
     ];
-    downloadBlob(`${info.slug}-guests.csv`, new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' }));
+    downloadBlob(`${info.slug}${formFilter ? `-${formFilter}` : ''}-guests.csv`, new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' }));
   };
 
   const handleTemplate = () => {
@@ -217,7 +225,7 @@ export function GuestsTab({ eventId, onOpenInvitationBuilder }: { eventId: strin
       } else {
         setWorking(true);
         // Rows keep their spreadsheet position so skipped rows can be found (row numbers count the header).
-        const res = await importGuests(eventId, rows);
+        const res = await importGuests(eventId, rows, true, addTo || undefined);
         say(importSummary(res), res.ok ? 'ok' : 'error');
       }
       setSubTab('list');
@@ -230,7 +238,7 @@ export function GuestsTab({ eventId, onOpenInvitationBuilder }: { eventId: strin
   };
 
   const q = search.toLowerCase();
-  const filtered = guests.filter((g) =>
+  const filtered = guests.filter((g) => inForm(g, formFilter) &&
     `${formatGuestNumber(g.guest_number, digits)} ${g.name} ${g.email ?? ''} ${g.phone ?? ''} ${(g.tags ?? [g.category]).join(' ')} ${g.table_number ?? ''}`.toLowerCase().includes(q),
   );
 
@@ -321,8 +329,11 @@ export function GuestsTab({ eventId, onOpenInvitationBuilder }: { eventId: strin
           >
             {working && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Add guest
           </button>
+          {multi && <p className="sm:col-span-5 text-[11px] text-zinc-500">Joins <span className="text-premium-gold font-bold">{addToLabel}</span> with its own QR pass. Pick another form above the list to add to it instead.</p>}
         </div>
       )}
+
+      {subTab !== 'invitation' && <FormFilter forms={forms} guests={guests} value={formFilter} onChange={setFormFilter} />}
 
       {subTab === 'list' && (
         <input
@@ -501,6 +512,7 @@ export function GuestsTab({ eventId, onOpenInvitationBuilder }: { eventId: strin
               Upload a CSV or Excel file with columns: Name, Phone, Email, Category, Table No. Phones like 0812… are saved as +62….
               A row with the email or phone of a guest already on the list updates that guest; repeated rows are skipped.
             </p>
+            {multi && <p className="text-[11px] text-zinc-400 mt-2">Imports into <span className="text-premium-gold font-bold">{addToLabel}</span>. Pick another form above to import into it.</p>}
             {capacityNote && <p className="text-[11px] text-zinc-500 mt-2">{capacityNote}</p>}
           </div>
           <div className="flex items-center gap-3">

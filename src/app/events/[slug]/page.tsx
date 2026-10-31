@@ -1,7 +1,7 @@
 'use client';
 
 import React, { use, Suspense, useMemo } from 'react';
-import { useEventConfigBySlug } from '@/lib/eventStore';
+import { landingFormButtons, useEventConfigBySlug } from '@/lib/eventStore';
 import { resolveTheme } from '@/lib/eventTheme';
 import { EventFonts } from '@/components/events/EventFonts';
 import { LandingRenderer } from '@/components/events/landing/LandingRenderer';
@@ -9,6 +9,7 @@ import { LandingRenderer } from '@/components/events/landing/LandingRenderer';
 function EventLandingContent({ slug }: { slug: string }) {
   const { hydrated, config, event } = useEventConfigBySlug(slug);
   const theme = useMemo(() => resolveTheme(config.design), [config.design]);
+  const forms = useMemo(() => landingFormButtons(config, slug), [config, slug]);
 
   if (!hydrated) {
     return <div className="min-h-screen bg-premium-black flex items-center justify-center text-zinc-500 text-sm">Loading event...</div>;
@@ -25,6 +26,7 @@ function EventLandingContent({ slug }: { slug: string }) {
         theme={theme}
         isWedding={event.event_type === 'wedding'}
         defaultCover={event.cover_image_url ?? ''}
+        forms={forms}
       />
     </div>
   );

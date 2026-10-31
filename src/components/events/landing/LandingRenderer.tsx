@@ -4,7 +4,7 @@ import React, { useEffect, useState, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { Calendar, Clock, MapPin, Users, Globe, Copy, CheckCircle2, Star, Quote, ChevronDown, Navigation, ArrowRight, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { formatEventTime, useAssetUrl, type EventInfo, type LandingConfig, type DesignConfig } from '@/lib/eventStore';
+import { formatEventTime, useAssetUrl, type EventInfo, type FormButton, type LandingConfig, type DesignConfig } from '@/lib/eventStore';
 import type { LandingBlock, HeroBlock, CtaTarget } from '@/lib/landingBlocks';
 import { alpha, gradientText, PRISM_COLORS, type ResolvedTheme } from '@/lib/eventTheme';
 import { BrandMark } from '@/components/BrandMark';
@@ -21,6 +21,8 @@ interface RendererProps {
   embedded?: boolean;
   selectedId?: string | null;
   onSelect?: (id: string) => void;
+  /** The open invitation forms, when the event has more than one (landingFormButtons): invitation buttons become one per form. */
+  forms?: FormButton[];
 }
 
 function shortDate(date: string, long = false) {
@@ -60,6 +62,13 @@ function ctaHref(slug: string, target: CtaTarget, url: string) {
   if (target === 'custom') return url ? (url.startsWith('http') || url.startsWith('/') ? url : `https://${url}`) : '#';
   // 'invitation' and the older 'register' both open the invitation form.
   return `/events/${slug}/invitation`;
+}
+
+/** A call-to-action's buttons: one per open form when an invitation button belongs to an event with several forms. */
+function ctaButtons(p: RendererProps, target: CtaTarget, url: string, label: string): { key: string; href: string; label: string }[] {
+  if (target !== 'custom' && p.forms && p.forms.length > 1) return p.forms.map((f) => ({ key: f.id || 'first', href: f.href, label: f.name }));
+  if (target !== 'custom' && p.forms?.length === 1) return [{ key: 'cta', href: p.forms[0].href, label }];
+  return [{ key: 'cta', href: ctaHref(p.slug, target, url), label }];
 }
 
 function Logo({ refId, size, fallback }: { refId: string; size: 's' | 'm' | 'l'; fallback?: boolean }) {
@@ -280,19 +289,20 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
             </div>
           )}
 
-          <div className="flex flex-col @sm:flex-row gap-3 pt-1" style={{ justifyContent: center ? 'center' : 'flex-start' }}>
-            {b.ctaLabel && (
+          <div className="flex flex-col @sm:flex-row @sm:flex-wrap gap-3 pt-1" style={{ justifyContent: center ? 'center' : 'flex-start' }}>
+            {b.ctaLabel && ctaButtons(p, b.ctaTarget, b.ctaUrl, b.ctaLabel).map((cta) => (
               <Link
-                href={ctaHref(slug, b.ctaTarget, b.ctaUrl)}
+                key={cta.key}
+                href={cta.href}
                 onClick={() => confetti({ particleCount: 60, spread: 70, origin: { y: 0.7 } })}
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 font-bold text-base scale-on-click transition-all"
                 style={{ background: theme.primary, color: theme.onPrimary, borderRadius: theme.buttonRadius, boxShadow: `0 0 28px ${alpha(theme.primary, 0.35)}`, fontFamily: theme.headingFamily }}
               >
                 <Sparkles className="w-5 h-5" />
-                {b.ctaLabel}
+                {cta.label}
                 <ArrowRight className="w-4 h-4" />
               </Link>
-            )}
+            ))}
             {b.secondaryLabel && (
               <button
                 type="button"
@@ -570,13 +580,18 @@ export function LandingRenderer(p: RendererProps) {
             {b.heading && <h2 className="font-bold mb-4" style={{ ...heading, fontSize: 'clamp(26px, 5cqw, 44px)' }}>{b.heading}</h2>}
             {b.body && <p className="max-w-md mx-auto mb-8" style={{ color: theme.muted }}>{b.body}</p>}
             {b.ctaLabel && (
-              <Link
-                href={ctaHref(slug, b.ctaTarget, b.ctaUrl)}
-                className="inline-flex items-center gap-2 px-10 py-5 font-bold text-lg scale-on-click transition-all"
-                style={{ background: theme.primary, color: theme.onPrimary, borderRadius: theme.buttonRadius, boxShadow: `0 0 28px ${alpha(theme.primary, 0.35)}`, ...heading }}
-              >
-                <Sparkles className="w-5 h-5" /> {b.ctaLabel} <ArrowRight className="w-5 h-5" />
-              </Link>
+              <div className="flex flex-wrap justify-center gap-3">
+                {ctaButtons(p, b.ctaTarget, b.ctaUrl, b.ctaLabel).map((cta) => (
+                  <Link
+                    key={cta.key}
+                    href={cta.href}
+                    className="inline-flex items-center gap-2 px-10 py-5 font-bold text-lg scale-on-click transition-all"
+                    style={{ background: theme.primary, color: theme.onPrimary, borderRadius: theme.buttonRadius, boxShadow: `0 0 28px ${alpha(theme.primary, 0.35)}`, ...heading }}
+                  >
+                    <Sparkles className="w-5 h-5" /> {cta.label} <ArrowRight className="w-5 h-5" />
+                  </Link>
+                ))}
+              </div>
             )}
             {b.note && <p className="text-xs mt-4" style={{ color: theme.subtle }}>{b.note}</p>}
           </div>
