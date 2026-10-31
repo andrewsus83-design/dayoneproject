@@ -503,7 +503,8 @@ function GuestAppContent({ slug }: { slug: string }) {
 
         {/* Bottom navigation */}
         <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[420px] z-30 pb-[env(safe-area-inset-bottom)]">
-          <div className="mx-[5%] mb-4 glass-panel rounded-[2rem] px-1 py-1.5 flex items-center shadow-2xl border border-zinc-700/80">
+          {/* Tall enough for the centre tab with its name, so the bar keeps its height when tabs change. */}
+          <div className="mx-[5%] mb-4 min-h-[5.1rem] glass-panel rounded-[2rem] px-1 py-1.5 flex items-center shadow-2xl border border-zinc-700/80">
             {NAV.map(({ id, icon: Icon, label, central, locked }) => {
               const active = shown === id;
               if (central) {
@@ -514,11 +515,13 @@ function GuestAppContent({ slug }: { slug: string }) {
                     onClick={() => setTab(id)}
                     className={`flex-1 min-w-0 flex flex-col items-center gap-0.5 px-1 py-1 rounded-2xl scale-on-click transition-all ${active ? 'bg-premium-gold/20' : ''}`}
                     aria-current={active ? 'page' : undefined}
+                    aria-label={label}
                   >
                     <div className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${active ? 'bg-premium-gold text-black shadow-gold' : 'bg-premium-charcoal text-premium-gold border border-premium-gold/30'}`}>
                       <Icon className="w-5 h-5" />
                     </div>
-                    <span className={`text-[9px] font-bold ${active ? 'text-premium-gold' : 'text-zinc-500'}`}>{label}</span>
+                    {/* Only the open tab shows its name. */}
+                    {active && <span className="text-[9px] font-bold text-premium-gold">{label}</span>}
                   </button>
                 );
               }
@@ -529,12 +532,13 @@ function GuestAppContent({ slug }: { slug: string }) {
                   onClick={() => setTab(id)}
                   className="relative flex-1 min-w-0 flex flex-col items-center gap-0.5 px-1 py-2 rounded-2xl scale-on-click transition-all"
                   aria-current={active ? 'page' : undefined}
+                  aria-label={label}
                 >
                   <span className="relative">
                     <Icon className={`w-5 h-5 transition-colors ${active ? 'text-white' : 'text-zinc-500'}`} />
                     {locked && <Lock className="absolute -top-1 -right-2 w-3 h-3 text-zinc-500" />}
                   </span>
-                  <span className={`text-[9px] font-bold transition-colors ${active ? 'text-white' : 'text-zinc-500'}`}>{label}</span>
+                  {active && <span className="text-[9px] font-bold text-white">{label}</span>}
                   {active && <span className="w-1 h-1 rounded-full bg-premium-gold" />}
                 </button>
               );
