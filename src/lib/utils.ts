@@ -33,3 +33,13 @@ export function formatDateTime(dateString: string | Date): string {
     hour12: true,
   }).format(date);
 }
+
+/** The venue line and Maps link for an event. An address pasted as a Maps link opens Maps instead of showing as text. */
+export function venueDisplay(info: { venue: string; address: string; city?: string; mapsUrl: string }): { text: string; mapsUrl: string } {
+  const address = info.address.trim();
+  const isLink = /^https?:\/\//i.test(address);
+  const text = [info.venue, isLink ? '' : address, info.city].filter(Boolean).join(', ');
+  const query = [info.venue, isLink ? '' : address, info.city].filter(Boolean).join(' ');
+  const mapsUrl = info.mapsUrl || (isLink ? address : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`);
+  return { text, mapsUrl };
+}

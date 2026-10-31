@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { BrandMark } from '@/components/BrandMark';
+import { venueDisplay } from '@/lib/utils';
 
 /*
  * The guest app (PWA) a guest lands in after registering: Event · Activity · QR · Prize · Setting, with the QR pass
@@ -303,7 +304,7 @@ function GuestAppContent({ slug }: { slug: string }) {
   // The centre tab: the QR pass until the guest is checked in, then Shot.
   const center: GuestTab = checkedIn ? 'shot' : 'qr';
   const shown: GuestTab = tab === 'qr' || tab === 'shot' ? center : tab;
-  const mapsUrl = info.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([info.venue, info.address, info.city].filter(Boolean).join(' '))}`;
+  const { text: venueText, mapsUrl } = venueDisplay(info);
   const time = [info.startTime && formatEventTime(info.startTime), info.endTime && formatEventTime(info.endTime)].filter(Boolean).join(' – ');
 
   const forget = () => {
@@ -324,7 +325,7 @@ function GuestAppContent({ slug }: { slug: string }) {
     <div className="guest-app min-h-screen bg-premium-black text-zinc-100 flex justify-center font-sans selection:bg-premium-gold selection:text-premium-black">
       <div className="w-full max-w-[420px] min-h-screen bg-premium-black relative flex flex-col sm:border-x sm:border-premium-borderDark">
         {/* Top app bar */}
-        <header className="px-[5%] pt-3 pb-2.5 flex justify-between items-center gap-3 bg-premium-black/90 backdrop-blur border-b border-premium-borderDark sticky top-0 z-20">
+        <header className="px-[5%] pt-[max(0.75rem,env(safe-area-inset-top))] pb-2.5 flex justify-between items-center gap-3 bg-premium-black/90 backdrop-blur border-b border-premium-borderDark sticky top-0 z-20">
           <div className="flex items-center gap-2.5 min-w-0">
             <BrandMark size={32} />
             <div className="min-w-0">
@@ -375,7 +376,7 @@ function GuestAppContent({ slug }: { slug: string }) {
                   )}
                   <div className="flex items-start gap-3">
                     <MapPin className="w-4 h-4 text-premium-neon flex-shrink-0 mt-0.5" />
-                    <span className="text-zinc-200 font-medium">{[info.venue, info.address, info.city].filter(Boolean).join(', ') || '—'}</span>
+                    <span className="text-zinc-200 font-medium">{venueText || '—'}</span>
                   </div>
                 </div>
                 <a

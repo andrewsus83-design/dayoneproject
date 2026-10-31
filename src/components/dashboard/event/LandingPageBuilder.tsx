@@ -207,6 +207,12 @@ function BlockEditor({ block, set, isWedding, onError }: { block: LandingBlock; 
       return (
         <div className="space-y-4">
           <Segmented label="Layout" value={block.layout} onChange={(v) => p({ layout: v })} options={[{ id: 'left', label: 'Left aligned' }, { id: 'center', label: 'Centered' }]} />
+          <Segmented
+            label="Text position"
+            value={block.placement ?? 'inside'}
+            onChange={(v) => p({ placement: v })}
+            options={[{ id: 'inside', label: 'On the image' }, { id: 'outside', label: 'Below the image' }, { id: 'card', label: 'Card over the image' }]}
+          />
           <ImagePicker label="Background image" value={block.imageUrl} onChange={(r) => p({ imageUrl: r })} onError={onError} allowAi fallbackLabel="Use event cover" />
           <Switch label="Dark gradient overlay" on={block.overlay} onClick={() => p({ overlay: !block.overlay })} />
           <Segmented label="Side decoration" value={block.decoration} onChange={(v) => p({ decoration: v })} options={[{ id: 'none', label: 'None' }, { id: 'prism', label: 'Stained-glass panels' }]} />

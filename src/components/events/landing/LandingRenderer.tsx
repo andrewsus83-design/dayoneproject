@@ -8,6 +8,7 @@ import { formatEventTime, useAssetUrl, type EventInfo, type LandingConfig, type 
 import type { LandingBlock, HeroBlock, CtaTarget } from '@/lib/landingBlocks';
 import { alpha, gradientText, PRISM_COLORS, type ResolvedTheme } from '@/lib/eventTheme';
 import { BrandMark } from '@/components/BrandMark';
+import { venueDisplay } from '@/lib/utils';
 
 interface RendererProps {
   slug: string;
@@ -103,12 +104,18 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
   const [copied, setCopied] = useState(false);
   const light = theme.mode === 'light';
   const center = b.layout === 'center';
+  const placement = b.placement ?? 'inside';
+  const onImage = placement === 'inside';
+  /** Below the image or on the card, the image is a band of its own and the text takes the theme's colours. */
+  const imageHeight = placement === 'card' ? (embedded ? 440 : '64vh') : embedded ? 380 : '58vh';
+  const ink = onImage ? '#FFFFFF' : theme.text;
+  const soft = onImage ? 'rgba(255,255,255,0.85)' : theme.muted;
   const heading: CSSProperties = { fontFamily: theme.headingFamily, letterSpacing: `calc(${theme.space.headingTracking} - 0.01em)` };
   const title = b.title || info.name;
   const titleStyle: CSSProperties =
     b.titleStyle === 'prism' ? gradientText(PRISM_COLORS, true)
     : b.titleStyle === 'gradient' ? gradientText([theme.primary, theme.secondary, theme.accent])
-    : { color: '#FFFFFF' };
+    : { color: ink };
   const taglineSplit = center ? b.tagline.lastIndexOf('. ', b.tagline.length - 2) : -1;
 
   const share = () => {
@@ -118,23 +125,30 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
   };
 
   return (
-    <section className="relative flex flex-col overflow-hidden" style={{ minHeight: embedded ? 680 : '92vh' }}>
-      <div className="absolute inset-0 z-0">
+    <section className="relative flex flex-col overflow-hidden" style={{ minHeight: onImage ? (embedded ? 680 : '92vh') : undefined }}>
+      <div className={onImage ? 'absolute inset-0 z-0' : 'relative z-0 shrink-0'} style={onImage ? undefined : { height: imageHeight }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {image && <img src={image} alt="" className="w-full h-full object-cover" style={{ objectPosition: center ? 'center 20%' : 'center' }} />}
-        {b.overlay && (
+        {onImage && b.overlay && (
           <div
             className="absolute inset-0"
             style={{
               background: light
                 ? 'linear-gradient(180deg, rgba(0,0,0,0.6), rgba(0,0,0,0.35) 50%, rgba(0,0,0,0.7))'
                 : center
-                  ? `linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.1) 25%, rgba(0,0,0,0.35) 65%, ${theme.bg} 100%)`
+                  ? `linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.3) 25%, rgba(0,0,0,0.5) 60%, ${theme.bg} 100%)`
                   : `linear-gradient(180deg, rgba(0,0,0,0.6), rgba(0,0,0,0.3) 50%, ${theme.bg})`,
             }}
           />
         )}
-        {!b.overlay && !light && <div className="absolute inset-x-0 bottom-0 h-40" style={{ background: `linear-gradient(180deg, transparent, ${theme.bg})` }} />}
+        {onImage && !b.overlay && !light && <div className="absolute inset-x-0 bottom-0 h-40" style={{ background: `linear-gradient(180deg, transparent, ${theme.bg})` }} />}
+        {/* Off the image: a shade behind the logo and Share, and a fade into the page under the text. */}
+        {!onImage && (
+          <div
+            className="absolute inset-0"
+            style={{ background: `linear-gradient(180deg, rgba(0,0,0,0.45), transparent 28%${placement === 'outside' ? `, transparent 72%, ${theme.bg}` : ''})` }}
+          />
+        )}
       </div>
 
       {b.decoration === 'prism' && (
@@ -142,9 +156,10 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
           {(['left', 'right'] as const).map((side) => (
             <div
               key={side}
-              className="absolute top-0 bottom-0 z-[1] pointer-events-none"
+              className="absolute top-0 z-[1] pointer-events-none"
               style={{
                 [side]: 0,
+                ...(onImage ? { bottom: 0 } : { height: imageHeight }),
                 width: 'clamp(40px, 9cqw, 120px)',
                 opacity: 0.5,
                 background: `repeating-linear-gradient(to bottom, ${(side === 'left' ? PRISM_COLORS : [...PRISM_COLORS].reverse())
@@ -158,7 +173,7 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
         </>
       )}
 
-      <nav className="relative z-10 flex items-center justify-between px-6 pt-6 gap-3">
+      <nav className={`${onImage ? 'relative' : 'absolute inset-x-0 top-0'} z-10 flex items-center justify-between px-6 pt-6 gap-3`}>
         <Logo refId={design.logoUrl} size={design.logoSize} fallback />
         <div className="flex items-center gap-2">
           <Link href={`/events/${slug}/invitation`} className="hidden @md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur border border-white/20 text-white text-xs font-bold hover:bg-white/20 transition-all scale-on-click">
@@ -172,10 +187,25 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
       </nav>
 
       <div
-        className={`relative z-10 flex-1 flex flex-col px-6 w-full ${center ? 'items-center justify-center text-center mx-auto py-16' : 'justify-end pb-16 max-w-3xl'}`}
-        style={center ? { maxWidth: theme.pageWidth } : undefined}
+        className={`relative z-10 flex-1 flex flex-col w-full ${placement === 'card' ? 'px-4' : 'px-6'} ${center ? 'items-center text-center' : ''} ${
+          onImage ? (center ? 'justify-center mx-auto py-16' : 'justify-end pb-16 max-w-3xl') : `mx-auto pb-14 ${placement === 'outside' ? 'pt-8' : ''}`
+        }`}
+        style={{
+          ...(center || !onImage ? { maxWidth: theme.pageWidth } : {}),
+          // The card sits half over the bottom of the image.
+          ...(placement === 'card' ? { marginTop: embedded ? -150 : 'calc(-1 * min(22vh, 200px))' } : {}),
+        }}
       >
-        <div className="flex flex-col" style={{ gap: theme.space.stack, alignItems: center ? 'center' : 'flex-start' }}>
+        <div
+          className={`flex flex-col ${placement === 'card' ? 'w-full p-6 @md:p-10' : ''}`}
+          style={{
+            gap: theme.space.stack,
+            alignItems: center ? 'center' : 'flex-start',
+            ...(placement === 'card'
+              ? { background: theme.card, border: `1px solid ${theme.border}`, borderRadius: Math.max(theme.radius, 16) * 1.5, boxShadow: '0 24px 60px rgba(0,0,0,0.35)' }
+              : {}),
+          }}
+        >
           {center && b.showLogo && design.logoUrl && <Logo refId={design.logoUrl} size="l" />}
           {b.badge && (
             <span
@@ -190,7 +220,7 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
             </span>
           )}
           {b.eyebrow && (
-            <p className="text-xs @md:text-sm font-semibold uppercase tracking-[0.3em] text-white/80" style={{ fontFamily: theme.accentFamily }}>
+            <p className="text-xs @md:text-sm font-semibold uppercase tracking-[0.3em]" style={{ fontFamily: theme.accentFamily, color: soft }}>
               {b.eyebrow}
             </p>
           )}
@@ -200,14 +230,14 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
             style={{
               ...heading,
               ...titleStyle,
-              fontSize: center ? 'clamp(52px, 15cqw, 160px)' : 'clamp(36px, 8cqw, 64px)',
-              textShadow: b.titleStyle === 'solid' ? '0 2px 24px rgba(0,0,0,0.4)' : undefined,
+              fontSize: !center ? 'clamp(36px, 8cqw, 64px)' : onImage ? 'clamp(44px, 13cqw, 160px)' : 'clamp(36px, 10cqw, 112px)',
+              textShadow: b.titleStyle === 'solid' && onImage ? '0 2px 24px rgba(0,0,0,0.4)' : undefined,
             }}
           >
             {title}
           </h1>
           {b.tagline && (
-            <p className={`text-white/90 ${center ? 'uppercase tracking-[0.22em]' : ''}`} style={{ fontSize: center ? 'clamp(13px, 2.8cqw, 21px)' : 16 }}>
+            <p className={center ? 'uppercase tracking-[0.22em]' : ''} style={{ color: onImage ? 'rgba(255,255,255,0.9)' : theme.text, fontSize: center ? 'clamp(13px, 2.8cqw, 21px)' : 16 }}>
               {taglineSplit > 0 ? (
                 <>
                   {b.tagline.slice(0, taglineSplit + 1)}{' '}
@@ -218,10 +248,10 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
               )}
             </p>
           )}
-          {b.showDescription && info.description && <p className="text-base text-zinc-300 leading-relaxed max-w-xl">{info.description}</p>}
+          {b.showDescription && info.description && <p className="text-base leading-relaxed max-w-xl" style={{ color: soft }}>{info.description}</p>}
 
           {b.meta === 'inline' && (
-            <div className="flex flex-wrap items-center gap-4 text-sm text-zinc-200">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm" style={{ color: soft, justifyContent: center ? 'center' : 'flex-start' }}>
               <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" style={{ color: theme.primary }} /> {shortDate(info.startDate)}</span>
               {info.startTime && <span className="flex items-center gap-1.5"><Clock className="w-4 h-4" style={{ color: theme.primary }} /> {formatEventTime(info.startTime)}</span>}
               {info.venue && <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" style={{ color: theme.primary }} /> {info.venue}</span>}
@@ -244,7 +274,7 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
                   <div className="w-16 h-16 @md:w-[72px] @md:h-[72px] rounded-xl flex items-center justify-center text-3xl font-black backdrop-blur" style={{ background: 'rgba(0,0,0,0.72)', border: `1px solid ${alpha(theme.primary, 0.5)}`, color: theme.accent, fontFamily: theme.headingFamily }}>
                     {String(v).padStart(2, '0')}
                   </div>
-                  <span className="text-[9px] tracking-[0.18em] font-bold text-zinc-300">{l}</span>
+                  <span className="text-[9px] tracking-[0.18em] font-bold" style={{ color: soft }}>{l}</span>
                 </div>
               ))}
             </div>
@@ -264,12 +294,17 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
               </Link>
             )}
             {b.secondaryLabel && (
-              <button type="button" onClick={onLearnMore} className="inline-flex items-center justify-center gap-2 px-6 py-4 border border-white/25 text-white font-bold text-sm hover:bg-white/10 transition-all scale-on-click backdrop-blur" style={{ borderRadius: theme.buttonRadius }}>
+              <button
+                type="button"
+                onClick={onLearnMore}
+                className={`inline-flex items-center justify-center gap-2 px-6 py-4 border font-bold text-sm transition-all scale-on-click backdrop-blur ${onImage ? 'border-white/25 text-white hover:bg-white/10' : ''}`}
+                style={{ borderRadius: theme.buttonRadius, ...(onImage ? {} : { borderColor: theme.border, color: theme.text }) }}
+              >
                 {b.secondaryLabel} <ChevronDown className="w-4 h-4" />
               </button>
             )}
           </div>
-          {b.note && <p className="text-xs text-white/50 tracking-wide">{b.note}</p>}
+          {b.note && <p className="text-xs tracking-wide" style={{ color: onImage ? 'rgba(255,255,255,0.5)' : theme.subtle }}>{b.note}</p>}
         </div>
       </div>
     </section>
@@ -333,7 +368,7 @@ export function LandingRenderer(p: RendererProps) {
     const next = visible[idx + 1];
     if (next) document.getElementById(`blk-${next.id}`)?.scrollIntoView({ behavior: 'smooth' });
   };
-  const directions = info.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${info.venue} ${info.address}`.trim())}`;
+  const directions = venueDisplay(info).mapsUrl;
   const pad = `${theme.space.section / 2}px 24px`;
   /** The content column, as wide as the Design Studio's page width. */
   const column: CSSProperties = { width: theme.pageWidth, marginInline: 'auto' };
@@ -550,7 +585,7 @@ export function LandingRenderer(p: RendererProps) {
   };
 
   return (
-    <div className="@container min-h-full" style={{ ...theme.vars, background: theme.bg, color: theme.text, fontFamily: theme.bodyFamily }}>
+    <div className={`@container min-h-full ${embedded ? '' : 'guest-landing'}`} style={{ ...theme.vars, background: theme.bg, color: theme.text, fontFamily: theme.bodyFamily }}>
       {!firstIsHero && (
         <nav className="flex items-center justify-between px-6 py-5" style={{ borderBottom: `1px solid ${theme.border}` }}>
           <Logo refId={p.design.logoUrl} size={p.design.logoSize} fallback />

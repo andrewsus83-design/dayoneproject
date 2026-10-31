@@ -186,6 +186,21 @@ body {
   .guest-app .text-\[15px\] { font-size: 19px; }
 }
 
+/* The guest app and the event's landing page hold still on phones like a native app: no sideways drag, pinch zoom or
+   rubber-band bounce (sideways carousels inside still scroll), and long words such as pasted links wrap inside their card. */
+html:has(.guest-app),
+html:has(.guest-app) body,
+html:has(.guest-landing),
+html:has(.guest-landing) body {
+  overflow-x: hidden;
+  overscroll-behavior: none;
+}
+.guest-app,
+.guest-landing {
+  touch-action: pan-y;
+  overflow-wrap: anywhere;
+}
+
 /* Big-screen controls (ScreenControls) keep a pointer even where the screen hides it on air. */
 .screen-controls,
 .screen-controls * {

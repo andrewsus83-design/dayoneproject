@@ -30,6 +30,8 @@ interface Base {
 export interface HeroBlock extends Base {
   type: 'hero';
   layout: 'left' | 'center';
+  /** Where the title and buttons sit: on the image, below it, or on a card half over its bottom edge. Older heroes: inside. */
+  placement?: 'inside' | 'outside' | 'card';
   imageUrl: string;
   overlay: boolean;
   decoration: 'none' | 'prism';
@@ -94,7 +96,7 @@ export function createBlock(type: BlockType, isWedding = false): LandingBlock {
   switch (type) {
     case 'hero':
       return {
-        id, type, layout: 'left', imageUrl: '', overlay: true, decoration: 'none', showLogo: true,
+        id, type, layout: 'left', placement: 'inside', imageUrl: '', overlay: true, decoration: 'none', showLogo: true,
         badge: isWedding ? 'Wedding Celebration' : 'Corporate Summit', eyebrow: '', title: '', titleStyle: 'solid', tagline: '',
         showDescription: true, meta: 'inline', showCountdown: false,
         ctaLabel: isWedding ? 'RSVP to Attend' : 'Register Now', ctaTarget: 'invitation', ctaUrl: '', secondaryLabel: 'Learn More', note: '',
