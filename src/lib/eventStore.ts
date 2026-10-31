@@ -994,6 +994,20 @@ export function useOrgEventsCache(): Record<string, OrgEventRow> | null {
   return useStoredJSON<Record<string, OrgEventRow>>(ORG_EVENTS_KEY);
 }
 
+/** Forgets a deleted event on this device: its row in the events cache, its link and its saved setup. */
+export function forgetOrgEvent(eventId: string) {
+  const cached = { ...(readJSON<Record<string, OrgEventRow>>(ORG_EVENTS_KEY) ?? {}) };
+  delete cached[eventId];
+  const index = readJSON<Record<string, string>>(SLUG_INDEX_KEY) ?? {};
+  try {
+    localStorage.removeItem(eventKey(eventId));
+  } catch {
+    // Browser storage is off; there is nothing to forget.
+  }
+  writeJSON(SLUG_INDEX_KEY, Object.fromEntries(Object.entries(index).filter(([, id]) => id !== eventId)));
+  writeJSON(ORG_EVENTS_KEY, cached);
+}
+
 export function useEventConfig(eventId: string) {
   const saved = useOrgEventsCache();
   const base = useMemo(() => getBaseEvent(eventId, saved), [eventId, saved]);

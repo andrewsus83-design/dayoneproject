@@ -2,7 +2,7 @@
 
 import type { PostgrestError } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
-import { cacheOrgEvents } from '@/lib/eventStore';
+import { cacheOrgEvents, forgetOrgEvent } from '@/lib/eventStore';
 import type { OrgEventRow } from '@/lib/events';
 
 export const COLUMNS = 'id, name, slug, type, timezone, starts_at, ends_at, venue_name, venue_address, status, package, created_at';
@@ -113,6 +113,18 @@ export async function setOrgEventStatus(id: string, status: 'draft' | 'published
   if (!row) throw new Error('Your account cannot publish this event. Ask the event owner.');
   cacheOrgEvents([row], true);
   return row;
+}
+
+/**
+ * Deletes an event and everything in it (guests, replies, door prizes, games, screens, messages). The database lets
+ * only the account owner delete, and only events on the Free package. Photo wall files go with the nightly cleanup.
+ */
+export async function deleteOrgEvent(id: string): Promise<void> {
+  const ownerOnly = 'Only the account owner can delete this event, and only while it is on the Free package.';
+  const { data, error } = await createClient().from('a41_events').delete().eq('id', id).select('id');
+  if (error) throw new Error(error.code === '42501' ? ownerOnly : readable(error));
+  if (!data?.length) throw new Error(ownerOnly);
+  forgetOrgEvent(id);
 }
 
 /** Wall-clock date + time at the venue as a timestamp the database understands. */

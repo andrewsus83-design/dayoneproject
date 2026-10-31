@@ -19,6 +19,7 @@ import { PublishButton } from '@/components/dashboard/event/PublishButton';
 import { GuestsTab } from '@/components/dashboard/event/GuestsTab';
 import { RegistrationsTab } from '@/components/dashboard/event/RegistrationsTab';
 import { ShotSettings } from '@/components/dashboard/event/ShotSettings';
+import { DeleteEventCard } from '@/components/dashboard/event/DeleteEventCard';
 import { TeamMembers } from '@/components/dashboard/TeamMembers';
 import {
   POPVERSE_QUIZ_QUESTIONS,
@@ -970,6 +971,8 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
                 />
               </div>
             </div>
+
+            {isSavedEvent && <DeleteEventCard eventId={eventId} eventName={event.name} eventPackage={savedEvents?.[eventId]?.package ?? ''} />}
           </div>
         )}
 
