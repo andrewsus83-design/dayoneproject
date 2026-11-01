@@ -1583,7 +1583,7 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
               )}
             </div>
 
-            <Field label="Form name" hint={forms.length > 1 ? 'Guests see it on the landing page buttons and their pass, and replies are tagged with it.' : 'Only you see this, until the event has more than one form.'}>
+            <Field label="Form name" hint={forms.length > 1 ? 'The title guests see on this form, with the event name as a small pill above it. Also the landing page button and pass label, and replies are tagged with it.' : 'The title guests see on this form, with the event name as a small pill above it. Left as “Register · event name”, the event name stays the title.'}>
               <input value={inv.formName} onChange={(e) => setInv({ formName: e.target.value })} className={inputCls} />
             </Field>
 

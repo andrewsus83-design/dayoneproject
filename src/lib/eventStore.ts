@@ -1304,6 +1304,17 @@ export function formLabel(form: Pick<InvitationForm, 'id' | 'formName'> | undefi
   return form.formName.trim() || (form.id || 'Invitation');
 }
 
+/**
+ * The title and pill a registration form shows: its own name as the title, the event name in a pill above it.
+ * A form with no name of its own, or only the auto-made "Register · <event>", keeps the event name as its title with no pill.
+ */
+export function formHeading(form: Pick<InvitationForm, 'formName'>, eventName: string): { title: string; pill: string } {
+  const event = eventName.trim();
+  const name = form.formName.trim();
+  if (!name || name === event || name === `Register · ${event}` || name === `RSVP · ${event}`) return { title: eventName, pill: '' };
+  return { title: name, pill: event };
+}
+
 export function formPath(slug: string, formId: string): string {
   return formId ? `/events/${slug}/invitation/${formId}` : `/events/${slug}/invitation`;
 }
@@ -1324,7 +1335,7 @@ export function formIdFromName(name: string, taken: string[]): string {
 
 /** A new form with the default questions and pages, named by the organizer. */
 export function newInvitationForm(base: Event, name: string, id: string): InvitationForm {
-  return { ...buildDefaults(base).invitation, id, formName: name, subtitle: name };
+  return { ...buildDefaults(base).invitation, id, formName: name };
 }
 
 /** Today on this device, as YYYY-MM-DD (what reply-by dates are compared with). */

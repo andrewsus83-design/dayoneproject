@@ -7,7 +7,7 @@ import {
   Navigation, Pencil, Phone, WifiOff,
 } from 'lucide-react';
 import {
-  fillVariables, findQuestion, formatEventDate, formatGuestNumber, formatEventTime, formatOpensAt, getQuestions, isQuestion, makePassToken, newId, useAssetUrl,
+  fillVariables, findQuestion, formHeading, formatEventDate, formatGuestNumber, formatEventTime, formatOpensAt, getQuestions, isQuestion, makePassToken, newId, useAssetUrl,
   type EventInfo, type FormFile, type FormImage, type FormItem, type FormQuestion, type FormResponse, type InvitationConfig, type WriteResult,
 } from '@/lib/eventStore';
 import { alpha, type ResolvedTheme } from '@/lib/eventTheme';
@@ -239,6 +239,10 @@ export function InvitationFormView({
   const fill = (text: string, r?: FormResponse) =>
     fillVariables(text, { ...baseVars, name: r?.name.split(' ')[0], fullname: r?.name, party: r?.party, code: r ? passCode(r.token) : undefined, number: r?.number ? formatGuestNumber(r.number, numberPad) : undefined });
 
+  const heading = formHeading(invitation, info.name);
+  // A subtitle that only repeats the title (older forms got their name as subtitle) adds nothing.
+  const subtitle = invitation.subtitle && fill(invitation.subtitle).trim() !== heading.title.trim() ? fill(invitation.subtitle) : '';
+
   const sp = theme.space;
   const accentIsScript = theme.accentFamily !== theme.headingFamily;
   const headingStyle: CSSProperties = { fontFamily: theme.headingFamily, letterSpacing: theme.space.headingTracking };
@@ -246,6 +250,7 @@ export function InvitationFormView({
   const secondaryBtn: CSSProperties = { background: theme.surface, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: theme.buttonRadius };
   const inputCls =
     'w-full px-4 py-3.5 text-base outline-none transition-colors border bg-[var(--ev-surface)] text-[var(--ev-text)] border-[var(--ev-border)] focus:border-[var(--ev-primary)] placeholder:text-[var(--ev-subtle)]';
+  const eventPill: CSSProperties = { background: alpha(theme.primary, 0.14), color: theme.primaryText, border: `1px solid ${alpha(theme.primary, 0.4)}` };
   const inviteLabelStyle: CSSProperties = accentIsScript
     ? { fontFamily: theme.accentFamily, color: theme.secondaryText, fontSize: 26, lineHeight: 1.1 }
     : { fontFamily: theme.accentFamily, color: theme.primaryText };
@@ -526,8 +531,11 @@ export function InvitationFormView({
             </p>
           )}
           <div>
-            <h1 className="text-3xl font-bold leading-tight" style={headingStyle}>{info.name}</h1>
-            {invitation.subtitle && <p className="text-sm mt-1.5" style={{ color: theme.muted }}>{fill(invitation.subtitle)}</p>}
+            {heading.pill && (
+              <span className="block w-fit max-w-full mb-3 px-3 py-1 rounded-2xl text-[11px] font-bold uppercase tracking-[0.14em] leading-snug break-words" style={eventPill}>{heading.pill}</span>
+            )}
+            <h1 className="text-3xl font-bold leading-tight" style={headingStyle}>{heading.title}</h1>
+            {subtitle && <p className="text-sm mt-1.5" style={{ color: theme.muted }}>{subtitle}</p>}
           </div>
           <div className="space-y-2 text-sm font-medium">
             {info.startDate && <div className="flex items-center gap-2.5"><Calendar className="w-4 h-4 shrink-0" style={{ color: theme.primaryText }} />{formatEventDate(info.startDate)}</div>}
@@ -721,8 +729,11 @@ export function InvitationFormView({
                 <div className={accentIsScript ? 'text-xl' : 'text-[10px] font-bold uppercase tracking-[0.2em] opacity-80'} style={{ fontFamily: theme.accentFamily }}>
                   {fill(invitation.ticketLabel || invitation.heading || "You're invited")}
                 </div>
-                <div className="text-lg font-bold leading-tight mt-0.5" style={headingStyle}>{info.name}</div>
-                {invitation.subtitle && <div className="text-xs opacity-80 mt-0.5">{fill(invitation.subtitle)}</div>}
+                {heading.pill && (
+                  <span className="block w-fit max-w-full mt-1.5 px-2.5 py-0.5 rounded-2xl text-[10px] font-bold uppercase tracking-[0.14em] leading-snug break-words" style={{ background: alpha(theme.onPrimary, 0.16), border: `1px solid ${alpha(theme.onPrimary, 0.32)}` }}>{heading.pill}</span>
+                )}
+                <div className="text-lg font-bold leading-tight mt-1" style={headingStyle}>{heading.title}</div>
+                {subtitle && <div className="text-xs opacity-80 mt-0.5">{subtitle}</div>}
               </div>
               <div className="flex flex-col items-end gap-2 shrink-0">
                 {logoRef && <LogoMark refId={logoRef} size="s" />}
