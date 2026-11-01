@@ -59,6 +59,13 @@ export const ACCENT_FONTS = [
   { id: 'dancing', label: 'Dancing Script', family: "'Dancing Script', cursive", google: 'Dancing+Script:wght@500;700' },
   { id: 'caveat', label: 'Caveat', family: "'Caveat', cursive", google: 'Caveat:wght@500;700' },
   { id: 'cinzeldeco', label: 'Cinzel Decorative', family: "'Cinzel Decorative', serif", google: 'Cinzel+Decorative:wght@400;700' },
+  { id: 'labelleaurore', label: 'La Belle Aurore', family: "'La Belle Aurore', cursive", google: 'La+Belle+Aurore' },
+] as const;
+
+/** Numbers and small tags (countdowns, labels on cards). 'default' keeps the app's own monospace. */
+export const MONO_FONTS = [
+  { id: 'default', label: 'Default', family: '', google: null },
+  { id: 'firacode', label: 'Fira Code', family: "'Fira Code', monospace", google: 'Fira+Code:wght@400;500;600;700' },
 ] as const;
 
 export const CARD_STYLES: { id: CardStyleId; label: string; desc: string }[] = [
@@ -191,6 +198,8 @@ export interface ResolvedTheme {
   headingFamily: string;
   bodyFamily: string;
   accentFamily: string;
+  /** The monospace for numbers and tags; empty keeps the app's own. */
+  monoFamily: string;
   radius: number;
   buttonRadius: number;
   space: ResolvedSpace;
@@ -213,11 +222,12 @@ export function paletteColors(design: Pick<DesignConfig, 'palette' | 'customPrim
   return { primary: p.primary as string, secondary: p.secondary as string, accent: p.accent as string };
 }
 
-export function fontsHref(ids: { heading?: string; body?: string; accent?: string }): string | null {
+export function fontsHref(ids: { heading?: string; body?: string; accent?: string; mono?: string }): string | null {
   const families = [
     HEADING_FONTS.find((f) => f.id === ids.heading)?.google,
     BODY_FONTS.find((f) => f.id === ids.body)?.google,
     ACCENT_FONTS.find((f) => f.id === ids.accent)?.google,
+    MONO_FONTS.find((f) => f.id === ids.mono)?.google,
   ].filter((f): f is NonNullable<typeof f> => !!f);
   if (families.length === 0) return null;
   return `https://fonts.googleapis.com/css2?${[...new Set(families)].map((f) => `family=${f}`).join('&')}&display=swap`;
@@ -276,6 +286,7 @@ export function resolveTheme(design: DesignConfig): ResolvedTheme {
   const headingFamily = HEADING_FONTS.find((f) => f.id === design.headingFont)?.family ?? HEADING_FONTS[0].family;
   const bodyFamily = BODY_FONTS.find((f) => f.id === design.bodyFont)?.family ?? BODY_FONTS[0].family;
   const accentFamily = ACCENT_FONTS.find((f) => f.id === design.accentFont)?.family || headingFamily;
+  const monoFamily = MONO_FONTS.find((f) => f.id === design.monoFont)?.family ?? '';
 
   const vars = {
     '--ev-bg': bg,
@@ -315,13 +326,14 @@ export function resolveTheme(design: DesignConfig): ResolvedTheme {
     headingFamily,
     bodyFamily,
     accentFamily,
+    monoFamily,
     radius: radiusPx,
     buttonRadius,
     space,
     pageWidth: (PAGE_WIDTH_OPTIONS.find((w) => w.id === design.pageWidth) ?? PAGE_WIDTH_OPTIONS[0]).css,
     cardStyle,
     vars,
-    fontsHref: fontsHref({ heading: design.headingFont, body: design.bodyFont, accent: design.accentFont }),
+    fontsHref: fontsHref({ heading: design.headingFont, body: design.bodyFont, accent: design.accentFont, mono: design.monoFont }),
   };
 }
 

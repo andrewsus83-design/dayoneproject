@@ -61,6 +61,20 @@ const nextConfig: NextConfig = {
         headers: [{ key: "Content-Security-Policy", value: contentSecurityPolicy("*") }],
       },
       {
+        // An uploaded landing page (Landing Page → Custom HTML). It is the organizer's own HTML, so it runs in a
+        // sandbox with no access to the app (no cookies, storage or sign-in) and is not held to the app's script,
+        // font and picture rules. The sandbox is part of this header, so the page cannot lift it.
+        source: "/events/:slug/site",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value:
+              "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-downloads allow-top-navigation-by-user-activation; " +
+              "default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; frame-ancestors *",
+          },
+        ],
+      },
+      {
         // Signed-in areas are never framed (the later entry wins for the same header).
         source: "/:area(dashboard|admin|desk|login)/:path*",
         headers: [

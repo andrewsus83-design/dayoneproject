@@ -3,6 +3,7 @@ import { Event, Guest } from './types';
 import { getBaseEvent, isSampleEventId, resolveEventIdFromSlug, SLUG_INDEX_KEY, ORG_EVENTS_KEY, type OrgEventRow } from './events';
 import { MOCK_GUESTS, POPVERSE_QUIZ_QUESTIONS } from './mockData';
 import { buildDefaultBlocks, legacyToBlocks, type LandingBlock } from './landingBlocks';
+import type { PageFile } from './customHtml';
 import { defaultBroadcast } from './broadcastTemplates';
 import { SHOT_EFFECTS, SHOT_FILTERS, SHOT_FRAMES } from './shotLooks';
 import { cachedGuests, isServerEventId, useServerGuestList } from './guestsApi';
@@ -92,6 +93,13 @@ export interface LandingConfig {
   footerTitle: string;
   footerTagline: string;
   footerText: string;
+  /** 'html': the landing page is the uploaded file below instead of the blocks. Left out = blocks. */
+  mode?: 'blocks' | 'html';
+  html?: string;
+  htmlName?: string;
+  /** Changes with every upload, so a changed page is fetched again. */
+  htmlRev?: string;
+  htmlFiles?: PageFile[];
 }
 
 export type ThemeMode = 'dark' | 'light';
@@ -111,6 +119,8 @@ export interface DesignConfig {
   headingFont: string;
   bodyFont: string;
   accentFont: string;
+  /** Font for numbers and small tags; left out on older events, which keep the app's own monospace. */
+  monoFont?: string;
   cardStyle: CardStyleId;
   radius: RadiusId;
   spacing: SpacingId;
@@ -483,6 +493,7 @@ export function buildDefaults(base: Event): EventConfig {
       headingFont: isPopverse ? 'montserrat' : 'outfit',
       bodyFont: isPopverse ? 'montserrat' : 'manrope',
       accentFont: 'none',
+      monoFont: 'default',
       cardStyle: isPopverse ? 'glass' : 'elevated',
       radius: 'medium',
       spacing: 'normal',

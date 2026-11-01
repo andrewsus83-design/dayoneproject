@@ -30,8 +30,8 @@ interface Base {
 export interface HeroBlock extends Base {
   type: 'hero';
   layout: 'left' | 'center';
-  /** Where the title and buttons sit: on the image, below it, or on a card half over its bottom edge. Older heroes: inside. */
-  placement?: 'inside' | 'outside' | 'card';
+  /** Where the title and buttons sit: on the image, below it, on a card half over its bottom edge, or beside it on a brand-colour band (the image framed). Older heroes: inside. */
+  placement?: 'inside' | 'outside' | 'card' | 'split';
   imageUrl: string;
   overlay: boolean;
   decoration: 'none' | 'prism';
@@ -51,10 +51,11 @@ export interface HeroBlock extends Base {
   note: string;
 }
 
-export interface CountdownBlock extends Base { type: 'countdown'; label: string }
+/** `until` (YYYY-MM-DD) counts down to the end of that day instead of the event start: an early-bird deadline. */
+export interface CountdownBlock extends Base { type: 'countdown'; label: string; until?: string }
 export interface DetailsBlock extends Base { type: 'details'; showDate: boolean; showVenue: boolean; showCapacity: boolean; showLink: boolean }
 export interface TextBlock extends Base { type: 'text'; label: string; heading: string; body: string; align: 'left' | 'center'; card: boolean }
-export interface FeaturesBlock extends Base { type: 'features'; label: string; heading: string; layout: 'grid' | 'list'; items: LandingListItem[] }
+export interface FeaturesBlock extends Base { type: 'features'; label: string; heading: string; intro?: string; layout: 'grid' | 'list'; items: LandingListItem[] }
 export interface GalleryBlock extends Base { type: 'gallery'; label: string; heading: string; images: { id: string; url: string }[] }
 export interface TestimonialsBlock extends Base { type: 'testimonials'; label: string; heading: string; items: Testimony[] }
 export interface QuoteBlock extends Base { type: 'quote'; text: string; author: string }
@@ -62,11 +63,29 @@ export interface FactsBlock extends Base { type: 'facts'; label: string; heading
 export interface StatsBlock extends Base { type: 'stats'; label: string; heading: string; subheading: string; items: LandingPair[]; note: string; noteValue: string }
 export interface VenueBlock extends Base { type: 'venue'; label: string; heading: string; body: string; tips: LandingPair[]; showDirections: boolean }
 export interface ImageBlock extends Base { type: 'image'; url: string; caption: string; fullWidth: boolean }
+export interface ProgramItem {
+  id: string;
+  imageUrl: string;
+  /** Over the top right of the image: who it is for. */
+  badge: string;
+  /** Over the top left of the image: the day. */
+  date: string;
+  tag: string;
+  title: string;
+  body: string;
+  meta: LandingPair[];
+  /** The invitation form its button opens ('' is the event's first form). */
+  formId: string;
+  buttonLabel: string;
+}
+export interface ProgramsBlock extends Base { type: 'programs'; label: string; heading: string; intro: string; items: ProgramItem[] }
+export interface FaqItem { id: string; question: string; answer: string }
+export interface FaqBlock extends Base { type: 'faq'; label: string; heading: string; items: FaqItem[] }
 export interface CtaBlock extends Base { type: 'cta'; label: string; heading: string; body: string; ctaLabel: string; ctaTarget: CtaTarget; ctaUrl: string; note: string }
 
 export type LandingBlock =
   | HeroBlock | CountdownBlock | DetailsBlock | TextBlock | FeaturesBlock | GalleryBlock | TestimonialsBlock
-  | QuoteBlock | FactsBlock | StatsBlock | VenueBlock | ImageBlock | CtaBlock;
+  | QuoteBlock | FactsBlock | StatsBlock | VenueBlock | ImageBlock | CtaBlock | ProgramsBlock | FaqBlock;
 
 export type BlockType = LandingBlock['type'];
 
@@ -76,6 +95,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; desc: string }[] =
   { type: 'details', label: 'Key Details', desc: 'Date, venue, capacity, link' },
   { type: 'text', label: 'Text', desc: 'Label, heading and paragraph' },
   { type: 'features', label: 'Highlights', desc: 'List or grid of points' },
+  { type: 'programs', label: 'Programs', desc: 'A card per activity, each opening its own form' },
   { type: 'gallery', label: 'Gallery', desc: 'Photo grid' },
   { type: 'testimonials', label: 'Testimonials', desc: 'Quotes from people' },
   { type: 'quote', label: 'Quote / Verse', desc: 'One highlighted quote' },
@@ -83,6 +103,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; desc: string }[] =
   { type: 'stats', label: 'Stats', desc: 'Big numbers' },
   { type: 'venue', label: 'Venue', desc: 'Venue story, tips and directions' },
   { type: 'image', label: 'Image', desc: 'A single picture with caption' },
+  { type: 'faq', label: 'FAQ', desc: 'Questions that open to show the answer' },
   { type: 'cta', label: 'Call to Action', desc: 'Closing message with a button' },
 ];
 
@@ -146,6 +167,16 @@ export function createBlock(type: BlockType, isWedding = false): LandingBlock {
       return { id, type, label: 'The Venue', heading: 'Getting there', body: 'Tell guests about the venue.', tips: [], showDirections: true };
     case 'image':
       return { id, type, url: '', caption: '', fullWidth: false };
+    case 'programs':
+      return {
+        id, type, label: 'Programs', heading: 'Choose your activity', intro: '',
+        items: [{ id: blockId('p'), imageUrl: '', badge: '', date: '', tag: '', title: 'First activity', body: 'Describe it in a sentence or two.', meta: [], formId: '', buttonLabel: 'Register' }],
+      };
+    case 'faq':
+      return {
+        id, type, label: 'FAQ', heading: 'Good to know',
+        items: [{ id: blockId('q'), question: 'A question guests ask?', answer: 'Your answer.' }],
+      };
     case 'cta':
       return {
         id, type, label: '', heading: isWedding ? 'Join Us on Our Special Day' : 'Secure Your Seat Today',

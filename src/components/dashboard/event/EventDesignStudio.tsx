@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { deleteAsset, resetEventSection, saveAsset, useAssetUrl, useEventConfig, type DesignConfig, type ThemeMode } from '@/lib/eventStore';
 import {
-  ACCENT_FONTS, BODY_FONTS, CARD_STYLES, DARK_BACKGROUNDS, HEADING_FONTS, LIGHT_BACKGROUNDS, PALETTES, RADIUS_OPTIONS,
+  ACCENT_FONTS, BODY_FONTS, CARD_STYLES, DARK_BACKGROUNDS, HEADING_FONTS, LIGHT_BACKGROUNDS, MONO_FONTS, PALETTES, RADIUS_OPTIONS,
   PAGE_WIDTH_OPTIONS, SPACING_OPTIONS, gradientText, modeForBackground, paletteColors, resolveTheme,
 } from '@/lib/eventTheme';
 import { compressImage } from '@/lib/image';
@@ -126,7 +126,7 @@ export function EventDesignStudio({ eventId }: { eventId: string }) {
   };
 
   const allFontsHref = useMemo(() => {
-    const fam = [...HEADING_FONTS, ...BODY_FONTS, ...ACCENT_FONTS].map((f) => f.google).filter(Boolean);
+    const fam = [...HEADING_FONTS, ...BODY_FONTS, ...ACCENT_FONTS, ...MONO_FONTS].map((f) => f.google).filter(Boolean);
     return `https://fonts.googleapis.com/css2?${[...new Set(fam)].map((f) => `family=${f}`).join('&')}&display=swap`;
   }, []);
 
@@ -272,11 +272,20 @@ export function EventDesignStudio({ eventId }: { eventId: string }) {
             </div>
           </div>
           <div>
-            <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-1">Accent font · 4 options</p>
+            <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-1">Accent font · 5 options</p>
             <p className="text-[11px] text-zinc-500 mb-3">Used for small labels like “You’re invited”, section labels and quotes.</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {ACCENT_FONTS.map((f) => (
                 <FontCard key={f.id} selected={design.accentFont === f.id} onClick={() => setDesign({ accentFont: f.id })} family={f.family} label={f.label} sample={f.id === 'none' ? 'Same as heading' : 'You’re invited'} big={f.id !== 'none'} />
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-1">Numbers font · 2 options</p>
+            <p className="text-[11px] text-zinc-500 mb-3">Used for countdowns and the small tags on cards.</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {MONO_FONTS.map((f) => (
+                <FontCard key={f.id} selected={(design.monoFont ?? 'default') === f.id} onClick={() => setDesign({ monoFont: f.id })} family={f.family || 'ui-monospace, monospace'} label={f.label} sample="36 : 04 : 57 : 22" big />
               ))}
             </div>
           </div>

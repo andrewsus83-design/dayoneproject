@@ -4,9 +4,9 @@ import React, { useEffect, useState, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { Calendar, Clock, MapPin, Users, Globe, Copy, CheckCircle2, Star, Quote, ChevronDown, Navigation, ArrowRight, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { formatEventTime, useAssetUrl, type EventInfo, type FormButton, type LandingConfig, type DesignConfig } from '@/lib/eventStore';
-import type { LandingBlock, HeroBlock, CtaTarget } from '@/lib/landingBlocks';
-import { alpha, gradientText, PRISM_COLORS, type ResolvedTheme } from '@/lib/eventTheme';
+import { formatEventTime, formPath, useAssetUrl, type EventInfo, type FormButton, type LandingConfig, type DesignConfig } from '@/lib/eventStore';
+import type { LandingBlock, HeroBlock, CtaTarget, ProgramItem } from '@/lib/landingBlocks';
+import { alpha, gradientText, luminance, mix, PRISM_COLORS, type ResolvedTheme } from '@/lib/eventTheme';
 import { BrandMark } from '@/components/BrandMark';
 import { venueDisplay } from '@/lib/utils';
 
@@ -71,6 +71,14 @@ function ctaButtons(p: RendererProps, target: CtaTarget, url: string, label: str
   return [{ key: 'cta', href: ctaHref(p.slug, target, url), label }];
 }
 
+/** The small label over a heading: spaced capitals, or one larger line when the accent font is a handwriting script. */
+function labelLook(theme: ResolvedTheme, color: string, size: 'md' | 'lg' = 'md'): { className: string; style: CSSProperties } {
+  const script = theme.accentFamily !== theme.headingFamily;
+  return script
+    ? { className: size === 'lg' ? 'text-2xl leading-tight' : 'text-xl leading-tight', style: { fontFamily: theme.accentFamily, color } }
+    : { className: `${size === 'lg' ? 'text-xs @md:text-sm font-semibold' : 'text-[11px] font-bold'} uppercase tracking-[0.3em]`, style: { fontFamily: theme.accentFamily, color } };
+}
+
 function Logo({ refId, size, fallback }: { refId: string; size: 's' | 'm' | 'l'; fallback?: boolean }) {
   const url = useAssetUrl(refId);
   const h = size === 's' ? 32 : size === 'l' ? 64 : 44;
@@ -83,12 +91,12 @@ function Logo({ refId, size, fallback }: { refId: string; size: 's' | 'm' | 'l';
   return <img src={url} alt="Event logo" style={{ height: h, width: 'auto', maxWidth: h * 4 }} className="object-contain" />;
 }
 
-function SectionHead({ label, heading, theme, center }: { label?: string; heading?: string; theme: ResolvedTheme; center?: boolean }) {
+function SectionHead({ label, heading, intro, theme, center }: { label?: string; heading?: string; intro?: string; theme: ResolvedTheme; center?: boolean }) {
   if (!label && !heading) return null;
   return (
     <div className={center ? 'text-center' : ''} style={{ marginBottom: theme.space.stack * 1.4 }}>
       {label && (
-        <p className="text-[11px] font-bold uppercase tracking-[0.3em] mb-3" style={{ color: theme.primaryText, fontFamily: theme.accentFamily }}>
+        <p className={`${labelLook(theme, theme.primaryText).className} mb-3`} style={labelLook(theme, theme.primaryText).style}>
           {label}
         </p>
       )}
@@ -97,6 +105,7 @@ function SectionHead({ label, heading, theme, center }: { label?: string; headin
           {heading}
         </h2>
       )}
+      {intro && <p className={`text-[15px] leading-relaxed mt-3 max-w-2xl ${center ? 'mx-auto' : ''}`} style={{ color: theme.muted }}>{intro}</p>}
     </div>
   );
 }
@@ -112,13 +121,18 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
   const time = useCountdown(info.startDate, info.startTime);
   const [copied, setCopied] = useState(false);
   const light = theme.mode === 'light';
-  const center = b.layout === 'center';
+  const center = b.layout === 'center' && b.placement !== 'split';
   const placement = b.placement ?? 'inside';
   const onImage = placement === 'inside';
+  /** Split: a brand-colour band with the text beside the framed picture. Light text, and gold where the brand colour would vanish. */
+  const split = placement === 'split';
+  const onDark = onImage || split;
+  const key = split ? theme.accent : theme.primary;
+  const onKey = split ? (luminance(theme.accent) > 0.4 ? '#14110A' : '#FFFFFF') : theme.onPrimary;
   /** Below the image or on the card, the image is a band of its own and the text takes the theme's colours. */
   const imageHeight = placement === 'card' ? (embedded ? 440 : '64vh') : embedded ? 380 : '58vh';
-  const ink = onImage ? '#FFFFFF' : theme.text;
-  const soft = onImage ? 'rgba(255,255,255,0.85)' : theme.muted;
+  const ink = onDark ? '#FFFFFF' : theme.text;
+  const soft = onDark ? 'rgba(255,255,255,0.85)' : theme.muted;
   const heading: CSSProperties = { fontFamily: theme.headingFamily, letterSpacing: `calc(${theme.space.headingTracking} - 0.01em)` };
   const title = b.title || info.name;
   const titleStyle: CSSProperties =
@@ -134,8 +148,14 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
   };
 
   return (
-    <section className="relative flex flex-col overflow-hidden" style={{ minHeight: onImage ? (embedded ? 680 : '92vh') : undefined }}>
-      <div className={onImage ? 'absolute inset-0 z-0' : 'relative z-0 shrink-0'} style={onImage ? undefined : { height: imageHeight }}>
+    <section
+      className="relative flex flex-col overflow-hidden"
+      style={{
+        minHeight: onImage ? (embedded ? 680 : '92vh') : undefined,
+        ...(split ? { background: `linear-gradient(140deg, ${mix(theme.primary, '#000000', 0.55)}, ${mix(theme.primary, '#000000', 0.2)} 70%, ${theme.primary})` } : {}),
+      }}
+    >
+      {!split && <div className={onImage ? 'absolute inset-0 z-0' : 'relative z-0 shrink-0'} style={onImage ? undefined : { height: imageHeight }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {image && <img src={image} alt="" className="w-full h-full object-cover" style={{ objectPosition: center ? 'center 20%' : 'center' }} />}
         {onImage && b.overlay && (
@@ -158,7 +178,7 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
             style={{ background: `linear-gradient(180deg, rgba(0,0,0,0.45), transparent 28%${placement === 'outside' ? `, transparent 72%, ${theme.bg}` : ''})` }}
           />
         )}
-      </div>
+      </div>}
 
       {b.decoration === 'prism' && (
         <>
@@ -182,13 +202,13 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
         </>
       )}
 
-      <nav className={`${onImage ? 'relative' : 'absolute inset-x-0 top-0'} z-10 flex items-center justify-between px-6 pt-6 gap-3`}>
+      <nav className={`${onDark ? 'relative' : 'absolute inset-x-0 top-0'} z-10 flex items-center justify-between px-6 pt-6 gap-3`}>
         <Logo refId={design.logoUrl} size={design.logoSize} fallback />
         <div className="flex items-center gap-2">
           <Link href={`/events/${slug}/invitation`} className="hidden @md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur border border-white/20 text-white text-xs font-bold hover:bg-white/20 transition-all scale-on-click">
             Invitation Form
           </Link>
-          <button type="button" onClick={share} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold scale-on-click" style={{ background: theme.primary, color: theme.onPrimary, borderRadius: theme.buttonRadius }}>
+          <button type="button" onClick={share} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold scale-on-click" style={{ background: key, color: onKey, borderRadius: theme.buttonRadius }}>
             {copied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
             {copied ? 'Copied!' : 'Share'}
           </button>
@@ -196,8 +216,10 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
       </nav>
 
       <div
-        className={`relative z-10 flex-1 flex flex-col w-full ${placement === 'card' ? 'px-4' : 'px-6'} ${center ? 'items-center text-center' : ''} ${
-          onImage ? (center ? 'justify-center mx-auto py-16' : 'justify-end pb-16 max-w-3xl') : `mx-auto pb-14 ${placement === 'outside' ? 'pt-8' : ''}`
+        className={`relative z-10 flex-1 flex w-full ${
+          split ? 'flex-col @3xl:flex-row @3xl:items-center gap-10 px-6 pt-4 pb-16 mx-auto' : `flex-col ${placement === 'card' ? 'px-4' : 'px-6'} ${center ? 'items-center text-center' : ''} ${
+            onImage ? (center ? 'justify-center mx-auto py-16' : 'justify-end pb-16 max-w-3xl') : `mx-auto pb-14 ${placement === 'outside' ? 'pt-8' : ''}`
+          }`
         }`}
         style={{
           ...(center || !onImage ? { maxWidth: theme.pageWidth } : {}),
@@ -206,7 +228,7 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
         }}
       >
         <div
-          className={`flex flex-col ${placement === 'card' ? 'w-full p-6 @md:p-10' : ''}`}
+          className={`flex flex-col ${placement === 'card' ? 'w-full p-6 @md:p-10' : ''} ${split ? 'min-w-0 @3xl:flex-1' : ''}`}
           style={{
             gap: theme.space.stack,
             alignItems: center ? 'center' : 'flex-start',
@@ -229,7 +251,7 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
             </span>
           )}
           {b.eyebrow && (
-            <p className="text-xs @md:text-sm font-semibold uppercase tracking-[0.3em]" style={{ fontFamily: theme.accentFamily, color: soft }}>
+            <p className={labelLook(theme, soft, 'lg').className} style={labelLook(theme, soft, 'lg').style}>
               {b.eyebrow}
             </p>
           )}
@@ -246,7 +268,7 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
             {title}
           </h1>
           {b.tagline && (
-            <p className={center ? 'uppercase tracking-[0.22em]' : ''} style={{ color: onImage ? 'rgba(255,255,255,0.9)' : theme.text, fontSize: center ? 'clamp(13px, 2.8cqw, 21px)' : 16 }}>
+            <p className={center ? 'uppercase tracking-[0.22em]' : ''} style={{ color: onDark ? 'rgba(255,255,255,0.9)' : theme.text, fontSize: center ? 'clamp(13px, 2.8cqw, 21px)' : 16 }}>
               {taglineSplit > 0 ? (
                 <>
                   {b.tagline.slice(0, taglineSplit + 1)}{' '}
@@ -261,9 +283,9 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
 
           {b.meta === 'inline' && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm" style={{ color: soft, justifyContent: center ? 'center' : 'flex-start' }}>
-              <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" style={{ color: theme.primary }} /> {shortDate(info.startDate)}</span>
-              {info.startTime && <span className="flex items-center gap-1.5"><Clock className="w-4 h-4" style={{ color: theme.primary }} /> {formatEventTime(info.startTime)}</span>}
-              {info.venue && <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" style={{ color: theme.primary }} /> {info.venue}</span>}
+              <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" style={{ color: key }} /> {shortDate(info.startDate)}</span>
+              {info.startTime && <span className="flex items-center gap-1.5"><Clock className="w-4 h-4" style={{ color: key }} /> {formatEventTime(info.startTime)}</span>}
+              {info.venue && <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" style={{ color: key }} /> {info.venue}</span>}
             </div>
           )}
           {b.meta === 'pills' && (
@@ -280,7 +302,7 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
             <div className="flex gap-2 justify-center flex-wrap">
               {[{ v: time.d, l: 'DAYS' }, { v: time.h, l: 'HRS' }, { v: time.m, l: 'MIN' }, { v: time.s, l: 'SEC' }].map(({ v, l }) => (
                 <div key={l} className="flex flex-col items-center gap-1.5">
-                  <div className="w-16 h-16 @md:w-[72px] @md:h-[72px] rounded-xl flex items-center justify-center text-3xl font-black backdrop-blur" style={{ background: 'rgba(0,0,0,0.72)', border: `1px solid ${alpha(theme.primary, 0.5)}`, color: theme.accent, fontFamily: theme.headingFamily }}>
+                  <div className="w-16 h-16 @md:w-[72px] @md:h-[72px] rounded-xl flex items-center justify-center text-3xl font-black backdrop-blur" style={{ background: 'rgba(0,0,0,0.72)', border: `1px solid ${alpha(theme.primary, 0.5)}`, color: theme.accent, fontFamily: theme.monoFamily || theme.headingFamily }}>
                     {String(v).padStart(2, '0')}
                   </div>
                   <span className="text-[9px] tracking-[0.18em] font-bold" style={{ color: soft }}>{l}</span>
@@ -296,7 +318,7 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
                 href={cta.href}
                 onClick={() => confetti({ particleCount: 60, spread: 70, origin: { y: 0.7 } })}
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 font-bold text-base scale-on-click transition-all"
-                style={{ background: theme.primary, color: theme.onPrimary, borderRadius: theme.buttonRadius, boxShadow: `0 0 28px ${alpha(theme.primary, 0.35)}`, fontFamily: theme.headingFamily }}
+                style={{ background: key, color: onKey, borderRadius: theme.buttonRadius, boxShadow: `0 0 28px ${alpha(key, 0.35)}`, fontFamily: theme.headingFamily }}
               >
                 <Sparkles className="w-5 h-5" />
                 {cta.label}
@@ -307,15 +329,26 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
               <button
                 type="button"
                 onClick={onLearnMore}
-                className={`inline-flex items-center justify-center gap-2 px-6 py-4 border font-bold text-sm transition-all scale-on-click backdrop-blur ${onImage ? 'border-white/25 text-white hover:bg-white/10' : ''}`}
-                style={{ borderRadius: theme.buttonRadius, ...(onImage ? {} : { borderColor: theme.border, color: theme.text }) }}
+                className={`inline-flex items-center justify-center gap-2 px-6 py-4 border font-bold text-sm transition-all scale-on-click backdrop-blur ${onDark ? 'border-white/25 text-white hover:bg-white/10' : ''}`}
+                style={{ borderRadius: theme.buttonRadius, ...(onDark ? {} : { borderColor: theme.border, color: theme.text }) }}
               >
                 {b.secondaryLabel} <ChevronDown className="w-4 h-4" />
               </button>
             )}
           </div>
-          {b.note && <p className="text-xs tracking-wide" style={{ color: onImage ? 'rgba(255,255,255,0.5)' : theme.subtle }}>{b.note}</p>}
+          {b.note && <p className="text-xs tracking-wide" style={{ color: onDark ? 'rgba(255,255,255,0.6)' : theme.subtle }}>{b.note}</p>}
         </div>
+        {split && image && (
+          <figure className="shrink-0 w-full max-w-[22rem] mx-auto @3xl:mx-0 @3xl:w-[36%] @3xl:max-w-none">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={image}
+              alt=""
+              className="w-full object-cover"
+              style={{ aspectRatio: '3 / 4', borderRadius: 28, border: `3px solid ${alpha(theme.accent, 0.85)}`, boxShadow: `0 0 0 8px ${alpha(theme.accent, 0.16)}, 0 30px 70px rgba(0,0,0,0.45)` }}
+            />
+          </figure>
+        )}
       </div>
     </section>
   );
@@ -349,17 +382,75 @@ function ImageSection({ refId, caption, theme }: { refId: string; caption: strin
   );
 }
 
-function CountdownBand({ label, info, theme }: { label: string; info: EventInfo; theme: ResolvedTheme }) {
-  const t = useCountdown(info.startDate, info.startTime);
+function ProgramCard({ it, p }: { it: ProgramItem; p: RendererProps }) {
+  const { theme, slug } = p;
+  const image = useAssetUrl(it.imageUrl);
+  const heading: CSSProperties = { fontFamily: theme.headingFamily, letterSpacing: theme.space.headingTracking };
+  // An event with several forms passes the open ones; a form that is missing from them is closed.
+  const open = !p.forms || p.forms.some((f) => f.id === it.formId);
+  const href = p.forms?.find((f) => f.id === it.formId)?.href ?? formPath(slug, it.formId);
+  const onAccent = luminance(theme.accent) > 0.4 ? '#14110A' : '#FFFFFF';
+  return (
+    <article className="flex flex-col overflow-hidden min-w-0" style={{ ...theme.cardStyle, padding: 0 }}>
+      <div className="relative overflow-hidden" style={{ aspectRatio: '16 / 10', background: theme.surface }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {image && <img src={image} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />}
+        {it.date && (
+          <span className="absolute top-3 left-3 px-3 py-1 rounded-full text-[11px] font-black tracking-wide" style={{ background: theme.accent, color: onAccent }}>
+            {it.date}
+          </span>
+        )}
+        {it.badge && (
+          <span className="absolute top-3 right-3 px-3 py-1 rounded-full text-[11px] font-bold backdrop-blur" style={{ background: 'rgba(0,0,0,0.6)', color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.25)' }}>
+            {it.badge}
+          </span>
+        )}
+      </div>
+      <div className="flex flex-col flex-1 gap-3" style={{ padding: theme.space.card }}>
+        {it.tag && <p className="text-[10px] font-bold uppercase tracking-[0.18em] leading-relaxed" style={{ color: theme.primaryText }}>{it.tag}</p>}
+        <h3 className="font-black text-xl leading-tight" style={heading}>{it.title}</h3>
+        {it.body && <p className="text-sm leading-relaxed" style={{ color: theme.muted }}>{it.body}</p>}
+        {it.meta.length > 0 && (
+          <dl className="grid grid-cols-2 gap-x-3 gap-y-2.5 pt-3 mt-1" style={{ borderTop: `1px solid ${theme.border}` }}>
+            {it.meta.map((m) => (
+              <div key={m.id} className="min-w-0">
+                <dt className="text-[9px] font-mono uppercase tracking-wider" style={{ color: theme.subtle, fontFamily: theme.monoFamily || undefined }}>{m.label}</dt>
+                <dd className="text-xs font-semibold leading-snug" style={{ ...heading, color: m.color || undefined }}>{m.value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+        {it.buttonLabel && (
+          <div className="mt-auto pt-3">
+            {open ? (
+              <Link
+                href={href}
+                className="flex items-center justify-center gap-2 w-full px-5 py-3 font-bold text-sm scale-on-click transition-all"
+                style={{ background: theme.primary, color: theme.onPrimary, borderRadius: theme.buttonRadius, ...heading }}
+              >
+                {it.buttonLabel} <ArrowRight className="w-4 h-4" />
+              </Link>
+            ) : (
+              <p className="text-center text-xs font-bold px-5 py-3" style={{ background: theme.surface, color: theme.subtle, borderRadius: theme.buttonRadius }}>Registration is closed</p>
+            )}
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function CountdownBand({ label, until, info, theme }: { label: string; until?: string; info: EventInfo; theme: ResolvedTheme }) {
+  const t = useCountdown(until || info.startDate, until ? '23:59' : info.startTime);
   return (
     <section style={{ background: theme.card, borderTop: `1px solid ${theme.border}`, borderBottom: `1px solid ${theme.border}`, padding: `${theme.space.stack * 1.6}px 24px` }}>
       <div className="max-w-2xl mx-auto flex flex-col items-center gap-4">
-        {label && <p className="text-xs font-mono uppercase tracking-widest" style={{ color: theme.subtle }}>{label}</p>}
+        {label && <p className="text-xs font-mono uppercase tracking-widest" style={{ color: theme.subtle, fontFamily: theme.monoFamily || undefined }}>{label}</p>}
         <div className="flex items-center gap-4 @sm:gap-8">
           {[{ v: t.d, l: 'Days' }, { v: t.h, l: 'Hours' }, { v: t.m, l: 'Min' }, { v: t.s, l: 'Sec' }].map(({ v, l }) => (
             <div key={l} className="flex flex-col items-center gap-1">
-              <span className="text-4xl @sm:text-5xl font-bold tabular-nums" style={{ fontFamily: theme.headingFamily, color: theme.primaryText }}>{String(v).padStart(2, '0')}</span>
-              <span className="text-[10px] font-mono uppercase tracking-widest" style={{ color: theme.subtle }}>{l}</span>
+              <span className="text-4xl @sm:text-5xl font-bold tabular-nums" style={{ fontFamily: theme.monoFamily || theme.headingFamily, color: theme.primaryText }}>{String(v).padStart(2, '0')}</span>
+              <span className="text-[10px] font-mono uppercase tracking-widest" style={{ color: theme.subtle, fontFamily: theme.monoFamily || undefined }}>{l}</span>
             </div>
           ))}
         </div>
@@ -388,7 +479,7 @@ export function LandingRenderer(p: RendererProps) {
       case 'hero':
         return <HeroSection b={b} p={p} onLearnMore={() => learnMore(b.id)} />;
       case 'countdown':
-        return <CountdownBand label={b.label} info={info} theme={theme} />;
+        return <CountdownBand label={b.label} until={b.until} info={info} theme={theme} />;
       case 'details': {
         const items = [
           b.showDate && { icon: Calendar, label: 'Date', val: shortDate(info.startDate) },
@@ -402,7 +493,7 @@ export function LandingRenderer(p: RendererProps) {
               {items.map(({ icon: Icon, label, val }) => (
                 <div key={label} className="flex flex-col gap-2 min-w-0" style={{ ...theme.cardStyle, padding: theme.space.card * 0.85 }}>
                   <Icon className="w-5 h-5" style={{ color: theme.primaryText }} />
-                  <div className="text-[10px] font-mono uppercase tracking-wider" style={{ color: theme.subtle }}>{label}</div>
+                  <div className="text-[10px] font-mono uppercase tracking-wider" style={{ color: theme.subtle, fontFamily: theme.monoFamily || undefined }}>{label}</div>
                   <div className="text-sm font-semibold leading-snug break-words" style={heading}>{val}</div>
                 </div>
               ))}
@@ -422,7 +513,7 @@ export function LandingRenderer(p: RendererProps) {
       case 'features':
         return (
           <div style={{ ...column, padding: pad }}>
-            <SectionHead label={b.label} heading={b.heading} theme={theme} />
+            <SectionHead label={b.label} heading={b.heading} intro={b.intro} theme={theme} />
             {b.layout === 'list' ? (
               <div style={{ ...theme.cardStyle, padding: theme.space.card * 1.4 }}>
                 {b.items.map((it, i) => (
@@ -442,7 +533,7 @@ export function LandingRenderer(p: RendererProps) {
                   <div key={it.id} className="flex gap-4" style={{ ...theme.cardStyle, padding: theme.space.card }}>
                     <Diamond color={it.color || theme.primary} />
                     <div className="min-w-0">
-                      {it.subtitle && <span className="text-xs font-mono font-bold" style={{ color: it.color || theme.primaryText }}>{it.subtitle}</span>}
+                      {it.subtitle && <span className="text-xs font-mono font-bold" style={{ color: it.color || theme.primaryText, fontFamily: theme.monoFamily || undefined }}>{it.subtitle}</span>}
                       <h3 className="font-bold text-sm" style={heading}>{it.title}</h3>
                       {it.body && <p className="text-xs mt-1 leading-relaxed" style={{ color: theme.muted }}>{it.body}</p>}
                     </div>
@@ -503,7 +594,7 @@ export function LandingRenderer(p: RendererProps) {
               <div className="grid grid-cols-1 @lg:grid-cols-3" style={{ gap: theme.space.gap }}>
                 {b.items.map((it) => (
                   <div key={it.id}>
-                    <div className="text-[10px] font-mono uppercase tracking-wider mb-1" style={{ color: theme.subtle }}>{it.label}</div>
+                    <div className="text-[10px] font-mono uppercase tracking-wider mb-1" style={{ color: theme.subtle, fontFamily: theme.monoFamily || undefined }}>{it.label}</div>
                     <div className="text-sm font-semibold" style={{ ...heading, color: it.color || undefined }}>{it.value}</div>
                   </div>
                 ))}
@@ -516,7 +607,7 @@ export function LandingRenderer(p: RendererProps) {
           <div style={{ ...column, padding: pad }}>
             <div style={{ ...theme.cardStyle, padding: theme.space.card * 1.3 }}>
               {b.label && (
-                <span className="inline-block px-4 py-1.5 mb-4 text-xs font-bold uppercase tracking-widest" style={{ border: `1.5px solid ${theme.primary}`, borderRadius: 7, fontFamily: theme.accentFamily }}>
+                <span className={`inline-block px-4 py-1.5 mb-4 ${theme.accentFamily !== theme.headingFamily ? 'text-lg' : 'text-xs font-bold uppercase tracking-widest'}`} style={{ border: `1.5px solid ${theme.primary}`, borderRadius: 7, fontFamily: theme.accentFamily }}>
                   {b.label}
                 </span>
               )}
@@ -567,6 +658,32 @@ export function LandingRenderer(p: RendererProps) {
             </div>
           </div>
         );
+      case 'programs':
+        return (
+          <div style={{ ...column, padding: pad }}>
+            <SectionHead label={b.label} heading={b.heading} intro={b.intro} theme={theme} center />
+            <div className={`grid grid-cols-1 ${b.items.length >= 3 ? '@3xl:grid-cols-3' : b.items.length === 2 ? '@2xl:grid-cols-2' : 'max-w-md mx-auto w-full'}`} style={{ gap: theme.space.gap }}>
+              {b.items.map((it) => <ProgramCard key={it.id} it={it} p={p} />)}
+            </div>
+          </div>
+        );
+      case 'faq':
+        return (
+          <div style={{ ...column, padding: pad }}>
+            <SectionHead label={b.label} heading={b.heading} theme={theme} center />
+            <div className="max-w-3xl mx-auto flex flex-col" style={{ gap: theme.space.gap * 0.6 }}>
+              {b.items.map((it) => (
+                <details key={it.id} className="group" style={{ ...theme.cardStyle, padding: 0 }}>
+                  <summary className="flex items-center justify-between gap-4 cursor-pointer list-none px-5 py-4 font-bold text-[15px] [&::-webkit-details-marker]:hidden" style={heading}>
+                    <span className="min-w-0">{it.question}</span>
+                    <ChevronDown className="w-5 h-5 shrink-0 transition-transform group-open:rotate-180" style={{ color: theme.primaryText }} />
+                  </summary>
+                  <p className="px-5 pb-5 text-sm leading-relaxed whitespace-pre-line" style={{ color: theme.muted }}>{it.answer}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        );
       case 'image':
         return (
           <div style={b.fullWidth ? { padding: `${theme.space.section / 2}px 0` } : { ...column, padding: pad }}>
@@ -576,7 +693,7 @@ export function LandingRenderer(p: RendererProps) {
       case 'cta':
         return (
           <div className="text-center" style={{ ...column, padding: `${theme.space.section * 0.75}px 24px` }}>
-            {b.label && <p className="text-[11px] font-bold uppercase tracking-[0.3em] mb-3" style={{ color: theme.primaryText, fontFamily: theme.accentFamily }}>{b.label}</p>}
+            {b.label && <p className={`${labelLook(theme, theme.primaryText).className} mb-3`} style={labelLook(theme, theme.primaryText).style}>{b.label}</p>}
             {b.heading && <h2 className="font-bold mb-4" style={{ ...heading, fontSize: 'clamp(26px, 5cqw, 44px)' }}>{b.heading}</h2>}
             {b.body && <p className="max-w-md mx-auto mb-8" style={{ color: theme.muted }}>{b.body}</p>}
             {b.ctaLabel && (

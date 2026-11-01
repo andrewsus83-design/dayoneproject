@@ -3,19 +3,21 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
   ArrowDown, ArrowUp, Check, Copy, Eye, EyeOff, ExternalLink, GripVertical, Image as ImageIcon, LayoutTemplate,
-  Monitor, Plus, RotateCcw, Smartphone, Sparkles, Star, Trash2, Upload, X,
+  FileCode, Monitor, Plus, RotateCcw, Smartphone, Sparkles, Star, Trash2, Upload, X,
 } from 'lucide-react';
 import {
-  deleteAsset, landingFormButtons, resetEventSection, saveAsset, useAssetUrl, useEventConfig, type LandingConfig, type Testimony,
+  deleteAsset, formLabel, formPath, landingFormButtons, listForms, readAsset, resetEventSection, saveAsset, useAssetUrl, useEventConfig, type LandingConfig, type Testimony,
 } from '@/lib/eventStore';
+import { frameDocument, inlineTextFiles, MAX_PAGE_BYTES, missingFiles } from '@/lib/customHtml';
 import { BASE_EVENTS } from '@/lib/events';
 import {
   BLOCK_CATALOG, blockId, blockTitle, createBlock,
-  type BlockType, type CtaTarget, type LandingBlock, type LandingListItem, type LandingPair,
+  type BlockType, type CtaTarget, type FaqItem, type LandingBlock, type LandingListItem, type LandingPair, type ProgramItem,
 } from '@/lib/landingBlocks';
 import { resolveTheme } from '@/lib/eventTheme';
 import { compressImage } from '@/lib/image';
 import { LandingRenderer } from '@/components/events/landing/LandingRenderer';
+import { CustomHtmlFrame } from '@/components/events/landing/CustomHtmlFrame';
 import { EventFonts } from '@/components/events/EventFonts';
 
 const AI_HEROES = BASE_EVENTS.map((e) => ({ id: e.id, label: e.name.split(':')[0], url: e.cover_image_url ?? '' })).filter((h) => h.url);
@@ -199,7 +201,7 @@ function ListEditor<T extends { id: string }>({
 
 /* ───────── Block inspector ───────── */
 
-function BlockEditor({ block, set, isWedding, onError }: { block: LandingBlock; set: (patch: Partial<LandingBlock>) => void; isWedding: boolean; onError: (m: string) => void }) {
+function BlockEditor({ block, set, isWedding, forms, onError }: { block: LandingBlock; set: (patch: Partial<LandingBlock>) => void; isWedding: boolean; forms: { id: string; name: string }[]; onError: (m: string) => void }) {
   const galleryRef = useRef<HTMLInputElement>(null);
   const { busy, upload } = useUploader(onError);
   const p = set as (patch: Record<string, unknown>) => void;
@@ -213,7 +215,7 @@ function BlockEditor({ block, set, isWedding, onError }: { block: LandingBlock; 
             label="Text position"
             value={block.placement ?? 'inside'}
             onChange={(v) => p({ placement: v })}
-            options={[{ id: 'inside', label: 'On the image' }, { id: 'outside', label: 'Below the image' }, { id: 'card', label: 'Card over the image' }]}
+            options={[{ id: 'inside', label: 'On the image' }, { id: 'outside', label: 'Below the image' }, { id: 'card', label: 'Card over the image' }, { id: 'split', label: 'Beside the image' }]}
           />
           <ImagePicker label="Background image" value={block.imageUrl} onChange={(r) => p({ imageUrl: r })} onError={onError} allowAi fallbackLabel="Use event cover" />
           <Switch label="Dark gradient overlay" on={block.overlay} onClick={() => p({ overlay: !block.overlay })} />
@@ -233,7 +235,16 @@ function BlockEditor({ block, set, isWedding, onError }: { block: LandingBlock; 
         </div>
       );
     case 'countdown':
-      return <Text label="Label" value={block.label} onChange={(v) => p({ label: v })} />;
+      return (
+        <div className="space-y-3">
+          <Text label="Label" value={block.label} onChange={(v) => p({ label: v })} />
+          <div>
+            <Label>Count down to (empty = event start)</Label>
+            <input type="date" value={block.until ?? ''} onChange={(e) => p({ until: e.target.value })} className={input} />
+            <p className="text-[10px] text-zinc-600 pt-1">A deadline such as an early-bird day. It counts to the end of that day.</p>
+          </div>
+        </div>
+      );
     case 'details':
       return (
         <div className="space-y-1">
@@ -259,6 +270,7 @@ function BlockEditor({ block, set, isWedding, onError }: { block: LandingBlock; 
         <div className="space-y-3">
           <Text label="Small label" value={block.label} onChange={(v) => p({ label: v })} />
           <Text label="Heading" value={block.heading} onChange={(v) => p({ heading: v })} />
+          <Text label="Short intro under the heading" value={block.intro ?? ''} onChange={(v) => p({ intro: v })} area />
           <Segmented label="Layout" value={block.layout} onChange={(v) => p({ layout: v })} options={[{ id: 'grid', label: 'Grid of cards' }, { id: 'list', label: 'List in one card' }]} />
           <ListEditor<LandingListItem>
             items={block.items}
@@ -423,6 +435,70 @@ function BlockEditor({ block, set, isWedding, onError }: { block: LandingBlock; 
           <Switch label='"Get directions" button' on={block.showDirections} onClick={() => p({ showDirections: !block.showDirections })} />
         </div>
       );
+    case 'programs':
+      return (
+        <div className="space-y-3">
+          <Text label="Small label" value={block.label} onChange={(v) => p({ label: v })} />
+          <Text label="Heading" value={block.heading} onChange={(v) => p({ heading: v })} />
+          <Text label="Short intro" value={block.intro} onChange={(v) => p({ intro: v })} area />
+          <ListEditor<ProgramItem>
+            items={block.items}
+            onChange={(items) => p({ items })}
+            addLabel="Add program"
+            make={() => ({ id: blockId('p'), imageUrl: '', badge: '', date: '', tag: '', title: 'New program', body: '', meta: [], formId: forms[0]?.id ?? '', buttonLabel: 'Register' })}
+            render={(it, s) => (
+              <>
+                <ImagePicker label="Picture" value={it.imageUrl} onChange={(r) => s({ imageUrl: r })} onError={onError} allowAi />
+                <div className="grid grid-cols-2 gap-2">
+                  <input value={it.date} onChange={(e) => s({ date: e.target.value })} placeholder="Day chip, e.g. 13 Dec" className={input} />
+                  <input value={it.badge} onChange={(e) => s({ badge: e.target.value })} placeholder="Badge, e.g. Kids" className={input} />
+                </div>
+                <input value={it.tag} onChange={(e) => s({ tag: e.target.value })} placeholder="Small line above the title" className={input} />
+                <input value={it.title} onChange={(e) => s({ title: e.target.value })} placeholder="Title" className={input} />
+                <textarea rows={3} value={it.body} onChange={(e) => s({ body: e.target.value })} placeholder="Description" className={`${input} resize-y`} />
+                <Label>Details</Label>
+                <ListEditor<LandingPair>
+                  items={it.meta}
+                  onChange={(meta) => s({ meta })}
+                  addLabel="Add detail"
+                  make={() => ({ id: blockId('m'), label: 'Time', value: '', color: '' })}
+                  render={(m, ms) => (
+                    <div className="flex gap-2">
+                      <input value={m.label} onChange={(e) => ms({ label: e.target.value })} placeholder="Label" className={`${input} w-24`} />
+                      <input value={m.value} onChange={(e) => ms({ value: e.target.value })} placeholder="Value" className={input} />
+                    </div>
+                  )}
+                />
+                <Label>Button opens this form</Label>
+                <select value={it.formId} onChange={(e) => s({ formId: e.target.value })} className={input}>
+                  {forms.map((f) => <option key={f.id || 'first'} value={f.id}>{f.name}</option>)}
+                  {!forms.some((f) => f.id === it.formId) && <option value={it.formId}>Removed form</option>}
+                </select>
+                <input value={it.buttonLabel} onChange={(e) => s({ buttonLabel: e.target.value })} placeholder="Button label — empty hides it" className={input} />
+              </>
+            )}
+          />
+        </div>
+      );
+    case 'faq':
+      return (
+        <div className="space-y-3">
+          <Text label="Small label" value={block.label} onChange={(v) => p({ label: v })} />
+          <Text label="Heading" value={block.heading} onChange={(v) => p({ heading: v })} />
+          <ListEditor<FaqItem>
+            items={block.items}
+            onChange={(items) => p({ items })}
+            addLabel="Add question"
+            make={() => ({ id: blockId('q'), question: 'New question?', answer: '' })}
+            render={(it, s) => (
+              <>
+                <input value={it.question} onChange={(e) => s({ question: e.target.value })} placeholder="Question" className={input} />
+                <textarea rows={3} value={it.answer} onChange={(e) => s({ answer: e.target.value })} placeholder="Answer" className={`${input} resize-y`} />
+              </>
+            )}
+          />
+        </div>
+      );
     case 'image':
       return (
         <div className="space-y-3">
@@ -444,6 +520,143 @@ function BlockEditor({ block, set, isWedding, onError }: { block: LandingBlock; 
   }
 }
 
+/* ───────── Custom HTML page ───────── */
+
+function CustomHtmlEditor({ landing, setLanding, forms, slug, onError }: {
+  landing: LandingConfig;
+  setLanding: (patch: Partial<LandingConfig>) => void;
+  forms: { id: string; name: string }[];
+  slug: string;
+  onError: (m: string) => void;
+}) {
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState('');
+  const files = useMemo(() => landing.htmlFiles ?? [], [landing.htmlFiles]);
+  const missing = useMemo(() => (landing.html ? missingFiles(landing.html, files) : []), [landing.html, files]);
+
+  const pick = async (list: FileList | null) => {
+    const picked = Array.from(list ?? []);
+    if (!picked.length) return;
+    setBusy(true);
+    try {
+      const page = picked.find((f) => /\.html?$/i.test(f.name));
+      let html = landing.html ?? '';
+      if (page) {
+        const texts = new Map<string, string>();
+        for (const f of picked) if (/\.(css|js)$/i.test(f.name)) texts.set(f.name.toLowerCase(), await f.text());
+        html = inlineTextFiles(await page.text(), texts);
+      }
+      if (!html) return onError('Choose your .html file. You can pick its pictures, .css and .js files together with it.');
+      if (new Blob([html]).size > MAX_PAGE_BYTES) {
+        return onError(`That page is over ${MAX_PAGE_BYTES / 1_000_000} MB once its CSS and scripts are inside. Host big pictures or videos elsewhere and use their web address.`);
+      }
+      let next = [...files];
+      for (const f of picked.filter((x) => x.type.startsWith('image/'))) {
+        const saved = saveAsset(await compressImage(f, 1800, 0.82));
+        if (!saved.ok || !saved.ref) {
+          onError(saved.error ?? 'Could not save a picture.');
+          break;
+        }
+        const old = next.find((x) => x.name.toLowerCase() === f.name.toLowerCase());
+        if (old) deleteAsset(old.url);
+        next = [...next.filter((x) => x !== old), { id: blockId('f'), name: f.name, url: saved.ref }];
+      }
+      setLanding({ mode: 'html', html, htmlName: page?.name ?? landing.htmlName ?? 'page.html', htmlRev: Date.now().toString(36), htmlFiles: next });
+    } catch (e) {
+      onError(e instanceof Error ? e.message : 'Upload failed.');
+    } finally {
+      setBusy(false);
+      if (fileInput.current) fileInput.current.value = '';
+    }
+  };
+
+  const removePage = () => {
+    if (!confirm('Remove the uploaded page and its pictures? The landing page goes back to the sections.')) return;
+    files.forEach((f) => deleteAsset(f.url));
+    setLanding({ mode: 'blocks', html: '', htmlName: '', htmlFiles: [] });
+  };
+  const removeFile = (id: string) => {
+    const f = files.find((x) => x.id === id);
+    if (f) deleteAsset(f.url);
+    setLanding({ htmlFiles: files.filter((x) => x.id !== id), htmlRev: Date.now().toString(36) });
+  };
+  const copy = (path: string) => {
+    navigator.clipboard?.writeText(`${window.location.origin}${path}`).catch(() => {});
+    setCopied(path);
+    setTimeout(() => setCopied(''), 1800);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="p-4 rounded-2xl bg-premium-charcoal border border-premium-borderDark space-y-3">
+        <input ref={fileInput} type="file" multiple accept=".html,.htm,.css,.js,image/*" className="hidden" onChange={(e) => pick(e.target.files)} />
+        {landing.html ? (
+          <div className="flex items-center gap-3">
+            <FileCode className="w-5 h-5 text-premium-gold shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-white truncate">{landing.htmlName || 'page.html'}</p>
+              <p className="text-[10px] text-zinc-500">{Math.round(new Blob([landing.html]).size / 1000)} KB · {files.length} {files.length === 1 ? 'picture' : 'pictures'}</p>
+            </div>
+            <button type="button" onClick={() => fileInput.current?.click()} className="px-3 py-1.5 rounded-lg bg-premium-gold text-black text-[11px] font-bold scale-on-click flex items-center gap-1.5">
+              <Upload className="w-3.5 h-3.5" /> {busy ? 'Working…' : 'Replace or add files'}
+            </button>
+            <button type="button" onClick={removePage} className="text-zinc-600 hover:text-premium-danger scale-on-click" aria-label="Remove the uploaded page"><Trash2 className="w-4 h-4" /></button>
+          </div>
+        ) : (
+          <button type="button" onClick={() => fileInput.current?.click()} className="w-full py-8 rounded-2xl border-2 border-dashed border-premium-borderDark hover:border-premium-gold/50 text-center scale-on-click">
+            <FileCode className="w-6 h-6 text-premium-gold mx-auto mb-2" />
+            <span className="block text-xs font-bold text-white">{busy ? 'Working…' : 'Choose your .html file'}</span>
+            <span className="block text-[10px] text-zinc-500 mt-1">Select the page together with its pictures (and its .css and .js files, if it has them) in one go.</span>
+          </button>
+        )}
+        <p className="text-[10px] text-zinc-500 leading-relaxed">
+          Your page replaces the sections and fills the screen, so it brings its own header, buttons and footer. It runs in a safe frame: its scripts work, but it cannot reach this app or its sign-in.
+          Press Save to publish it.
+        </p>
+      </div>
+
+      {missing.length > 0 && (
+        <div className="p-3 rounded-xl bg-premium-gold/10 border border-premium-gold/40 text-[11px] text-premium-gold space-y-1">
+          <p className="font-bold">The page points at files that are not uploaded yet:</p>
+          <p className="font-mono break-all">{missing.join(' · ')}</p>
+          <p className="text-zinc-400">Pick them together with the page (or use full web addresses starting with https://).</p>
+        </div>
+      )}
+
+      {files.length > 0 && (
+        <div className="p-4 rounded-2xl bg-premium-charcoal border border-premium-borderDark space-y-2">
+          <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Pictures</p>
+          {files.map((f) => (
+            <div key={f.id} className="flex items-center gap-3">
+              <AssetThumb refId={f.url} className="w-14 h-10 rounded-lg border border-premium-borderDark shrink-0" />
+              <span className="flex-1 min-w-0 text-xs text-white truncate font-mono">{f.name}</span>
+              <button type="button" onClick={() => removeFile(f.id)} className="text-zinc-600 hover:text-premium-danger scale-on-click" aria-label={`Remove ${f.name}`}><Trash2 className="w-3.5 h-3.5" /></button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="p-4 rounded-2xl bg-premium-charcoal border border-premium-borderDark space-y-2">
+        <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Links to use in your page</p>
+        <p className="text-[10px] text-zinc-500">Point your buttons at these. Plain addresses work: <span className="font-mono">/events/{slug}/invitation</span>.</p>
+        {forms.map((f) => {
+          const path = formPath(slug, f.id);
+          return (
+            <div key={f.id || 'first'} className="flex items-center gap-3">
+              <span className="text-xs font-bold text-white w-40 truncate">{f.name}</span>
+              <span className="flex-1 min-w-0 text-[11px] text-zinc-400 truncate font-mono">{path}</span>
+              <button type="button" onClick={() => copy(path)} className="px-2.5 py-1 rounded-lg bg-premium-surfaceDark border border-premium-borderDark text-[10px] font-bold text-white scale-on-click flex items-center gap-1">
+                {copied === path ? <Check className="w-3 h-3 text-premium-success" /> : <Copy className="w-3 h-3" />} {copied === path ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ───────── Main builder ───────── */
 
 export function LandingPageBuilder({ eventId }: { eventId: string }) {
@@ -453,6 +666,10 @@ export function LandingPageBuilder({ eventId }: { eventId: string }) {
   const theme = useMemo(() => resolveTheme(config.design), [config.design]);
   // Several invitation forms: the preview shows one button per open form, like the live page.
   const formButtons = useMemo(() => landingFormButtons(config, config.info.slug), [config]);
+  const formChoices = useMemo(() => listForms(config).map((f) => ({ id: f.id, name: formLabel(f) })), [config]);
+
+  const htmlMode = landing.mode === 'html';
+  const previewDoc = useMemo(() => (landing.html ? frameDocument(landing.html, landing.htmlFiles ?? [], readAsset) : ''), [landing.html, landing.htmlFiles]);
 
   const [selected, setSelected] = useState<string | null>(landing.blocks[0]?.id ?? null);
   const [showCatalog, setShowCatalog] = useState(false);
@@ -517,7 +734,7 @@ export function LandingPageBuilder({ eventId }: { eventId: string }) {
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <p className="text-xs text-zinc-400">
             <LayoutTemplate className="w-3.5 h-3.5 inline mr-1 text-premium-gold" />
-            {landing.blocks.length} blocks · click one to edit, drag to reorder
+            {htmlMode ? 'Custom HTML page' : `${landing.blocks.length} blocks · click one to edit, drag to reorder`}
           </p>
           <div className="flex items-center gap-3 text-[11px] font-mono">
             {savedAt && (
@@ -535,6 +752,17 @@ export function LandingPageBuilder({ eventId }: { eventId: string }) {
           </div>
         )}
 
+        <Segmented<'blocks' | 'html'>
+          label="Page type"
+          value={htmlMode ? 'html' : 'blocks'}
+          onChange={(v) => setLanding({ mode: v })}
+          options={[{ id: 'blocks', label: 'Sections builder' }, { id: 'html', label: 'Custom HTML file' }]}
+        />
+
+        {htmlMode ? (
+          <CustomHtmlEditor landing={landing} setLanding={setLanding} forms={formChoices} slug={info.slug} onError={setError} />
+        ) : (
+        <>
         <div className="space-y-2">
           {landing.blocks.map((b, idx) => {
             const open = selected === b.id;
@@ -565,7 +793,7 @@ export function LandingPageBuilder({ eventId }: { eventId: string }) {
                 </div>
                 {open && (
                   <div className="px-4 pb-4 pt-2 border-t border-premium-borderDark/60">
-                    <BlockEditor block={b} set={(patch) => patchBlock(b.id, patch)} isWedding={isWedding} onError={setError} />
+                    <BlockEditor block={b} set={(patch) => patchBlock(b.id, patch)} isWedding={isWedding} forms={formChoices} onError={setError} />
                   </div>
                 )}
               </div>
@@ -599,18 +827,20 @@ export function LandingPageBuilder({ eventId }: { eventId: string }) {
             <input value={landing.footerText} onChange={(e) => setLanding({ footerText: e.target.value })} placeholder="Small print (optional)" className={input} />
           </div>
         </div>
+        </>
+        )}
 
         <div className="flex items-center gap-2 flex-wrap">
           <a href={`/events/${info.slug}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black text-sm font-bold scale-on-click shadow-gold">
             <ExternalLink className="w-4 h-4" /> Open live landing page
           </a>
-          <button
+          {!htmlMode && <button
             type="button"
             onClick={() => { if (confirm('Reset the landing page to its default blocks? Uploaded photos stay in the library until removed.')) { report(resetEventSection(eventId, 'landing')); setSelected(null); } }}
             className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-zinc-500 hover:text-white text-xs font-bold scale-on-click"
           >
             <RotateCcw className="w-3.5 h-3.5" /> Reset to default blocks
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -627,6 +857,9 @@ export function LandingPageBuilder({ eventId }: { eventId: string }) {
           style={{ width: frame.w * frame.scale + 12, height: frame.h * frame.scale + 12, borderRadius: device === 'mobile' ? 36 : 14 }}
         >
           <div style={{ width: frame.w, height: frame.h, transform: `scale(${frame.scale})`, transformOrigin: 'top left' }} className="overflow-y-auto overflow-x-hidden">
+            {htmlMode && landing.html ? (
+              <CustomHtmlFrame embedded title="Landing page preview" srcDoc={previewDoc} />
+            ) : (
             <LandingRenderer
               embedded
               slug={info.slug}
@@ -640,9 +873,13 @@ export function LandingPageBuilder({ eventId }: { eventId: string }) {
               selectedId={selected}
               onSelect={(id) => setSelected(id)}
             />
+            )}
           </div>
         </div>
-        <p className="text-[10px] text-zinc-500 flex items-center gap-1"><ImageIcon className="w-3 h-3" /> Click a section in the preview to edit it</p>
+        <p className="text-[10px] text-zinc-500 flex items-center gap-1 max-w-[16rem] text-center">
+          <ImageIcon className="w-3 h-3 shrink-0" />
+          {htmlMode ? 'This preview is stricter than the live page: icon libraries and other outside scripts may not load here.' : 'Click a section in the preview to edit it'}
+        </p>
       </div>
     </div>
   );

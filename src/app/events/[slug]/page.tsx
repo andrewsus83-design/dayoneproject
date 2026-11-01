@@ -5,6 +5,7 @@ import { landingFormButtons, useEventConfigBySlug } from '@/lib/eventStore';
 import { resolveTheme } from '@/lib/eventTheme';
 import { EventFonts } from '@/components/events/EventFonts';
 import { LandingRenderer } from '@/components/events/landing/LandingRenderer';
+import { CustomHtmlFrame } from '@/components/events/landing/CustomHtmlFrame';
 
 function EventLandingContent({ slug }: { slug: string }) {
   const { hydrated, config, event } = useEventConfigBySlug(slug);
@@ -13,6 +14,11 @@ function EventLandingContent({ slug }: { slug: string }) {
 
   if (!hydrated) {
     return <div className="min-h-screen bg-premium-black flex items-center justify-center text-zinc-500 text-sm">Loading event...</div>;
+  }
+
+  // An uploaded page replaces the sections.
+  if (config.landing.mode === 'html' && config.landing.html) {
+    return <CustomHtmlFrame title={config.info.name} src={`/events/${slug}/site?v=${encodeURIComponent(config.landing.htmlRev ?? '')}`} />;
   }
 
   return (
