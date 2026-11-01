@@ -7,9 +7,9 @@ import { deleteOrgEvent } from '@/lib/orgEvents';
 
 /**
  * The event Setting menu's last card: deletes the event for good after the organizer types its name. The database only
- * lets the account owner delete, and only Free events, so Plus events just say who can remove them.
+ * lets the account owner delete; anyone else gets its refusal as a message.
  */
-export function DeleteEventCard({ eventId, eventName, eventPackage }: { eventId: string; eventName: string; eventPackage: string }) {
+export function DeleteEventCard({ eventId, eventName }: { eventId: string; eventName: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState('');
@@ -18,7 +18,6 @@ export function DeleteEventCard({ eventId, eventName, eventPackage }: { eventId:
 
   const name = eventName.trim();
   const matches = typed.trim().toLowerCase() === name.toLowerCase();
-  const isFree = eventPackage === 'free';
 
   const remove = async () => {
     if (!matches || busy) return;
@@ -45,7 +44,7 @@ export function DeleteEventCard({ eventId, eventName, eventPackage }: { eventId:
             messages. Photo wall uploads are removed overnight. This can&apos;t be undone.
           </p>
         </div>
-        {isFree && !open && (
+        {!open && (
           <button
             type="button"
             onClick={() => setOpen(true)}
@@ -56,14 +55,7 @@ export function DeleteEventCard({ eventId, eventName, eventPackage }: { eventId:
         )}
       </div>
 
-      {!isFree && (
-        <p className="text-[11px] text-zinc-400 leading-relaxed">
-          This event is on the <span className="font-bold text-white capitalize">{eventPackage || 'paid'}</span> package, so it
-          can&apos;t be deleted here. Ask your dayoneproject.xyz admin to remove it.
-        </p>
-      )}
-
-      {isFree && open && (
+      {open && (
         <div className="p-4 rounded-2xl bg-premium-surfaceDark border border-premium-danger/40 space-y-3">
           <label htmlFor="delete-event-name" className="block text-xs text-zinc-300 leading-relaxed">
             Type <span className="font-bold text-white">{name}</span> to confirm.

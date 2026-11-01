@@ -117,10 +117,10 @@ export async function setOrgEventStatus(id: string, status: 'draft' | 'published
 
 /**
  * Deletes an event and everything in it (guests, replies, door prizes, games, screens, messages). The database lets
- * only the account owner delete, and only events on the Free package. Photo wall files go with the nightly cleanup.
+ * only the account owner delete. Photo wall files go with the nightly cleanup.
  */
 export async function deleteOrgEvent(id: string): Promise<void> {
-  const ownerOnly = 'Only the account owner can delete this event, and only while it is on the Free package.';
+  const ownerOnly = 'Only the account owner can delete this event.';
   const { data, error } = await createClient().from('a41_events').delete().eq('id', id).select('id');
   if (error) throw new Error(error.code === '42501' ? ownerOnly : readable(error));
   if (!data?.length) throw new Error(ownerOnly);

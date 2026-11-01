@@ -981,7 +981,7 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
               </div>
             </div>
 
-            {isSavedEvent && <DeleteEventCard eventId={eventId} eventName={event.name} eventPackage={savedEvents?.[eventId]?.package ?? ''} />}
+            {isSavedEvent && <DeleteEventCard eventId={eventId} eventName={event.name} />}
           </div>
         )}
 
