@@ -156,7 +156,13 @@ function DoorPrizeArena({ slug, initialId }: { slug: string; initialId?: string 
               <h2 className="text-4xl font-display font-medium text-white mt-1">{draw.prize}</h2>
               {draw.sponsor && <p className="text-xs text-zinc-400 mt-1">Sponsored by {draw.sponsor}</p>}
             </div>
-            {showSettings && <SlotSettings eventId={eventId} drawId={draw.id} className="justify-center" />}
+            {/* Operator controls live behind the gear, so they are not on the display the audience watches. */}
+            {showSettings && (
+              <div className="flex flex-col items-center gap-4">
+                <SlotSettings eventId={eventId} drawId={draw.id} className="justify-center" />
+                <RepeatWinnersToggle eventId={eventId} drawId={draw.id} disabled={spinning} />
+              </div>
+            )}
             <DrawMachine
               key={draw.id}
               eventId={eventId}
@@ -164,7 +170,8 @@ function DoorPrizeArena({ slug, initialId }: { slug: string; initialId?: string 
               size="md"
               trigger={trigger}
               showButton={false}
-              onSpinStart={() => { setSpinning(true); setResult(null); }}
+              // The settings fold away when a draw starts, so they never sit on the screen during the reveal.
+              onSpinStart={() => { setSpinning(true); setResult(null); setShowSettings(false); }}
               onResult={(r) => { setSpinning(false); setResult(r); }}
             />
             <button
@@ -175,7 +182,6 @@ function DoorPrizeArena({ slug, initialId }: { slug: string; initialId?: string 
             >
               {spinning ? <><RefreshCw className="w-5 h-5 animate-spin" /> Drawing…</> : full ? 'All winners drawn' : <><Play className="w-5 h-5 fill-current" /> Draw a winner</>}
             </button>
-            <RepeatWinnersToggle eventId={eventId} drawId={draw.id} disabled={spinning} />
             {server && boardError && <p className="text-xs text-premium-danger">{boardError}</p>}
           </div>
 
