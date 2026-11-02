@@ -115,11 +115,13 @@ function LivePhotoWallContent({ slug }: { slug: string }) {
   return (
     <div className="min-h-screen bg-premium-black text-zinc-100 flex flex-col justify-between overflow-x-hidden relative select-none font-sans">
       <ScreenControls backHref={`/dashboard/events/${eventId}?tab=live`} backLabel="Dashboard" />
-      {/* Background Ambient Glows */}
-      <div className="absolute top-0 left-1/4 w-[700px] h-[700px] bg-premium-neon/10 blur-[180px] pointer-events-none rounded-full" />
-      <div className="absolute bottom-0 right-1/4 w-[700px] h-[700px] bg-premium-gold/10 blur-[180px] pointer-events-none rounded-full" />
+      {/* Background Ambient Glows: gradients, not blurred discs (a blur filter this big is slow on a 4K screen) */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
+        <div className="ambient-glow ambient-glow-neon [--glow-scale:2.1] absolute top-0 left-1/4 w-[700px] h-[700px]" />
+        <div className="ambient-glow ambient-glow-gold [--glow-scale:2.1] absolute bottom-0 right-1/4 w-[700px] h-[700px]" />
+      </div>
 
-      <header className="h-20 px-8 flex items-center justify-between z-20 backdrop-blur-md bg-premium-surfaceDark/80 border-b border-premium-borderDark">
+      <header className="h-20 px-8 flex items-center justify-between z-20 bg-premium-surfaceDark/80 border-b border-premium-borderDark">
         <div className="flex items-center gap-4 min-w-0">
           <BrandMark size={40} />
           <div className="min-w-0">
@@ -160,7 +162,7 @@ function LivePhotoWallContent({ slug }: { slug: string }) {
 
       <main className="flex-1 p-8 max-w-7xl mx-auto w-full z-10 flex flex-col">{body}</main>
 
-      <footer className="h-28 px-8 bg-premium-surfaceDark/95 border-t border-premium-borderDark flex items-center justify-between relative z-20 backdrop-blur-2xl">
+      <footer className="h-28 px-8 bg-premium-surfaceDark/95 border-t border-premium-borderDark flex items-center justify-between relative z-20">
         <div className="flex items-center gap-6 min-w-0">
           <div className="p-2.5 bg-white rounded-2xl shadow-2xl flex-shrink-0 flex items-center justify-center">
             {qrDataUrl ? (
