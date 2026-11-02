@@ -3,6 +3,7 @@
 import React, { Component, Suspense, use, useEffect, useReducer, useState } from 'react';
 import { DESIGN_HEIGHT, FitBox, SourceView, designWidth } from '@/components/screens/ScreenView';
 import { ScreenControls } from '@/components/screens/ScreenControls';
+import { FpsMeter } from '@/components/screens/FpsMeter';
 import { useScreenFeed, type ScreenFeed } from '@/lib/screensApi';
 import { useWakeLock } from '@/lib/useWakeLock';
 import { BrandMark } from '@/components/BrandMark';
@@ -139,6 +140,8 @@ function ScreenOutput({ screenId }: { screenId: string }) {
   const { feed, state } = useScreenFeed(screenId);
   const [air, dispatch] = useReducer(airReducer, START);
   const [started, setStarted] = useState(false);
+  // The frame-rate readout for whoever runs the screen: key D, or ?debug=1 in the address.
+  const [meter, setMeter] = useState(false);
   const wake = useWakeLock(true);
   const { shown, incoming, fading, failed, shownDown } = air;
 
@@ -190,7 +193,13 @@ function ScreenOutput({ screenId }: { screenId: string }) {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (new URLSearchParams(window.location.search).get('debug') === '1') setMeter(true);
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'd' || e.key === 'D') {
+        setMeter((on) => !on);
+        return;
+      }
       if (e.key !== 'f' && e.key !== 'F') return;
       if (document.fullscreenElement) document.exitFullscreen().catch(() => undefined);
       else document.documentElement.requestFullscreen().catch(() => undefined);
@@ -254,6 +263,8 @@ function ScreenOutput({ screenId }: { screenId: string }) {
         </FitBox>
       </div>
 
+      {meter && <FpsMeter source={shown?.source} />}
+
       {!started && feed && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="px-8 py-6 rounded-[2rem] bg-premium-charcoal border border-premium-gold/40 text-center space-y-2 shadow-gold">
@@ -261,7 +272,7 @@ function ScreenOutput({ screenId }: { screenId: string }) {
             <div className="text-xl font-display font-bold text-white">{feed.screen.name}</div>
             <div className="text-xs font-mono text-zinc-400">{width} × {height}</div>
             <div className="text-sm text-premium-gold font-bold pt-2">Click anywhere to start this screen</div>
-            <div className="text-[11px] text-zinc-500">It goes full screen and hides the pointer. Move the pointer to the top edge for Back, Full screen and Close.</div>
+            <div className="text-[11px] text-zinc-500">It goes full screen and hides the pointer. Move the pointer to the top edge for Back, Full screen and Close. Press D for a frame-rate readout.</div>
           </div>
         </div>
       )}
