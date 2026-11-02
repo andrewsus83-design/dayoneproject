@@ -267,8 +267,8 @@ export function GamesScreen({ slug, initialId }: { slug: string; initialId?: str
 
   return (
     <div className="min-h-screen bg-premium-black text-zinc-100 select-none relative overflow-hidden font-sans">
-      <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-premium-neon/10 blur-[150px] pointer-events-none rounded-full" />
-      <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-premium-gold/10 blur-[150px] pointer-events-none rounded-full" />
+      <div className="ambient-glow ambient-glow-neon [--glow-scale:2.3] absolute top-1/4 left-1/4 w-[500px] h-[500px]" />
+      <div className="ambient-glow ambient-glow-gold [--glow-scale:2.3] absolute bottom-1/4 right-1/4 w-[500px] h-[500px]" />
       <StageFrameShell frame={activity.frame} logoRef={config.design.logoUrl} className="min-h-screen">
         <header className="px-8 pt-6 pb-4 z-20 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-4">

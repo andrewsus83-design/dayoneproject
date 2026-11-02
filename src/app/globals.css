@@ -154,6 +154,30 @@ body {
   will-change: transform;
 }
 
+/* The soft coloured glows behind big-screen pages, as a gradient instead of a blurred disc. A blur filter this big
+   (blur-[180px] on an 800 px disc) has to be redone by the graphics card for every pixel of a 4K screen, which is what
+   made full-screen mode stutter while a small window was fine. The gradient is the same shape (a disc that fades out
+   over about two blur radii: the box is scaled up by --glow-scale) and costs nothing. */
+.ambient-glow {
+  border-radius: 9999px;
+  pointer-events: none;
+  transform: scale(var(--glow-scale, 1.9));
+  background: radial-gradient(
+    closest-side,
+    rgb(var(--glow-rgb) / 9.3%) 0%,
+    rgb(var(--glow-rgb) / 8%) 30%,
+    rgb(var(--glow-rgb) / 6%) 45%,
+    rgb(var(--glow-rgb) / 4.5%) 53%,
+    rgb(var(--glow-rgb) / 2.6%) 66%,
+    rgb(var(--glow-rgb) / 1.2%) 79%,
+    rgb(var(--glow-rgb) / 0.45%) 92%,
+    transparent 100%
+  );
+}
+/* The rgb of premium-neon (#00F0FF) and premium-gold (#C5A059). */
+.ambient-glow-neon { --glow-rgb: 0 240 255; }
+.ambient-glow-gold { --glow-rgb: 197 160 89; }
+
 /* Animated multi-colour text used by the event "prism" title style */
 @keyframes ev-prism {
   0% { background-position: 0% 50%; }

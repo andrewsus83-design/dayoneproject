@@ -84,8 +84,8 @@ export function DoorPrizeViewer({ slug, initialId }: { slug: string; initialId?:
 
   return (
     <div className="guest-app min-h-screen bg-premium-black text-zinc-100 font-sans relative overflow-hidden">
-      <div className="absolute top-1/4 left-1/3 w-[600px] h-[600px] bg-premium-gold/10 blur-[160px] pointer-events-none rounded-full" />
-      <div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-premium-neon/10 blur-[160px] pointer-events-none rounded-full" />
+      <div className="ambient-glow ambient-glow-gold [--glow-scale:2.2] absolute top-1/4 left-1/3 w-[600px] h-[600px]" />
+      <div className="ambient-glow ambient-glow-neon [--glow-scale:2.2] absolute bottom-1/4 right-1/4 w-[600px] h-[600px]" />
 
       <header className="relative z-20 px-4 sm:px-8 pt-6 pb-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">

@@ -196,9 +196,11 @@ function StageBigScreenContent({ slug }: { slug: string }) {
       className={`min-h-screen bg-premium-black text-zinc-100 flex flex-col justify-between overflow-x-hidden relative select-none font-sans ${outputMode ? 'cursor-none [&_*]:!cursor-none' : ''}`}
     >
       {!outputMode && <ScreenControls backHref={`/dashboard/events/${eventId}?tab=live`} backLabel="Dashboard" />}
-      {/* Background Stage Ambient Glows */}
-      <div className="absolute top-0 left-1/4 w-[800px] h-[800px] bg-premium-neon/10 blur-[180px] pointer-events-none rounded-full" />
-      <div className="absolute bottom-0 right-1/4 w-[800px] h-[800px] bg-premium-gold/10 blur-[180px] pointer-events-none rounded-full" />
+      {/* Background Stage Ambient Glows: gradients, not blurred discs (a blur filter this big is slow on a 4K screen) */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
+        <div className="ambient-glow ambient-glow-neon absolute top-0 left-1/4 w-[800px] h-[800px]" />
+        <div className="ambient-glow ambient-glow-gold absolute bottom-0 right-1/4 w-[800px] h-[800px]" />
+      </div>
 
       {/* POPVERSE LED Stage Frame — decorative cathedral border overlay for the big screen */}
       {slug === 'popverse' && !bare && (
@@ -212,7 +214,7 @@ function StageBigScreenContent({ slug }: { slug: string }) {
       )}
 
       {/* Top Ballroom Stage Header */}
-      {!bare && <header className="h-20 px-8 sm:px-12 flex items-center justify-between z-20 backdrop-blur-md bg-premium-surfaceDark/80 border-b border-premium-borderDark">
+      {!bare && <header className="h-20 px-8 sm:px-12 flex items-center justify-between z-20 bg-premium-surfaceDark/80 border-b border-premium-borderDark">
         <div className="flex items-center gap-4 min-w-0">
           <BrandMark size={40} />
           <div className="min-w-0">
@@ -473,7 +475,7 @@ function StageBigScreenContent({ slug }: { slug: string }) {
 
       {/* Stage Tech HUD Controller Bar (Hidden with key H) */}
       {hudVisible && (
-        <footer className="h-14 px-8 bg-premium-surfaceDark/90 border-t border-premium-borderDark flex items-center justify-between z-30 backdrop-blur-xl">
+        <footer className="h-14 px-8 bg-premium-surfaceDark/90 border-t border-premium-borderDark flex items-center justify-between z-30">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-mono text-zinc-500 uppercase">HUD [Key: H to toggle]:</span>
             <button
