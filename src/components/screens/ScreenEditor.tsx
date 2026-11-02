@@ -285,8 +285,11 @@ function EditOverlay({ stageRef, dw, items, main, sel, onSelect, begin, liveItem
  * screens until "Push": the draft is only in this browser, and the screens on air keep showing the saved version.
  * Push is possible once the draft has loaded in the preview, like Take in the switcher.
  */
-export function ScreenEditor({ eventId, scene: openedScene, target, event = null, liveOn, logo, startSlide = 0, onPushed, onClose }: {
+export function ScreenEditor({ eventId, slug, wallKey = null, scene: openedScene, target, event = null, liveOn, logo, startSlide = 0, onPushed, onClose }: {
   eventId: string;
+  /** The event's address and photo wall key: a stage module screen shows that module of the event. */
+  slug: string;
+  wallKey?: string | null;
   scene: Scene;
   /** The screen whose shape the preview has, and where Push goes. */
   target: Screen | null;
@@ -325,6 +328,8 @@ export function ScreenEditor({ eventId, scene: openedScene, target, event = null
   const items = draft.layout.items;
   const main = draft.layout.main;
   const frame = sceneFrame(draft.frame);
+  // A stage module draws its own header and ticker (or the screen's look does), so it has no scene frame or footer to edit.
+  const isModule = scene.kind === 'module';
   const steps = sceneSteps({ kind: scene.kind, media: draft.media });
   const slide = Math.min(slideIndex, steps - 1);
   const selItem = sel.startsWith('item:') ? items.find((i) => i.id === sel.slice(5)) : undefined;
@@ -392,7 +397,7 @@ export function ScreenEditor({ eventId, scene: openedScene, target, event = null
     if (selItem) removeItem(selItem.id);
     else if (selection === FRAME) patchFrame({ preset: 'none' });
     else if (selection === FOOTER) patchFrame({ footerOn: false });
-    else setError('The screen’s own picture, video or page cannot be deleted here. Add one with Edit on its source card.');
+    else setError(isModule ? 'The stage module itself cannot be deleted here. Remove this custom version from its source card instead.' : 'The screen’s own picture, video or page cannot be deleted here. Add one with Edit on its source card.');
   };
 
   /** Moves or resizes the selection by a step (keyboard and the + / − buttons). */
@@ -652,7 +657,7 @@ export function ScreenEditor({ eventId, scene: openedScene, target, event = null
           <button type="button" onClick={() => resize(1.15)} className={tool} aria-label="Bigger">Bigger</button>
           <button type="button" onClick={() => patchMain({ x: 0, y: 0, scale: 1 })} disabled={main.x === 0 && main.y === 0 && main.scale === 1} className={tool}><RotateCcw className="w-3.5 h-3.5" /> Reset size and place</button>
         </div>
-        <p className="text-[11px] text-zinc-500 leading-relaxed">Click the picture once to select it, then drag it to move it. Anything that leaves the screen is cut off.</p>
+        <p className="text-[11px] text-zinc-500 leading-relaxed">Click the {isModule ? 'stage' : 'picture'} once to select it, then drag it to move it. Anything that leaves the screen is cut off.</p>
         <div className="space-y-3 pt-3 border-t border-premium-borderDark">
           <span className={lbl}>Effects</span>
           {effectsFor(main, (p, key) => patchMain(p as Partial<MainLayout>, key))}
@@ -662,25 +667,29 @@ export function ScreenEditor({ eventId, scene: openedScene, target, event = null
             </Field>
           )}
           <Slider name="Blur" value={main.blur} min={0} max={24} step={1} format={(v) => `${v}px`} onChange={(blur) => patchMain({ blur }, 'blur')} />
-          {main.blur > 0 && (scene.kind === 'video' || scene.kind === 'web') && (
+          {main.blur > 0 && (scene.kind === 'video' || scene.kind === 'web' || isModule) && (
             <p className="text-[11px] text-premium-gold leading-relaxed">
-              Blur on a {scene.kind === 'video' ? 'video' : 'moving page'} is heavy for the graphics card and can make a big screen stutter, most on 4K. Check it on the real screen, or blur a picture instead.
+              Blur on {scene.kind === 'video' ? 'a video' : isModule ? 'a stage module' : 'a moving page'} is heavy for the graphics card and can make a big screen stutter, most on 4K. Check it on the real screen, or blur a picture instead.
             </p>
           )}
           <Slider name="Darken" value={main.dim} min={0} max={0.8} step={0.05} format={(v) => `${Math.round(v * 100)}%`} onChange={(dim) => patchMain({ dim }, 'dim')} />
         </div>
-        <p className="text-[11px] text-zinc-500 leading-relaxed">The {kindLabel.toLowerCase()} itself cannot be deleted here. To replace it, use Edit on its source card.</p>
+        <p className="text-[11px] text-zinc-500 leading-relaxed">
+          {isModule
+            ? 'The stage module itself cannot be deleted here. To go back to the plain module, remove this custom version from its source card.'
+            : `The ${kindLabel.toLowerCase()} itself cannot be deleted here. To replace it, use Edit on its source card.`}
+        </p>
       </div>
     );
   })();
 
   const rows: { id: string; icon: React.ReactNode; name: string; sub?: string }[] = [
     ...[...items].reverse().map((i) => ({ id: itemSel(i.id), icon: <ItemIcon item={i} />, name: itemLabel(i), sub: i.type === 'text' ? 'Text' : i.type === 'image' ? 'Picture' : 'Logo' })),
-    ...(look.on ? [] : [
+    ...(look.on || isModule ? [] : [
       { id: FOOTER, icon: <PanelBottom className="w-3.5 h-3.5" />, name: 'Footer', sub: frame.footerOn ? frame.footerStyle === 'image' ? 'Own banner' : frame.footerText || 'On' : 'Deleted' },
       { id: FRAME, icon: <FrameIcon className="w-3.5 h-3.5" />, name: 'Frame', sub: frame.preset === 'none' ? 'None' : FRAME_PRESETS.find((p) => p.id === frame.preset)?.label },
     ]),
-    { id: MAIN, icon: <Layers className="w-3.5 h-3.5" />, name: kindLabel, sub: 'The screen itself' },
+    { id: MAIN, icon: <Layers className="w-3.5 h-3.5" />, name: isModule ? scene.title : kindLabel, sub: isModule ? 'The stage module itself' : 'The screen itself' },
   ];
 
   return (
@@ -751,6 +760,8 @@ export function ScreenEditor({ eventId, scene: openedScene, target, event = null
                       playing
                       sound={false}
                       logo={logo}
+                      slug={slug}
+                      wallKey={wallKey}
                       replay={replay}
                       bare={look.on}
                       onReady={onReady}
@@ -832,6 +843,7 @@ export function ScreenEditor({ eventId, scene: openedScene, target, event = null
                 })}
               </div>
               {look.on && <p className="text-[11px] text-zinc-500 leading-relaxed">{target?.name} draws its own header, frame and footer around this screen, so they are not edited here. Change them with the palette button on the screen&apos;s card.</p>}
+              {isModule && !look.on && <p className="text-[11px] text-zinc-500 leading-relaxed">A stage module draws its own header and ticker. To set one header, frame and footer for the whole screen, use the palette button on the screen&apos;s card.</p>}
             </div>
             <div className="pt-3 border-t border-premium-borderDark" data-testid="inspector">
               {inspector}

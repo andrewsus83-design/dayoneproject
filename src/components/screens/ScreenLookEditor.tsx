@@ -4,7 +4,7 @@ import React, { useRef, useState } from 'react';
 import { Check, Loader2, Trash2, X } from 'lucide-react';
 import { FRAME_PRESETS } from '@/components/stage/StageFrameShell';
 import { imageForScreen, removeMediaFiles, saveScreenChrome, uploadMedia, type Screen } from '@/lib/screensApi';
-import { chromeFiles, normalizeChrome, type ChromeFooter, type ScreenChrome } from '@/lib/screenChrome';
+import { STANDARD_CHROME, chromeFiles, normalizeChrome, type ChromeFooter, type ScreenChrome } from '@/lib/screenChrome';
 import { DESIGN_HEIGHT, FitBox, designWidth } from './ScreenView';
 import { ScreenChromeView, type ChromeEvent } from './ScreenChromeView';
 
@@ -26,12 +26,15 @@ const SAMPLE_EVENT: ChromeEvent = { slug: 'your-event', name: 'Your event', logo
  * The header, frame and footer of one live screen, set here once instead of in every stage module, game and custom
  * screen. They stay up while the sources change, and each source leaves out its own. Off, the screen is drawn as before.
  */
-export function ScreenLookEditor({ screen, event, eventId, logo, onSaved, onClose }: {
-  screen: Screen;
+export function ScreenLookEditor({ screen, event, eventId, logo, onSaved, onApply, onClose }: {
+  /** A screen that exists (the look is saved on it), or the name and shape of one being added (the look is handed back). */
+  screen: Pick<Screen, 'name' | 'width' | 'height' | 'chrome'> & { id?: string };
   event: ChromeEvent | null;
   eventId: string;
   logo?: string | null;
-  onSaved: (screen: Screen) => void;
+  onSaved?: (screen: Screen) => void;
+  /** Adding a screen: nothing is saved here; the look goes back to the form and is saved with the screen. */
+  onApply?: (chrome: ScreenChrome) => void;
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState<ScreenChrome>(() => normalizeChrome(screen.chrome));
@@ -74,10 +77,16 @@ export function ScreenLookEditor({ screen, event, eventId, logo, onSaved, onClos
     setBusy('save');
     setError(null);
     try {
-      const saved = await saveScreenChrome(screen, draft);
       const kept = chromeFiles(draft);
+      if (onApply) {
+        await removeMediaFiles(fresh.current.filter((u) => !kept.includes(u)));
+        onApply(draft);
+        return;
+      }
+      if (!screen.id) throw new Error('This screen has not been saved yet.');
+      const saved = await saveScreenChrome({ id: screen.id, chrome: screen.chrome }, draft);
       await removeMediaFiles(fresh.current.filter((u) => !kept.includes(u)));
-      onSaved(saved);
+      onSaved?.(saved);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save. Try again.');
       setBusy(null);
@@ -91,7 +100,7 @@ export function ScreenLookEditor({ screen, event, eventId, logo, onSaved, onClos
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="text-xl font-display font-bold text-white truncate">Header, frame and footer · {screen.name}</h3>
-            <p className="text-xs text-zinc-400 mt-0.5">Set once here, drawn around everything this screen shows, and kept up while the sources change. Stage modules, games and custom screens leave out their own.</p>
+            <p className="text-xs text-zinc-400 mt-0.5">Set once here, drawn around everything this screen shows, and kept up while the sources change. Stage modules, games and custom screens leave out their own.{onApply ? ' It is saved with the screen when you press Add.' : ''}</p>
           </div>
           <button type="button" onClick={close} className="text-zinc-500 hover:text-white scale-on-click shrink-0" aria-label="Close"><X className="w-5 h-5" /></button>
         </div>
@@ -200,10 +209,36 @@ export function ScreenLookEditor({ screen, event, eventId, logo, onSaved, onClos
             disabled={busy !== null}
             className="px-5 py-2.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-sm shadow-gold scale-on-click disabled:opacity-50 flex items-center gap-2"
           >
-            {busy === 'save' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Save
+            {busy === 'save' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} {onApply ? 'Use this look' : 'Save'}
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** What a look consists of, in a few words, for the add-screen form. */
+function describeLook(chrome: ScreenChrome): string {
+  if (!chrome.on) return 'Off: each stage module and custom screen draws its own header and footer.';
+  const frame = chrome.frame.preset === 'none' ? '' : `${FRAME_PRESETS.find((p) => p.id === chrome.frame.preset)?.label ?? 'Own'} frame`;
+  const footer = { off: '', ticker: 'scrolling line', bar: 'footer bar', image: 'own banner' }[chrome.footer];
+  return ['On', chrome.header && 'event header', frame, footer].filter(Boolean).join(' · ');
+}
+
+/**
+ * The header, frame and footer choice while adding a screen: none, the standard look in one click, or a design of its
+ * own (opens the editor). The look is saved with the screen.
+ */
+export function ScreenLookField({ chrome, onChange, onDesign }: { chrome: ScreenChrome; onChange: (chrome: ScreenChrome) => void; onDesign: () => void }) {
+  const standard = chrome.on && JSON.stringify(chrome) === JSON.stringify(STANDARD_CHROME);
+  return (
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap gap-1.5">
+        <button type="button" onClick={() => onChange({ ...chrome, on: false })} className={pill(!chrome.on)} aria-pressed={!chrome.on}>None</button>
+        <button type="button" onClick={() => onChange(STANDARD_CHROME)} className={pill(standard)} aria-pressed={standard} title="The event header, the gold frame and the event's scrolling line">Standard</button>
+        <button type="button" onClick={onDesign} className={pill(chrome.on && !standard)} aria-pressed={chrome.on && !standard}>Design…</button>
+      </div>
+      <p className="text-[11px] text-zinc-500">{describeLook(chrome)}</p>
     </div>
   );
 }

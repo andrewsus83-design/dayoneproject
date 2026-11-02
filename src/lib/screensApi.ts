@@ -15,8 +15,12 @@ import type { ProbeResult } from '@/lib/screenUrl';
 import { layoutPaths, type SceneLayout } from '@/lib/sceneLayout';
 import { chromeFiles, normalizeChrome, type ScreenChrome } from '@/lib/screenChrome';
 
-/** 'web' is a link: a web page or an embed (YouTube, Google Slides, Canva…) shown inside the screen. */
-export type SceneKind = 'slides' | 'images' | 'video' | 'web';
+/**
+ * 'web' is a link: a web page or an embed (YouTube, Google Slides, Canva…) shown inside the screen.
+ * 'module' is a stage module (options.module) opened in the screen editor: the live module with the editor's changes
+ * on top (moved or zoomed, added text, pictures, logo, effects). It has no media of its own.
+ */
+export type SceneKind = 'slides' | 'images' | 'video' | 'web' | 'module';
 
 export interface SceneMedia {
   url: string;
@@ -40,6 +44,8 @@ export interface SceneOptions {
   /** Links: what kind of link it is ('youtube', 'google-slides', 'page'…), and the address as the organizer pasted it. */
   provider?: string;
   page?: string;
+  /** Stage modules: which module this screen shows. */
+  module?: StageModuleId;
   /** What the screen editor added or changed on top of the content (lib/sceneLayout.ts). Absent = a plain screen. */
   layout?: SceneLayout;
 }
@@ -95,10 +101,16 @@ export const SIZE_PRESETS: { label: string; width: number; height: number }[] = 
 /** Stage modules that have something to show (the others are not built yet). */
 export const SCREEN_MODULES: StageModuleId[] = STAGE_MODULE_IDS.filter((m) => !STAGE_MODULES_WITHOUT_CONTENT.includes(m));
 
-export const SCENE_KIND_LABELS: Record<SceneKind, string> = { slides: 'Presentation', images: 'Images', video: 'Video', web: 'Link' };
+export const SCENE_KIND_LABELS: Record<SceneKind, string> = { slides: 'Presentation', images: 'Images', video: 'Video', web: 'Link', module: 'Stage module' };
 
 export const moduleSource = (id: StageModuleId) => `module:${id}`;
 export const sceneSource = (id: string) => `scene:${id}`;
+
+/** The stage module a 'module' scene shows, or null for any other scene (or one naming a module that does not exist). */
+export function sceneModule(scene: Pick<Scene, 'kind' | 'options'> | null | undefined): StageModuleId | null {
+  const id = scene?.kind === 'module' ? scene.options.module : undefined;
+  return id && STAGE_MODULE_IDS.includes(id) ? id : null;
+}
 
 export function parseSource(source: string): { kind: 'module'; id: StageModuleId } | { kind: 'scene'; id: string } | null {
   if (source.startsWith('module:')) {
@@ -142,8 +154,9 @@ export const screenBusName = (screenId: string) => `a41_screen:${screenId}`;
 function readable(message: string): string {
   if (/forbidden|permission denied|row-level security/i.test(message)) return 'Only organizers and screen managers can change the screens.';
   if (message.includes('invalid_screen_source')) return 'That source does not exist for this event any more.';
-  if (message.includes('a41_scenes_kind_check')) return 'Saving a link needs a one-time database update that has not been applied yet.';
+  if (message.includes('a41_scenes_kind_check')) return 'Saving this kind of screen needs a one-time database update that has not been applied yet.';
   if (message.includes('a41_scenes_web_https')) return 'A link screen needs a web address that starts with https://.';
+  if (message.includes('a41_scenes_module_shape')) return 'A stage module screen must name one of the stage modules and have no pictures of its own.';
   if (/chrome/.test(message) && /column|schema cache/.test(message)) return 'Saving the screen look needs a one-time database update that has not been applied yet.';
   if (/width|height/.test(message) && /check/.test(message)) return 'Screen size must be between 320 × 240 and 7680 × 4320.';
   if (/Failed to fetch|NetworkError|network|load failed/i.test(message)) return 'No connection. Check the internet and try again.';
@@ -165,11 +178,12 @@ export async function listScenes(eventId: string): Promise<Scene[]> {
   return (data ?? []) as Scene[];
 }
 
-export async function saveScreen(input: { id?: string; eventId: string; name: string; width: number; height: number; position?: number }): Promise<Screen> {
+/** `chrome` is for a screen being added (its look from the start); an existing screen's look is saved with saveScreenChrome. */
+export async function saveScreen(input: { id?: string; eventId: string; name: string; width: number; height: number; position?: number; chrome?: ScreenChrome | null }): Promise<Screen> {
   const values = { name: input.name.trim(), width: Math.round(input.width), height: Math.round(input.height) };
   const q = input.id
     ? createClient().from('a41_screens').update(values).eq('id', input.id)
-    : createClient().from('a41_screens').insert({ ...values, event_id: input.eventId, position: input.position ?? 0 });
+    : createClient().from('a41_screens').insert({ ...values, event_id: input.eventId, position: input.position ?? 0, ...(input.chrome ? { chrome: input.chrome } : {}) });
   const { data, error } = await q.select(SCREEN_COLUMNS).single();
   if (error) throw new Error(readable(error.message));
   return data as Screen;

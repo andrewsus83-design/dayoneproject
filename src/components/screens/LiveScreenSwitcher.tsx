@@ -8,17 +8,18 @@ import {
 import { STAGE_MODULE_NAMES } from '@/lib/stageApi';
 import type { StageModuleId } from '@/lib/types';
 import {
-  SCENE_KIND_LABELS, SCREEN_MODULES, SIZE_PRESETS, deleteScreen, fetchScreenFeed, fetchWallKey, listScenes, listScreens, moduleSource, outputPath,
-  parseSource, sceneSource, sceneSteps, saveScreen, sourceLabel, takeToScreen,
+  SCENE_KIND_LABELS, SCREEN_MODULES, SIZE_PRESETS, deleteScene, deleteScreen, fetchScreenFeed, fetchWallKey, listScenes, listScreens, moduleSource, outputPath,
+  parseSource, saveScene, sceneModule, sceneSource, sceneSteps, saveScreen, sourceLabel, takeToScreen,
   type Scene, type Screen,
 } from '@/lib/screensApi';
 import { hostOf } from '@/lib/screenUrl';
-import { normalizeChrome } from '@/lib/screenChrome';
+import { DEFAULT_CHROME, chromeFiles, normalizeChrome, type ScreenChrome } from '@/lib/screenChrome';
+import { removeMediaFiles } from '@/lib/screensApi';
 import { hasDraft } from '@/lib/sceneDraft';
 import { DESIGN_HEIGHT, FitBox, SourceView, designWidth, useLoadState } from './ScreenView';
 import { LoadBadge } from './LoadBadge';
 import { ScreenChromeView, type ChromeEvent } from './ScreenChromeView';
-import { ScreenLookEditor } from './ScreenLookEditor';
+import { ScreenLookEditor, ScreenLookField } from './ScreenLookEditor';
 import { SceneEditor } from './SceneEditor';
 import { ScreenEditor } from './ScreenEditor';
 
@@ -27,17 +28,32 @@ const label = 'text-[10px] font-mono uppercase tracking-widest text-zinc-500';
 const quiet = 'p-2 rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 scale-on-click';
 
 const MODULE_ICON: Partial<Record<StageModuleId, typeof Camera>> = { welcome: Sparkles, photowall: Camera, quiz: Gamepad2, raffle: Gift };
-const SCENE_ICON = { slides: Presentation, images: ImageIcon, video: Film, web: Link2 };
+const SCENE_ICON = { slides: Presentation, images: ImageIcon, video: Film, web: Link2, module: Monitor };
 
-type ScreenForm = { id?: string; name: string; preset: string; width: number; height: number };
+/** `chrome` is the look chosen while adding a screen; an existing screen's look has its own button on its card. */
+type ScreenForm = { id?: string; name: string; preset: string; width: number; height: number; chrome: ScreenChrome };
 const CUSTOM = 'custom';
-const blankScreen = (): ScreenForm => ({ name: '', preset: `${SIZE_PRESETS[0].width}x${SIZE_PRESETS[0].height}`, width: SIZE_PRESETS[0].width, height: SIZE_PRESETS[0].height });
+const blankScreen = (): ScreenForm => ({ name: '', preset: `${SIZE_PRESETS[0].width}x${SIZE_PRESETS[0].height}`, width: SIZE_PRESETS[0].width, height: SIZE_PRESETS[0].height, chrome: DEFAULT_CHROME });
+
+/** A stage module's tile: its icon and name; `custom` marks a copy opened in the screen editor. */
+function ModuleTile({ id, custom = false }: { id: StageModuleId; custom?: boolean }) {
+  const Icon = MODULE_ICON[id] || Monitor;
+  return (
+    <div className="w-full h-full flex flex-col items-center justify-center gap-1 bg-gradient-to-br from-premium-surfaceDark to-premium-black text-premium-gold">
+      <Icon className="w-6 h-6" />
+      <span className="text-[10px] font-bold text-zinc-300">{STAGE_MODULE_NAMES[id]}</span>
+      {custom && <span className="text-[9px] font-mono uppercase tracking-widest text-premium-gold/80">Custom</span>}
+    </div>
+  );
+}
 
 /** A light picture of a source for cards: the first slide or image, or the module's icon. Never an iframe. */
 function SourceThumb({ source, scenes }: { source: string; scenes: Scene[] }) {
   const parsed = parseSource(source);
   if (parsed?.kind === 'scene') {
     const scene = scenes.find((s) => s.id === parsed.id);
+    const moduleId = sceneModule(scene);
+    if (moduleId) return <ModuleTile id={moduleId} custom />;
     const Icon = scene ? SCENE_ICON[scene.kind] : Film;
     const first = scene && (scene.kind === 'slides' || scene.kind === 'images') ? scene.media[0]?.url : null;
     if (scene?.kind === 'web') {
@@ -55,11 +71,10 @@ function SourceThumb({ source, scenes }: { source: string; scenes: Scene[] }) {
       <div className="w-full h-full flex items-center justify-center bg-premium-black text-zinc-500"><Icon className="w-6 h-6" /></div>
     );
   }
-  const Icon = (parsed?.kind === 'module' && MODULE_ICON[parsed.id]) || Monitor;
+  if (parsed?.kind === 'module') return <ModuleTile id={parsed.id} />;
   return (
     <div className="w-full h-full flex flex-col items-center justify-center gap-1 bg-gradient-to-br from-premium-surfaceDark to-premium-black text-premium-gold">
-      <Icon className="w-6 h-6" />
-      <span className="text-[10px] font-bold text-zinc-300">{parsed?.kind === 'module' ? STAGE_MODULE_NAMES[parsed.id] : ''}</span>
+      <Monitor className="w-6 h-6" />
     </div>
   );
 }
@@ -87,6 +102,8 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
   const [chromeEvent, setChromeEvent] = useState<ChromeEvent | null>(null);
   // The screen whose header, frame and footer are being set.
   const [looking, setLooking] = useState<Screen | null>(null);
+  // The same editor while adding a screen: its look is only handed back to the form.
+  const [lookDraft, setLookDraft] = useState(false);
   // The preview counts as loaded only when the source has really loaded here; Try again mounts it afresh.
   const [previewNonce, setPreviewNonce] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
@@ -117,6 +134,10 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
     return p?.kind === 'scene' ? scenes.find((s) => s.id === p.id) ?? null : null;
   })();
   const previewSteps = sceneSteps(previewScene);
+  const previewModule = (() => {
+    const p = parseSource(preview.source);
+    return p?.kind === 'module' ? p.id : null;
+  })();
   const programScene = (() => {
     const p = target ? parseSource(target.program.source) : null;
     return p?.kind === 'scene' ? scenes.find((s) => s.id === p.id) ?? null : null;
@@ -162,10 +183,52 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
       }
     });
 
+  /**
+   * Opens a stage module in the screen editor. The editor works on a scene, so the first time this makes a custom copy
+   * of the module (a scene of kind 'module', listed under Sources); the plain module itself is never changed.
+   */
+  const customise = (moduleId: StageModuleId) =>
+    run(async () => {
+      let scene = scenes.find((s) => sceneModule(s) === moduleId);
+      if (!scene) {
+        const made = await saveScene({ eventId, title: `${STAGE_MODULE_NAMES[moduleId]} (custom)`, kind: 'module', media: [], options: { module: moduleId }, frame: {} });
+        scene = made;
+        setScenes((list) => [...list, made]);
+      }
+      setPreview({ source: sceneSource(scene.id), slide: 0 });
+      setDesigning(true);
+    });
+
+  /** Removes a custom copy of a stage module; screens that showed it go back to the Welcome module (the database does that). */
+  const removeCustomModule = (scene: Scene) => {
+    if (!confirm(`Remove “${scene.title}”? The plain stage module stays as it is.`)) return;
+    run(async () => {
+      await deleteScene(scene);
+      setScenes((list) => list.filter((s) => s.id !== scene.id));
+      if (preview.source === sceneSource(scene.id)) setPreview({ source: moduleSource(sceneModule(scene) ?? 'welcome'), slide: 0 });
+      load();
+    });
+  };
+
   /** Steps a presentation that is live on a screen. */
   const stepLive = (screen: Screen, delta: number, steps: number) => {
     const slide = Math.min(steps - 1, Math.max(0, screen.program.slide + delta));
     if (slide !== screen.program.slide) take(screen, { source: screen.program.source, slide });
+  };
+
+  /** The look chosen in the add-screen form; pictures the form's earlier choice uploaded and this one drops are deleted. */
+  const setFormLook = (next: ScreenChrome) => {
+    if (!screenForm) return;
+    const kept = chromeFiles(next);
+    void removeMediaFiles(chromeFiles(screenForm.chrome).filter((u) => !kept.includes(u)));
+    setScreenForm({ ...screenForm, chrome: next });
+  };
+
+  const cancelScreenForm = () => {
+    // A screen that was never added owns no pictures.
+    if (screenForm && !screenForm.id) void removeMediaFiles(chromeFiles(screenForm.chrome));
+    setLookDraft(false);
+    setScreenForm(null);
   };
 
   const submitScreen = (e: React.FormEvent) => {
@@ -174,7 +237,10 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
     run(async () => {
       setSavingScreen(true);
       try {
-        const saved = await saveScreen({ id: screenForm.id, eventId, name: screenForm.name, width: screenForm.width, height: screenForm.height, position: screens?.length ?? 0 });
+        const chrome = !screenForm.id && screenForm.chrome.on ? screenForm.chrome : null;
+        const saved = await saveScreen({ id: screenForm.id, eventId, name: screenForm.name, width: screenForm.width, height: screenForm.height, position: screens?.length ?? 0, chrome });
+        // A look turned off before adding leaves pictures that nothing will use.
+        if (!screenForm.id && !chrome) void removeMediaFiles(chromeFiles(screenForm.chrome));
         setScreens((list) => (screenForm.id ? (list ?? []).map((s) => (s.id === saved.id ? saved : s)) : [...(list ?? []), saved]));
         if (!screenForm.id) setTargetId(saved.id);
         setScreenForm(null);
@@ -273,7 +339,7 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
                   type="button"
                   onClick={() => {
                     const preset = SIZE_PRESETS.find((p) => p.width === s.width && p.height === s.height);
-                    setScreenForm({ id: s.id, name: s.name, width: s.width, height: s.height, preset: preset ? `${preset.width}x${preset.height}` : CUSTOM });
+                    setScreenForm({ id: s.id, name: s.name, width: s.width, height: s.height, preset: preset ? `${preset.width}x${preset.height}` : CUSTOM, chrome: normalizeChrome(s.chrome) });
                   }}
                   className={quiet}
                   title="Rename or resize"
@@ -326,8 +392,14 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
                 <input type="number" min={240} max={4320} required value={screenForm.height} onChange={(e) => setScreenForm({ ...screenForm, height: Number(e.target.value) })} className={input} aria-label="Height in pixels" />
               </div>
             )}
+            {!screenForm.id && (
+              <div className="space-y-1">
+                <span className={label}>Header, frame and footer</span>
+                <ScreenLookField chrome={screenForm.chrome} onChange={setFormLook} onDesign={() => setLookDraft(true)} />
+              </div>
+            )}
             <div className="flex gap-2 justify-end">
-              <button type="button" onClick={() => setScreenForm(null)} className="px-3 py-2 rounded-xl border border-premium-borderDark text-zinc-300 text-xs font-bold scale-on-click">Cancel</button>
+              <button type="button" onClick={cancelScreenForm} className="px-3 py-2 rounded-xl border border-premium-borderDark text-zinc-300 text-xs font-bold scale-on-click">Cancel</button>
               <button type="submit" disabled={savingScreen} className="px-4 py-2 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-xs shadow-gold scale-on-click disabled:opacity-50 flex items-center gap-1.5">
                 {savingScreen ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} {screenForm.id ? 'Save' : 'Add'}
               </button>
@@ -363,9 +435,15 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
             <span className="flex-1" />
             <button
               type="button"
-              onClick={() => setDesigning(true)}
-              disabled={!previewScene}
-              title={previewScene ? 'Resize, delete, add text and effects on a draft. The big screens change only when you push.' : 'Pick a custom screen under Sources to edit it here. Stage modules are not edited here.'}
+              onClick={() => (previewScene ? setDesigning(true) : previewModule && customise(previewModule))}
+              disabled={!previewScene && !previewModule}
+              title={
+                previewScene
+                  ? 'Resize, delete, add text and effects on a draft. The big screens change only when you push.'
+                  : previewModule
+                    ? 'Move or zoom this stage module and add text, pictures and effects on a draft. The first time, this makes a custom copy under Sources; the plain module stays as it is.'
+                    : 'Pick a source under Sources to edit it here.'
+              }
               className="px-4 py-2.5 rounded-xl border border-premium-borderDark bg-premium-surfaceDark text-zinc-200 hover:text-white hover:border-premium-gold/50 text-sm font-display font-bold scale-on-click disabled:opacity-40 disabled:hover:border-premium-borderDark flex items-center gap-2"
             >
               <Sparkles className="w-4 h-4 text-premium-gold" /> Edit screen
@@ -436,13 +514,28 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
                       {sourceLabel(source, scenes)}
                       {scene && hasDraft(scene) && <span className="ml-1.5 px-1 py-0.5 rounded bg-premium-gold/15 text-premium-gold text-[9px] font-bold align-middle">Draft</span>}
                     </div>
-                    <div className="text-[10px] text-zinc-500 truncate">{scene ? (scene.kind === 'web' ? `Link · ${hostOf(scene.media[0]?.url ?? '')}` : `${SCENE_KIND_LABELS[scene.kind]}${scene.kind === 'slides' || scene.kind === 'images' ? ` · ${scene.media.length}` : ''}`) : 'Stage module'}</div>
+                    <div className="text-[10px] text-zinc-500 truncate">{scene ? (scene.kind === 'web' ? `Link · ${hostOf(scene.media[0]?.url ?? '')}` : scene.kind === 'module' ? 'Stage module · custom' : `${SCENE_KIND_LABELS[scene.kind]}${scene.kind === 'slides' || scene.kind === 'images' ? ` · ${scene.media.length}` : ''}`) : 'Stage module'}</div>
                   </div>
                 </button>
-                {scene && (
+                {parsed?.kind === 'module' && (
+                  <button type="button" onClick={() => customise(parsed.id)} className="w-full px-2.5 pb-2 text-left text-[10px] font-bold text-zinc-500 hover:text-premium-gold flex items-center gap-1 scale-on-click" title="Move or zoom this module and add text, pictures and effects">
+                    <Pencil className="w-3 h-3" /> Customise
+                  </button>
+                )}
+                {scene && scene.kind !== 'module' && (
                   <button type="button" onClick={() => setEditing(scene)} className="w-full px-2.5 pb-2 text-left text-[10px] font-bold text-zinc-500 hover:text-premium-gold flex items-center gap-1 scale-on-click">
                     <Pencil className="w-3 h-3" /> Edit
                   </button>
+                )}
+                {scene?.kind === 'module' && (
+                  <div className="flex items-center gap-3 px-2.5 pb-2">
+                    <button type="button" onClick={() => { setPreview({ source, slide: 0 }); setDesigning(true); }} className="text-[10px] font-bold text-zinc-500 hover:text-premium-gold flex items-center gap-1 scale-on-click">
+                      <Pencil className="w-3 h-3" /> Edit
+                    </button>
+                    <button type="button" onClick={() => removeCustomModule(scene)} className="text-[10px] font-bold text-zinc-500 hover:text-premium-danger flex items-center gap-1 scale-on-click">
+                      <Trash2 className="w-3 h-3" /> Remove
+                    </button>
+                  </div>
                 )}
               </div>
             );
@@ -480,9 +573,25 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
         />
       )}
 
+      {lookDraft && screenForm && !screenForm.id && (
+        <ScreenLookEditor
+          screen={{ name: screenForm.name.trim() || 'New screen', width: screenForm.width || 1920, height: screenForm.height || 1080, chrome: { ...screenForm.chrome, on: true } }}
+          event={chromeEvent}
+          eventId={eventId}
+          logo={logo}
+          onApply={(chrome) => {
+            setFormLook(chrome);
+            setLookDraft(false);
+          }}
+          onClose={() => setLookDraft(false)}
+        />
+      )}
+
       {designing && previewScene && (
         <ScreenEditor
           eventId={eventId}
+          slug={slug}
+          wallKey={wallKey}
           scene={previewScene}
           target={target}
           event={chromeEvent}

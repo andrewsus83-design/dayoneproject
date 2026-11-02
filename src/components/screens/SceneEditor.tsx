@@ -17,7 +17,7 @@ const pill = (on: boolean) =>
   `px-3 py-2 rounded-xl text-xs font-bold scale-on-click transition-all ${on ? 'bg-premium-gold text-black shadow-gold' : 'bg-premium-surfaceDark border border-premium-borderDark text-zinc-400 hover:text-white'}`;
 
 /** What the editor offers: three uploads, and a link. A link is saved as a picture, a video or a page, whichever it turns out to be. */
-type Mode = Exclude<SceneKind, 'web'> | 'link';
+type Mode = Exclude<SceneKind, 'web' | 'module'> | 'link';
 const MODES: Mode[] = ['slides', 'images', 'video', 'link'];
 const MODE_LABEL: Record<Mode, string> = { slides: SCENE_KIND_LABELS.slides, images: SCENE_KIND_LABELS.images, video: SCENE_KIND_LABELS.video, link: 'Link' };
 const MODE_ICON: Record<Mode, typeof Film> = { slides: Presentation, images: ImageIcon, video: Film, link: Link2 };
@@ -52,7 +52,7 @@ export function SceneEditor({ eventId, scene, startAs, logo, onSaved, onDeleted,
   onClose: () => void;
 }) {
   const [title, setTitle] = useState(scene?.title ?? '');
-  const [mode, setMode] = useState<Mode>(scene ? (isLinkScene(scene) ? 'link' : (scene.kind as Exclude<SceneKind, 'web'>)) : (startAs ?? 'slides'));
+  const [mode, setMode] = useState<Mode>(scene ? (isLinkScene(scene) ? 'link' : (scene.kind as Exclude<SceneKind, 'web' | 'module'>)) : (startAs ?? 'slides'));
   // Uploaded files only: a link keeps its address in the box below.
   const [media, setMedia] = useState<SceneMedia[]>(isLinkScene(scene) ? [] : (scene?.media ?? []));
   const [linkText, setLinkText] = useState(scene && isLinkScene(scene) ? (scene.options.page ?? scene.media[0]?.url ?? '') : '');

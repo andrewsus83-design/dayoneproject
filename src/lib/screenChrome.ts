@@ -33,7 +33,14 @@ export const DEFAULT_CHROME: ScreenChrome = {
   footerImageUrl: '',
 };
 
-const PRESETS: FramePreset[] = ['none', 'gold', 'neon', 'prism', 'confetti', 'image'];
+/** The quick choice when adding a screen: the event header, the gold frame and the event's own scrolling line. */
+export const STANDARD_CHROME: ScreenChrome = {
+  ...DEFAULT_CHROME,
+  on: true,
+  frame: { preset: 'gold', imageUrl: '', imageBlend: 'normal' },
+};
+
+const PRESETS: FramePreset[] =['none', 'gold', 'neon', 'prism', 'confetti', 'image'];
 const FOOTERS: ChromeFooter[] = ['off', 'ticker', 'bar', 'image'];
 const STYLES: ScreenChrome['footerStyle'][] = ['dark', 'gold', 'glass'];
 

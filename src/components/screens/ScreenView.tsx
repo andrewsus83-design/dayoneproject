@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StageFrameShell } from '@/components/stage/StageFrameShell';
 import type { StageFrame } from '@/lib/eventStore';
-import { moduleOutputPath, parseSource, type Scene, type SceneKind } from '@/lib/screensApi';
+import { moduleOutputPath, parseSource, sceneModule, type Scene, type SceneKind } from '@/lib/screensApi';
 import { isHttpsUrl } from '@/lib/screenUrl';
 import { normalizeLayout } from '@/lib/sceneLayout';
 import { ItemsLayer, MainLayer, type OverlayState } from './SceneLayoutView';
@@ -305,11 +305,14 @@ function WebFrame({ url, ready, fail }: { url: string; ready: () => void; fail: 
  * added (the content moved or zoomed, text, pictures, the logo, effects). A scene is ready once its content and every
  * added picture have loaded.
  */
-export function SceneContent({ scene, slide, playing, sound, logo, replay = 0, bare = false, onReady, onFail, onOverlays }: {
+export function SceneContent({ scene, slide, playing, sound, logo, slug, wallKey, replay = 0, bare = false, onReady, onFail, onOverlays }: {
   scene: SceneLike;
   slide: number;
-  /** The screen draws its own header, frame and footer: leave out the scene's own. */
+  /** The screen draws its own header, frame and footer: leave out the scene's own (a stage module leaves out its header and ticker). */
   bare?: boolean;
+  /** A stage module scene shows that module of this event (the photo wall also needs the wall key). */
+  slug?: string;
+  wallKey?: string | null;
   /** Outputs play videos and run image slideshows; small previews stay still. */
   playing: boolean;
   sound: boolean;
@@ -333,8 +336,10 @@ export function SceneContent({ scene, slide, playing, sound, logo, replay = 0, b
   // Ready = the content loaded and no added picture is still loading; an added picture that cannot load fails the scene.
   const [mainLoaded, setMainLoaded] = useState(false);
   const mainReady = useCallback(() => setMainLoaded(true), []);
-  // No content yet counts as loaded, so a take never hangs.
-  const mainOk = mainLoaded || urls.length === 0;
+  // No content yet counts as loaded, so a take never hangs. A stage module has no media: it counts once its stage is up.
+  const moduleId = sceneModule(scene);
+  const isModule = scene.kind === 'module';
+  const mainOk = mainLoaded || (urls.length === 0 && !isModule);
   const [overlayRaw, setOverlayRaw] = useState<OverlayState>({ pending: 0, failed: 0 });
   const overlay = layout.items.length ? overlayRaw : NO_OVERLAY;
   // The editor follows the added pictures itself (it can delete a broken one), so for it only the content decides.
@@ -363,7 +368,15 @@ export function SceneContent({ scene, slide, playing, sound, logo, replay = 0, b
 
   const content = (
     <div className="relative flex-1 min-h-0">
-      {!urls.length ? (
+      {isModule ? (
+        <MainLayer main={layout.main} playing={playing} replay={replay}>
+          {moduleId && slug ? (
+            <ModuleFrame src={moduleOutputPath(slug, moduleId, wallKey, bare)} title={moduleId} onReady={mainReady} onFail={fail} />
+          ) : (
+            <MissingSource onFail={fail} />
+          )}
+        </MainLayer>
+      ) : !urls.length ? (
         <div className="absolute inset-0 flex items-center justify-center text-zinc-600 font-mono text-2xl">No media yet</div>
       ) : (
         <MainLayer main={layout.main} playing={playing} replay={replay}>
@@ -381,7 +394,8 @@ export function SceneContent({ scene, slide, playing, sound, logo, replay = 0, b
 
   return (
     <div className="relative w-full h-full flex flex-col bg-black">
-      {bare ? (
+      {/* A stage module draws its own header, frame and ticker (or the screen's look does), never a scene frame. */}
+      {bare || isModule ? (
         content
       ) : (
         <StageFrameShell frame={sceneFrame(scene.frame)} logoRef={logo ?? undefined} className="w-full h-full bg-black">
@@ -421,7 +435,7 @@ export function SourceView({ source, scene, slug, slide, wallKey, logo, playing,
     return <ModuleFrame src={moduleOutputPath(slug, parsed.id, wallKey, bare)} title={parsed.id} onReady={onReady} onFail={onFail} />;
   }
   if (parsed?.kind === 'scene' && scene) {
-    return <SceneContent scene={scene} slide={slide} playing={playing} sound={sound} logo={logo} bare={bare} onReady={onReady} onFail={onFail} />;
+    return <SceneContent scene={scene} slide={slide} playing={playing} sound={sound} logo={logo} slug={slug} wallKey={wallKey} bare={bare} onReady={onReady} onFail={onFail} />;
   }
   return <MissingSource onFail={onFail} />;
 }
