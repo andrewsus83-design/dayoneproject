@@ -59,7 +59,7 @@ function useCountdown(date: string, time: string) {
 }
 
 function ctaHref(slug: string, target: CtaTarget, url: string) {
-  if (target === 'custom') return url ? (url.startsWith('http') || url.startsWith('/') ? url : `https://${url}`) : '#';
+  if (target === 'custom') return url ? (/^(https?:|mailto:|tel:|#|\/)/i.test(url) ? url : `https://${url}`) : '#';
   // 'invitation' and the older 'register' both open the invitation form.
   return `/events/${slug}/invitation`;
 }
