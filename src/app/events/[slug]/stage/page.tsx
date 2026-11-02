@@ -7,6 +7,7 @@ import QRCode from 'qrcode';
 import { Maximize2, Minimize2, Camera, Gamepad2, Gift, Sparkles, RotateCcw, Trophy, WifiOff } from 'lucide-react';
 import { useEventConfigBySlug, useSampleGuests } from '@/lib/eventStore';
 import { ScreenControls } from '@/components/screens/ScreenControls';
+import { useWakeLock } from '@/lib/useWakeLock';
 import { isSampleSlug } from '@/lib/events';
 import { isServerEventId } from '@/lib/guestsApi';
 import { createClient } from '@/lib/supabase/client';
@@ -62,6 +63,8 @@ function StageBigScreenContent({ slug }: { slug: string }) {
   // Live screens show one module through this page (?output=1&module=<id>): no controls, no keys, no pointer.
   const outputMode = search.get('output') === '1';
   const moduleParam = search.get('module');
+  // The display must not sleep while this is the stage screen (inside a Live Screen, that page holds the lock).
+  useWakeLock(!outputMode);
   const forced = moduleParam && (STAGE_MODULE_IDS as readonly string[]).includes(moduleParam) ? (moduleParam as StageModuleId) : null;
 
   // What the operator set: the server's copy, or this device's newer one (sample events: this device only).

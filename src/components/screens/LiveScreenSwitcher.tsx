@@ -2,25 +2,29 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Camera, Check, ChevronLeft, ChevronRight, Copy, ExternalLink, Film, Gamepad2, Gift, ImageIcon, Loader2, Monitor, Pencil,
+  Camera, Check, ChevronLeft, ChevronRight, Copy, ExternalLink, Film, Gamepad2, Gift, ImageIcon, Link2, Loader2, Monitor, Pencil,
   Plus, Presentation, Radio, Send, Sparkles, Trash2, X,
 } from 'lucide-react';
 import { STAGE_MODULE_NAMES } from '@/lib/stageApi';
 import type { StageModuleId } from '@/lib/types';
 import {
-  SCENE_KIND_LABELS, SCREEN_MODULES, SIZE_PRESETS, deleteScreen, fetchWallKey, listScenes, listScreens, moduleSource, outputPath,
+  SCENE_KIND_LABELS, SCREEN_MODULES, SIZE_PRESETS, deleteScreen, fetchScreenFeed, fetchWallKey, listScenes, listScreens, moduleSource, outputPath,
   parseSource, sceneSource, sceneSteps, saveScreen, sourceLabel, takeToScreen,
   type Scene, type Screen,
 } from '@/lib/screensApi';
-import { DESIGN_HEIGHT, FitBox, SourceView, designWidth } from './ScreenView';
+import { hostOf } from '@/lib/screenUrl';
+import { hasDraft } from '@/lib/sceneDraft';
+import { DESIGN_HEIGHT, FitBox, SourceView, designWidth, useLoadState } from './ScreenView';
+import { LoadBadge } from './LoadBadge';
 import { SceneEditor } from './SceneEditor';
+import { ScreenEditor } from './ScreenEditor';
 
 const input = 'w-full bg-premium-surfaceDark border border-premium-borderDark text-white px-3 py-2.5 rounded-xl text-sm outline-none focus:border-premium-gold placeholder:text-zinc-600';
 const label = 'text-[10px] font-mono uppercase tracking-widest text-zinc-500';
 const quiet = 'p-2 rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 scale-on-click';
 
 const MODULE_ICON: Partial<Record<StageModuleId, typeof Camera>> = { welcome: Sparkles, photowall: Camera, quiz: Gamepad2, raffle: Gift };
-const SCENE_ICON = { slides: Presentation, images: ImageIcon, video: Film };
+const SCENE_ICON = { slides: Presentation, images: ImageIcon, video: Film, web: Link2 };
 
 type ScreenForm = { id?: string; name: string; preset: string; width: number; height: number };
 const CUSTOM = 'custom';
@@ -32,7 +36,15 @@ function SourceThumb({ source, scenes }: { source: string; scenes: Scene[] }) {
   if (parsed?.kind === 'scene') {
     const scene = scenes.find((s) => s.id === parsed.id);
     const Icon = scene ? SCENE_ICON[scene.kind] : Film;
-    const first = scene && scene.kind !== 'video' ? scene.media[0]?.url : null;
+    const first = scene && (scene.kind === 'slides' || scene.kind === 'images') ? scene.media[0]?.url : null;
+    if (scene?.kind === 'web') {
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center gap-1 bg-gradient-to-br from-premium-surfaceDark to-premium-black text-premium-neon px-2">
+          <Icon className="w-6 h-6" />
+          <span className="text-[10px] font-mono text-zinc-300 truncate max-w-full">{hostOf(scene.media[0]?.url ?? '')}</span>
+        </div>
+      );
+    }
     return first ? (
       // eslint-disable-next-line @next/next/no-img-element
       <img src={first} alt="" className="w-full h-full object-cover" />
@@ -64,7 +76,12 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
   const [taking, setTaking] = useState(false);
   const [screenForm, setScreenForm] = useState<ScreenForm | null>(null);
   const [savingScreen, setSavingScreen] = useState(false);
-  const [editing, setEditing] = useState<Scene | 'new' | null>(null);
+  const [editing, setEditing] = useState<Scene | 'new' | 'link' | null>(null);
+  // The screen editor: a draft of the previewed custom screen.
+  const [designing, setDesigning] = useState(false);
+  const [logo, setLogo] = useState<string | null>(null);
+  // The preview counts as loaded only when the source has really loaded here; Try again mounts it afresh.
+  const [previewNonce, setPreviewNonce] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -98,6 +115,19 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
     return p?.kind === 'scene' ? scenes.find((s) => s.id === p.id) ?? null : null;
   })();
   const dw = target ? designWidth(target.width, target.height) : 1920;
+  const previewKey = `${preview.source}|${previewScene?.updated_at ?? ''}|${previewNonce}`;
+  const { load: previewLoad, onReady: previewReady, onFail: previewFail } = useLoadState(previewKey);
+
+  // The event's logo as the screens on air have it, so a footer logo or a Logo item looks the same here as on air.
+  const targetId0 = target?.id;
+  useEffect(() => {
+    if (!targetId0) return;
+    let alive = true;
+    fetchScreenFeed(targetId0).then((f) => alive && setLogo(f?.event.logo ?? null)).catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [targetId0]);
 
   const run = async (fn: () => Promise<void>) => {
     setError(null);
@@ -169,7 +199,7 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
     <div className="space-y-6">
       <div>
         <h3 className="text-2xl font-display font-bold text-white flex items-center gap-2"><Radio className="w-5 h-5 text-premium-danger" /> Live Screens</h3>
-        <p className="text-xs text-zinc-400 mt-1">Click a source to see it in Preview, then Take it live on a screen. Open each screen&apos;s link full screen on the computer that drives it.</p>
+        <p className="text-xs text-zinc-400 mt-1">Click a source to load it in Preview, then Take it live on a screen once it shows “Loaded”. Each screen has its own link: open it full screen on the computer that drives the display, and it follows what you take. A new source loads out of sight first, so the screen never goes blank.</p>
       </div>
 
       {error && (
@@ -207,6 +237,13 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
                   </div>
                 </div>
               </button>
+              {/* Each screen has its own address: open it full screen on the computer that drives the display. */}
+              <div className="px-3 pt-1 flex items-center gap-1.5 min-w-0">
+                <Link2 className="w-3 h-3 text-premium-neon shrink-0" />
+                <span className="text-[10px] font-mono text-premium-neon truncate select-all" title={`${window.location.origin}${outputPath(s.id)}`}>
+                  {window.location.host}{outputPath(s.id)}
+                </span>
+              </div>
               <div className="flex items-center gap-0.5 px-1.5 pb-1.5 pt-1">
                 {steps > 1 && (
                   <>
@@ -287,12 +324,16 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-premium-success font-bold">Preview · {sourceLabel(preview.source, scenes)}</span>
+            <span className="text-[10px] font-mono uppercase tracking-widest text-premium-success font-bold">
+              Preview · {sourceLabel(preview.source, scenes)}
+              {previewScene && hasDraft(previewScene) && <span className="ml-2 px-1.5 py-0.5 rounded-md bg-premium-gold/15 text-premium-gold normal-case tracking-normal">unpushed draft</span>}
+            </span>
             {target && <span className="text-[10px] font-mono text-zinc-500">as {target.name}</span>}
           </div>
-          <FitBox width={dw} height={DESIGN_HEIGHT} className="w-full aspect-video rounded-2xl border-2 border-premium-success/50">
-            <SourceView key={`${preview.source}|${previewScene?.updated_at ?? ''}`} source={preview.source} scene={previewScene} slug={slug} slide={preview.slide} wallKey={wallKey} playing sound={false} />
+          <FitBox width={dw} height={DESIGN_HEIGHT} className={`w-full aspect-video rounded-2xl border-2 ${previewLoad.state === 'failed' ? 'border-premium-danger/60' : 'border-premium-success/50'}`}>
+            <SourceView key={previewKey} source={preview.source} scene={previewScene} slug={slug} slide={preview.slide} wallKey={wallKey} logo={logo} playing sound={false} onReady={previewReady} onFail={previewFail} />
           </FitBox>
+          <LoadBadge load={previewLoad} onRetry={() => setPreviewNonce((n) => n + 1)} />
           <div className="flex flex-wrap items-center gap-2">
             {previewSteps > 1 && (
               <div className="flex items-center gap-1.5 text-xs text-zinc-400">
@@ -302,11 +343,21 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
               </div>
             )}
             <span className="flex-1" />
+            <button
+              type="button"
+              onClick={() => setDesigning(true)}
+              disabled={!previewScene}
+              title={previewScene ? 'Resize, delete, add text and effects on a draft. The big screens change only when you push.' : 'Pick a custom screen under Sources to edit it here. Stage modules are not edited here.'}
+              className="px-4 py-2.5 rounded-xl border border-premium-borderDark bg-premium-surfaceDark text-zinc-200 hover:text-white hover:border-premium-gold/50 text-sm font-display font-bold scale-on-click disabled:opacity-40 disabled:hover:border-premium-borderDark flex items-center gap-2"
+            >
+              <Sparkles className="w-4 h-4 text-premium-gold" /> Edit screen
+            </button>
             {target ? (
               <button
                 type="button"
                 onClick={() => take(target)}
-                disabled={taking}
+                disabled={taking || previewLoad.state !== 'ready'}
+                title={previewLoad.state === 'ready' ? undefined : previewLoad.state === 'loading' ? 'Wait until the preview has loaded' : 'This could not load, so it cannot go live'}
                 className="px-5 py-2.5 rounded-xl bg-premium-gold hover:bg-premium-goldHover text-black font-display font-bold text-sm shadow-gold scale-on-click disabled:opacity-50 flex items-center gap-2"
               >
                 {taking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Take to {target.name}
@@ -330,6 +381,7 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
                 slug={slug}
                 slide={target.program.slide}
                 wallKey={wallKey}
+                logo={logo}
                 playing
                 sound={false}
               />
@@ -359,8 +411,11 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
                     )}
                   </div>
                   <div className="px-2.5 py-2">
-                    <div className="text-xs font-bold text-white truncate">{sourceLabel(source, scenes)}</div>
-                    <div className="text-[10px] text-zinc-500">{scene ? `${SCENE_KIND_LABELS[scene.kind]}${scene.kind !== 'video' ? ` · ${scene.media.length}` : ''}` : 'Stage module'}</div>
+                    <div className="text-xs font-bold text-white truncate">
+                      {sourceLabel(source, scenes)}
+                      {scene && hasDraft(scene) && <span className="ml-1.5 px-1 py-0.5 rounded bg-premium-gold/15 text-premium-gold text-[9px] font-bold align-middle">Draft</span>}
+                    </div>
+                    <div className="text-[10px] text-zinc-500 truncate">{scene ? (scene.kind === 'web' ? `Link · ${hostOf(scene.media[0]?.url ?? '')}` : `${SCENE_KIND_LABELS[scene.kind]}${scene.kind === 'slides' || scene.kind === 'images' ? ` · ${scene.media.length}` : ''}`) : 'Stage module'}</div>
                   </div>
                 </button>
                 {scene && (
@@ -373,6 +428,14 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
           })}
           <button
             type="button"
+            onClick={() => setEditing('link')}
+            className="rounded-2xl border-2 border-dashed border-premium-borderDark hover:border-premium-neon/50 min-h-[120px] flex flex-col items-center justify-center gap-1.5 text-zinc-500 hover:text-premium-neon scale-on-click"
+          >
+            <Link2 className="w-5 h-5" />
+            <span className="text-[11px] font-bold text-center px-2">Paste a link<br /><span className="font-normal text-zinc-600">Web page, YouTube, Slides, picture, video</span></span>
+          </button>
+          <button
+            type="button"
             onClick={() => setEditing('new')}
             className="rounded-2xl border-2 border-dashed border-premium-borderDark hover:border-premium-gold/50 min-h-[120px] flex flex-col items-center justify-center gap-1.5 text-zinc-500 hover:text-premium-gold scale-on-click"
           >
@@ -382,10 +445,30 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
         </div>
       </div>
 
+      {designing && previewScene && (
+        <ScreenEditor
+          eventId={eventId}
+          scene={previewScene}
+          target={target}
+          liveOn={liveOn(sceneSource(previewScene.id))}
+          logo={logo}
+          startSlide={preview.slide}
+          onPushed={(saved, screen, takeError) => {
+            setScenes((list) => list.map((s) => (s.id === saved.id ? saved : s)));
+            if (screen) setScreens((list) => list?.map((s) => (s.id === screen.id ? screen : s)) ?? list);
+            setPreview((p) => ({ source: sceneSource(saved.id), slide: p.slide }));
+            setDesigning(false);
+            if (takeError) setError(takeError);
+          }}
+          onClose={() => setDesigning(false)}
+        />
+      )}
+
       {editing && (
         <SceneEditor
           eventId={eventId}
-          scene={editing === 'new' ? null : editing}
+          scene={editing === 'new' || editing === 'link' ? null : editing}
+          startAs={editing === 'link' ? 'link' : undefined}
           onSaved={(saved) => {
             setScenes((list) => (list.some((s) => s.id === saved.id) ? list.map((s) => (s.id === saved.id ? saved : s)) : [...list, saved]));
             setPreview({ source: sceneSource(saved.id), slide: 0 });

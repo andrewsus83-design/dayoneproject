@@ -11,9 +11,9 @@ const HIDE_AFTER_MS = 2500;
  * Back, full screen and close for the big screens (stage, live photo wall, Live Screens outputs). They stay hidden
  * on air and show while the mouse is at the top edge of the screen, or after a tap there, then hide again, so an
  * operator can always leave a screen that was opened in its own tab. Close falls back to Back when the browser
- * does not let the page close its own tab.
+ * does not let the page close its own tab. `status` is a line of connection details for the operator, shown with them.
  */
-export function ScreenControls({ backHref, backLabel = 'Back' }: { backHref: string; backLabel?: string }) {
+export function ScreenControls({ backHref, backLabel = 'Back', status }: { backHref: string; backLabel?: string; status?: string }) {
   const [visible, setVisible] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const hideTimer = useRef<number | undefined>(undefined);
@@ -81,6 +81,7 @@ export function ScreenControls({ backHref, backLabel = 'Back' }: { backHref: str
       }}
       aria-hidden={!visible}
     >
+      {status && <span className="px-3 max-w-[40vw] truncate text-[11px] font-mono text-zinc-400" title={status}>{status}</span>}
       <a href={backHref} className={button} aria-label={backLabel}>
         <ArrowLeft className="w-4 h-4" /> {backLabel}
       </a>

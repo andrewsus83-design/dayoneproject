@@ -12,18 +12,21 @@ const MEDIA = (process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "https://media.dayonepro
 /**
  * Next.js inlines its bootstrap scripts and styles (no nonces here), so inline is allowed; dev adds eval and the
  * HMR websocket. frameAncestors: 'none' for signed-in areas, 'self' for public event pages.
+ * `openLinks` is for the pages that show an organizer's pasted links (Live Screens: the output page, the switcher and
+ * its editor): any https page may be framed, and pictures and videos may come from any https address. Scripts and
+ * connections stay as strict as everywhere else, so a linked site can only be shown, never run code in the app.
  */
-function contentSecurityPolicy(frameAncestors: string) {
+function contentSecurityPolicy(frameAncestors: string, openLinks = false) {
   return [
     "default-src 'self'",
     `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' data: https://fonts.gstatic.com",
-    `img-src 'self' data: blob: ${SUPABASE} ${MEDIA} https://cdn.openart.ai https://images.unsplash.com`,
-    `media-src 'self' data: blob: ${SUPABASE} ${MEDIA}`,
+    `img-src 'self' data: blob: ${SUPABASE} ${MEDIA} https://cdn.openart.ai https://images.unsplash.com${openLinks ? " https:" : ""}`,
+    `media-src 'self' data: blob: ${SUPABASE} ${MEDIA}${openLinks ? " https:" : ""}`,
     `connect-src 'self' data: blob: ${SUPABASE} ${SUPABASE_WS}${dev ? " ws: wss:" : ""}`,
     "worker-src 'self' blob:",
-    "frame-src 'self'",
+    `frame-src 'self'${openLinks ? " https:" : ""}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -81,6 +84,26 @@ const nextConfig: NextConfig = {
           { key: "Content-Security-Policy", value: contentSecurityPolicy("'none'") },
           { key: "X-Frame-Options", value: "DENY" },
         ],
+      },
+      {
+        // Live Screens show pasted links (web pages, YouTube, pictures, videos). Only the pages that preview or play
+        // them may load those; the rest of the dashboard keeps the strict policy above.
+        source: "/screen",
+        headers: [
+          { key: "Content-Security-Policy", value: contentSecurityPolicy("'none'", true) },
+          { key: "X-Frame-Options", value: "DENY" },
+        ],
+      },
+      {
+        source: "/dashboard/events/:id",
+        headers: [
+          { key: "Content-Security-Policy", value: contentSecurityPolicy("'none'", true) },
+          { key: "X-Frame-Options", value: "DENY" },
+        ],
+      },
+      {
+        source: "/live/:screenId",
+        headers: [{ key: "Content-Security-Policy", value: contentSecurityPolicy("'self'", true) }],
       },
     ];
   },

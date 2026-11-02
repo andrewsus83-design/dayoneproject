@@ -254,11 +254,17 @@ export function useStageFeed(slug: string, enabled = true, intervalMs = 2000) {
     if (!enabled) return;
     let alive = true;
     let controller: AbortController | null = null;
+    let startedAt = 0;
     const load = () => {
       if (document.visibilityState !== 'visible') return;
+      // A slow answer gets time to arrive (a request dropped at every tick would never finish on a weak
+      // connection); one that has hung for 8 s is dropped and asked again.
+      if (controller && Date.now() - startedAt < 8000) return;
       controller?.abort();
-      controller = new AbortController();
-      fetchStageFeed(slug, controller.signal)
+      const mine = new AbortController();
+      controller = mine;
+      startedAt = Date.now();
+      fetchStageFeed(slug, mine.signal)
         .then((data) => {
           if (!alive) return;
           setFeed(data);
@@ -267,16 +273,27 @@ export function useStageFeed(slug: string, enabled = true, intervalMs = 2000) {
         .catch((e: unknown) => {
           if (!alive || (e instanceof DOMException && e.name === 'AbortError')) return;
           setState((s) => (s === 'ready' ? s : 'offline'));
+        })
+        .finally(() => {
+          if (controller === mine) controller = null;
         });
+    };
+    // The network or the tab came back: ask now (and drop a request that was stuck while it was away).
+    const wake = () => {
+      controller?.abort();
+      controller = null;
+      load();
     };
     load();
     const timer = window.setInterval(load, intervalMs);
     document.addEventListener('visibilitychange', load);
+    window.addEventListener('online', wake);
     return () => {
       alive = false;
       controller?.abort();
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', load);
+      window.removeEventListener('online', wake);
     };
   }, [slug, enabled, intervalMs]);
 

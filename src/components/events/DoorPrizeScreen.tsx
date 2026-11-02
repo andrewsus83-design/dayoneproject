@@ -10,6 +10,7 @@ import {
 import { isServerEventId } from '@/lib/guestsApi';
 import { boardExclusions, forfeitDraw, serverPrize, toDrawWinner, useDoorPrizeBoard, useDoorPrizeSync } from '@/lib/doorPrizeApi';
 import { stageBusName } from '@/lib/stageApi';
+import { useWakeLock } from '@/lib/useWakeLock';
 import { DrawMachine, DRAW_STYLES } from '@/components/raffle/DrawMachine';
 import { SlotSettings } from '@/components/raffle/SlotSettings';
 import { RepeatWinnersToggle } from '@/components/raffle/RepeatWinnersToggle';
@@ -43,6 +44,8 @@ function DoorPrizeArena({ slug, initialId }: { slug: string; initialId?: string 
   const router = useRouter();
   const { eventId, event, config } = useEventConfigBySlug(slug);
   const server = isServerEventId(eventId);
+  // The ballroom display must not go to sleep between draws.
+  useWakeLock();
   // New check-ins join the draw while the screen stays open.
   const { guests } = useGuestList(eventId, server ? 20_000 : 0);
   const { board, error: boardError } = useDoorPrizeBoard(server ? eventId : null);

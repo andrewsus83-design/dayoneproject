@@ -9,6 +9,7 @@ import { isSampleSlug } from '@/lib/events';
 import { feedToUploads, useWallFeed } from '@/lib/photoWallApi';
 import { PinterestMasonryPhotoWall } from '@/components/events/PinterestMasonryPhotoWall';
 import { ScreenControls } from '@/components/screens/ScreenControls';
+import { useWakeLock } from '@/lib/useWakeLock';
 import { Camera, Maximize2, Minimize2, QrCode, WifiOff } from 'lucide-react';
 import QRCode from 'qrcode';
 import { BrandMark } from '@/components/BrandMark';
@@ -32,6 +33,8 @@ function LivePhotoWallContent({ slug }: { slug: string }) {
   const key = useSearchParams().get('key');
   const clientDomain = getClientDomain(slug);
   const { feed, state } = useWallFeed(slug, sample ? null : key, 4000);
+  // The wall display must not go to sleep.
+  useWakeLock();
 
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
