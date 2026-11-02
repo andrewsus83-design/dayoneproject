@@ -11,8 +11,8 @@ import {
 import { frameDocument, inlineTextFiles, MAX_PAGE_BYTES, missingFiles } from '@/lib/customHtml';
 import { BASE_EVENTS } from '@/lib/events';
 import {
-  BLOCK_CATALOG, blockId, blockTitle, createBlock,
-  type BlockType, type CtaTarget, type FaqItem, type LandingBlock, type LandingListItem, type LandingPair, type ProgramItem,
+  BLOCK_CATALOG, blockId, blockTitle, createBlock, sectionAlign,
+  type BlockType, type CtaTarget, type FaqItem, type LandingBlock, type LandingListItem, type LandingPair, type ProgramItem, type SectionAlign,
 } from '@/lib/landingBlocks';
 import { resolveTheme } from '@/lib/eventTheme';
 import { compressImage } from '@/lib/image';
@@ -42,12 +42,15 @@ function Text({ label, value, onChange, placeholder, area }: { label: string; va
   );
 }
 
-function Switch({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
+function Switch({ label, on, onClick, showState }: { label: string; on: boolean; onClick: () => void; showState?: boolean }) {
   return (
-    <button type="button" onClick={onClick} className="flex items-center justify-between w-full py-1.5 text-xs text-zinc-300 scale-on-click">
+    <button type="button" role="switch" aria-checked={on} onClick={onClick} className="flex items-center justify-between w-full py-1.5 text-xs text-zinc-300 scale-on-click">
       <span className="font-bold">{label}</span>
-      <span className={`w-10 h-6 rounded-full flex items-center transition-colors ${on ? 'bg-premium-success justify-end pr-0.5' : 'bg-zinc-700 pl-0.5'}`}>
-        <span className="w-5 h-5 rounded-full bg-white" />
+      <span className="flex items-center gap-2 shrink-0">
+        {showState && <span className={`text-[10px] font-mono font-bold tracking-widest ${on ? 'text-premium-success' : 'text-zinc-500'}`}>{on ? 'ON' : 'OFF'}</span>}
+        <span className={`w-10 h-6 rounded-full flex items-center transition-colors ${on ? 'bg-premium-success justify-end pr-0.5' : 'bg-zinc-700 pl-0.5'}`}>
+          <span className="w-5 h-5 rounded-full bg-white" />
+        </span>
       </span>
     </button>
   );
@@ -201,6 +204,24 @@ function ListEditor<T extends { id: string }>({
 
 /* ───────── Block inspector ───────── */
 
+const ALIGN_OPTIONS: { id: SectionAlign; label: string }[] = [{ id: 'left', label: 'Left' }, { id: 'center', label: 'Center' }, { id: 'right', label: 'Right' }];
+
+/** What every section has: where its heading and text sit, and a line under it. The hero sets its alignment in Layout. */
+function SectionLayout({ block, set }: { block: LandingBlock; set: (patch: Partial<LandingBlock>) => void }) {
+  const p = set as (patch: Record<string, unknown>) => void;
+  return (
+    <div className="space-y-2 pb-4 mb-4 border-b border-premium-borderDark/60">
+      {block.type !== 'hero' && <Segmented<SectionAlign> label="Alignment" value={sectionAlign(block)} onChange={(v) => p({ align: v })} options={ALIGN_OPTIONS} />}
+      {block.type !== 'countdown' && (
+        <div>
+          <Switch showState label="Divider line below this section" on={!!block.divider} onClick={() => p({ divider: !block.divider })} />
+          <p className="text-[10px] text-zinc-600">A thin line between this section and the next one. Not drawn under the last section.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BlockEditor({ block, set, isWedding, forms, onError }: { block: LandingBlock; set: (patch: Partial<LandingBlock>) => void; isWedding: boolean; forms: { id: string; name: string }[]; onError: (m: string) => void }) {
   const galleryRef = useRef<HTMLInputElement>(null);
   const { busy, upload } = useUploader(onError);
@@ -210,7 +231,7 @@ function BlockEditor({ block, set, isWedding, forms, onError }: { block: Landing
     case 'hero':
       return (
         <div className="space-y-4">
-          <Segmented label="Layout" value={block.layout} onChange={(v) => p({ layout: v })} options={[{ id: 'left', label: 'Left aligned' }, { id: 'center', label: 'Centered' }]} />
+          <Segmented<SectionAlign> label="Alignment" value={block.layout} onChange={(v) => p({ layout: v })} options={[{ id: 'left', label: 'Left' }, { id: 'center', label: 'Center' }, { id: 'right', label: 'Right' }]} />
           <Segmented
             label="Text position"
             value={block.placement ?? 'inside'}
@@ -261,7 +282,6 @@ function BlockEditor({ block, set, isWedding, forms, onError }: { block: Landing
           <Text label="Small label" value={block.label} onChange={(v) => p({ label: v })} />
           <Text label="Heading" value={block.heading} onChange={(v) => p({ heading: v })} />
           <Text label="Paragraph" value={block.body} onChange={(v) => p({ body: v })} area />
-          <Segmented label="Alignment" value={block.align} onChange={(v) => p({ align: v })} options={[{ id: 'left', label: 'Left' }, { id: 'center', label: 'Center' }]} />
           <Switch label="Show inside a card" on={block.card} onClick={() => p({ card: !block.card })} />
         </div>
       );
@@ -724,6 +744,10 @@ export function LandingPageBuilder({ eventId }: { eventId: string }) {
     if (selected === b.id) setSelected(null);
   };
 
+  // The countdown band has lines of its own, so it takes no divider.
+  const lineable = landing.blocks.filter((b) => b.type !== 'countdown');
+  const linesOnAll = lineable.length > 0 && lineable.every((b) => b.divider);
+
   const frame = device === 'mobile' ? { w: 390, h: 844, scale: 0.6 } : { w: 1280, h: 860, scale: 0.36 };
 
   return (
@@ -763,6 +787,14 @@ export function LandingPageBuilder({ eventId }: { eventId: string }) {
           <CustomHtmlEditor landing={landing} setLanding={setLanding} forms={formChoices} slug={info.slug} onError={setError} />
         ) : (
         <>
+        <div className="px-4 py-1.5 rounded-2xl bg-premium-charcoal border border-premium-borderDark">
+          <Switch
+            showState
+            label="Divider lines between all sections"
+            on={linesOnAll}
+            onClick={() => setBlocks(landing.blocks.map((b) => (b.type === 'countdown' ? b : { ...b, divider: !linesOnAll })))}
+          />
+        </div>
         <div className="space-y-2">
           {landing.blocks.map((b, idx) => {
             const open = selected === b.id;
@@ -792,7 +824,8 @@ export function LandingPageBuilder({ eventId }: { eventId: string }) {
                   <button type="button" onClick={() => remove(b)} className="text-zinc-600 hover:text-premium-danger scale-on-click" aria-label="Remove block" title="Remove"><Trash2 className="w-3.5 h-3.5" /></button>
                 </div>
                 {open && (
-                  <div className="px-4 pb-4 pt-2 border-t border-premium-borderDark/60">
+                  <div className="px-4 pb-4 pt-3 border-t border-premium-borderDark/60">
+                    <SectionLayout block={b} set={(patch) => patchBlock(b.id, patch)} />
                     <BlockEditor block={b} set={(patch) => patchBlock(b.id, patch)} isWedding={isWedding} forms={formChoices} onError={setError} />
                   </div>
                 )}

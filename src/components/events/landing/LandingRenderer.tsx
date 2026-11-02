@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Calendar, Clock, MapPin, Users, Globe, Copy, CheckCircle2, Star, Quote, ChevronDown, Navigation, ArrowRight, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { formatEventTime, formPath, useAssetUrl, type EventInfo, type FormButton, type LandingConfig, type DesignConfig } from '@/lib/eventStore';
-import type { LandingBlock, HeroBlock, CtaTarget, ProgramItem } from '@/lib/landingBlocks';
+import { sectionAlign, type LandingBlock, type HeroBlock, type CtaTarget, type ProgramItem, type SectionAlign } from '@/lib/landingBlocks';
 import { alpha, gradientText, luminance, mix, PRISM_COLORS, type ResolvedTheme } from '@/lib/eventTheme';
 import { BrandMark } from '@/components/BrandMark';
 import { venueDisplay } from '@/lib/utils';
@@ -79,6 +79,11 @@ function labelLook(theme: ResolvedTheme, color: string, size: 'md' | 'lg' = 'md'
     : { className: `${size === 'lg' ? 'text-xs @md:text-sm font-semibold' : 'text-[11px] font-bold'} uppercase tracking-[0.3em]`, style: { fontFamily: theme.accentFamily, color } };
 }
 
+/** Flex placement of a row's items for each alignment. */
+const JUSTIFY: Record<SectionAlign, CSSProperties['justifyContent']> = { left: 'flex-start', center: 'center', right: 'flex-end' };
+/** Margin that puts a width-capped box at the left, centre or right of its column. */
+const SELF: Record<SectionAlign, CSSProperties> = { left: { marginRight: 'auto' }, center: { marginInline: 'auto' }, right: { marginLeft: 'auto' } };
+
 function Logo({ refId, size, fallback }: { refId: string; size: 's' | 'm' | 'l'; fallback?: boolean }) {
   const url = useAssetUrl(refId);
   const h = size === 's' ? 32 : size === 'l' ? 64 : 44;
@@ -91,10 +96,10 @@ function Logo({ refId, size, fallback }: { refId: string; size: 's' | 'm' | 'l';
   return <img src={url} alt="Event logo" style={{ height: h, width: 'auto', maxWidth: h * 4 }} className="object-contain" />;
 }
 
-function SectionHead({ label, heading, intro, theme, center }: { label?: string; heading?: string; intro?: string; theme: ResolvedTheme; center?: boolean }) {
+function SectionHead({ label, heading, intro, theme, align = 'left' }: { label?: string; heading?: string; intro?: string; theme: ResolvedTheme; align?: SectionAlign }) {
   if (!label && !heading) return null;
   return (
-    <div className={center ? 'text-center' : ''} style={{ marginBottom: theme.space.stack * 1.4 }}>
+    <div style={{ marginBottom: theme.space.stack * 1.4, textAlign: align }}>
       {label && (
         <p className={`${labelLook(theme, theme.primaryText).className} mb-3`} style={labelLook(theme, theme.primaryText).style}>
           {label}
@@ -105,7 +110,7 @@ function SectionHead({ label, heading, intro, theme, center }: { label?: string;
           {heading}
         </h2>
       )}
-      {intro && <p className={`text-[15px] leading-relaxed mt-3 max-w-2xl ${center ? 'mx-auto' : ''}`} style={{ color: theme.muted }}>{intro}</p>}
+      {intro && <p className="text-[15px] leading-relaxed mt-3 max-w-2xl" style={{ color: theme.muted, ...SELF[align] }}>{intro}</p>}
     </div>
   );
 }
@@ -122,6 +127,9 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
   const [copied, setCopied] = useState(false);
   const light = theme.mode === 'light';
   const center = b.layout === 'center' && b.placement !== 'split';
+  const right = b.layout === 'right' && b.placement !== 'split';
+  /** Where a row of pills, buttons or details starts. */
+  const rowStart = center ? 'center' : right ? 'flex-end' : 'flex-start';
   const placement = b.placement ?? 'inside';
   const onImage = placement === 'inside';
   /** Split: a brand-colour band with the text beside the framed picture. Light text, and gold where the brand colour would vanish. */
@@ -217,8 +225,8 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
 
       <div
         className={`relative z-10 flex-1 flex w-full ${
-          split ? 'flex-col @3xl:flex-row @3xl:items-center gap-10 px-6 pt-4 pb-16 mx-auto' : `flex-col ${placement === 'card' ? 'px-4' : 'px-6'} ${center ? 'items-center text-center' : ''} ${
-            onImage ? (center ? 'justify-center mx-auto py-16' : 'justify-end pb-16 max-w-3xl') : `mx-auto pb-14 ${placement === 'outside' ? 'pt-8' : ''}`
+          split ? 'flex-col @3xl:flex-row @3xl:items-center gap-10 px-6 pt-4 pb-16 mx-auto' : `flex-col ${placement === 'card' ? 'px-4' : 'px-6'} ${center ? 'items-center text-center' : right ? 'items-end text-right' : ''} ${
+            onImage ? (center ? 'justify-center mx-auto py-16' : right ? 'justify-end pb-16 max-w-3xl ml-auto' : 'justify-end pb-16 max-w-3xl') : `mx-auto pb-14 ${placement === 'outside' ? 'pt-8' : ''}`
           }`
         }`}
         style={{
@@ -231,7 +239,7 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
           className={`flex flex-col ${placement === 'card' ? 'w-full p-6 @md:p-10' : ''} ${split ? 'min-w-0 @3xl:flex-1' : ''}`}
           style={{
             gap: theme.space.stack,
-            alignItems: center ? 'center' : 'flex-start',
+            alignItems: center ? 'center' : right ? 'flex-end' : 'flex-start',
             ...(placement === 'card'
               ? { background: theme.card, border: `1px solid ${theme.border}`, borderRadius: Math.max(theme.radius, 16) * 1.5, boxShadow: '0 24px 60px rgba(0,0,0,0.35)' }
               : {}),
@@ -282,14 +290,14 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
           {b.showDescription && info.description && <p className="text-base leading-relaxed max-w-xl" style={{ color: soft }}>{info.description}</p>}
 
           {b.meta === 'inline' && (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm" style={{ color: soft, justifyContent: center ? 'center' : 'flex-start' }}>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm" style={{ color: soft, justifyContent: rowStart }}>
               <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" style={{ color: key }} /> {shortDate(info.startDate)}</span>
               {info.startTime && <span className="flex items-center gap-1.5"><Clock className="w-4 h-4" style={{ color: key }} /> {formatEventTime(info.startTime)}</span>}
               {info.venue && <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" style={{ color: key }} /> {info.venue}</span>}
             </div>
           )}
           {b.meta === 'pills' && (
-            <div className="flex flex-wrap gap-2.5" style={{ justifyContent: center ? 'center' : 'flex-start' }}>
+            <div className="flex flex-wrap gap-2.5" style={{ justifyContent: rowStart }}>
               {[`📅 ${shortDate(info.startDate, true).toUpperCase()}`, info.venue && `📍 ${info.venue.toUpperCase()}`].filter(Boolean).map((t) => (
                 <span key={t as string} className="px-5 py-2.5 rounded-full text-xs font-bold tracking-wider backdrop-blur" style={{ background: 'rgba(0,0,0,0.65)', border: `1px solid ${alpha(theme.primary, 0.45)}`, color: mixLight(theme) }}>
                   {t}
@@ -299,7 +307,7 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
           )}
 
           {b.showCountdown && (
-            <div className="flex gap-2 justify-center flex-wrap">
+            <div className="flex gap-2 justify-center flex-wrap" style={right ? { justifyContent: 'flex-end' } : undefined}>
               {[{ v: time.d, l: 'DAYS' }, { v: time.h, l: 'HRS' }, { v: time.m, l: 'MIN' }, { v: time.s, l: 'SEC' }].map(({ v, l }) => (
                 <div key={l} className="flex flex-col items-center gap-1.5">
                   <div className="w-16 h-16 @md:w-[72px] @md:h-[72px] rounded-xl flex items-center justify-center text-3xl font-black backdrop-blur" style={{ background: 'rgba(0,0,0,0.72)', border: `1px solid ${alpha(theme.primary, 0.5)}`, color: theme.accent, fontFamily: theme.monoFamily || theme.headingFamily }}>
@@ -311,7 +319,7 @@ function HeroSection({ b, p, onLearnMore }: { b: HeroBlock; p: RendererProps; on
             </div>
           )}
 
-          <div className="flex flex-col @sm:flex-row @sm:flex-wrap gap-3 pt-1" style={{ justifyContent: center ? 'center' : 'flex-start' }}>
+          <div className="flex flex-col @sm:flex-row @sm:flex-wrap gap-3 pt-1" style={{ justifyContent: rowStart }}>
             {b.ctaLabel && ctaButtons(p, b.ctaTarget, b.ctaUrl, b.ctaLabel).map((cta) => (
               <Link
                 key={cta.key}
@@ -365,7 +373,7 @@ function GalleryImage({ refId, radius }: { refId: string; radius: number }) {
   return <img src={url} alt="" className="w-full mb-3 break-inside-avoid object-cover" style={{ borderRadius: radius }} loading="lazy" />;
 }
 
-function ImageSection({ refId, caption, theme }: { refId: string; caption: string; theme: ResolvedTheme }) {
+function ImageSection({ refId, caption, theme, align = 'center' }: { refId: string; caption: string; theme: ResolvedTheme; align?: SectionAlign }) {
   const url = useAssetUrl(refId);
   return (
     <figure className="space-y-2">
@@ -377,12 +385,12 @@ function ImageSection({ refId, caption, theme }: { refId: string; caption: strin
           Upload an image in the builder
         </div>
       )}
-      {caption && <figcaption className="text-xs text-center" style={{ color: theme.subtle }}>{caption}</figcaption>}
+      {caption && <figcaption className="text-xs" style={{ color: theme.subtle, textAlign: align }}>{caption}</figcaption>}
     </figure>
   );
 }
 
-function ProgramCard({ it, p }: { it: ProgramItem; p: RendererProps }) {
+function ProgramCard({ it, p, align }: { it: ProgramItem; p: RendererProps; align?: SectionAlign }) {
   const { theme, slug } = p;
   const image = useAssetUrl(it.imageUrl);
   const heading: CSSProperties = { fontFamily: theme.headingFamily, letterSpacing: theme.space.headingTracking };
@@ -406,7 +414,7 @@ function ProgramCard({ it, p }: { it: ProgramItem; p: RendererProps }) {
           </span>
         )}
       </div>
-      <div className="flex flex-col flex-1 gap-3" style={{ padding: theme.space.card }}>
+      <div className="flex flex-col flex-1 gap-3" style={{ padding: theme.space.card, textAlign: align }}>
         {it.tag && <p className="text-[10px] font-bold uppercase tracking-[0.18em] leading-relaxed" style={{ color: theme.primaryText }}>{it.tag}</p>}
         <h3 className="font-black text-xl leading-tight" style={heading}>{it.title}</h3>
         {it.body && <p className="text-sm leading-relaxed" style={{ color: theme.muted }}>{it.body}</p>}
@@ -440,11 +448,12 @@ function ProgramCard({ it, p }: { it: ProgramItem; p: RendererProps }) {
   );
 }
 
-function CountdownBand({ label, until, info, theme }: { label: string; until?: string; info: EventInfo; theme: ResolvedTheme }) {
+function CountdownBand({ label, until, info, theme, align = 'center' }: { label: string; until?: string; info: EventInfo; theme: ResolvedTheme; align?: SectionAlign }) {
   const t = useCountdown(until || info.startDate, until ? '23:59' : info.startTime);
   return (
     <section style={{ background: theme.card, borderTop: `1px solid ${theme.border}`, borderBottom: `1px solid ${theme.border}`, padding: `${theme.space.stack * 1.6}px 24px` }}>
-      <div className="max-w-2xl mx-auto flex flex-col items-center gap-4">
+      {/* Centred, the numbers sit in a narrow column; left or right they line up with the page's column like the other sections. */}
+      <div className="flex flex-col gap-4" style={{ ...(align === 'center' ? { maxWidth: '42rem', marginInline: 'auto' } : { width: theme.pageWidth, marginInline: 'auto' }), alignItems: JUSTIFY[align] }}>
         {label && <p className="text-xs font-mono uppercase tracking-widest" style={{ color: theme.subtle, fontFamily: theme.monoFamily || undefined }}>{label}</p>}
         <div className="flex items-center gap-4 @sm:gap-8">
           {[{ v: t.d, l: 'Days' }, { v: t.h, l: 'Hours' }, { v: t.m, l: 'Min' }, { v: t.s, l: 'Sec' }].map(({ v, l }) => (
@@ -479,7 +488,7 @@ export function LandingRenderer(p: RendererProps) {
       case 'hero':
         return <HeroSection b={b} p={p} onLearnMore={() => learnMore(b.id)} />;
       case 'countdown':
-        return <CountdownBand label={b.label} until={b.until} info={info} theme={theme} />;
+        return <CountdownBand label={b.label} until={b.until} info={info} theme={theme} align={b.align} />;
       case 'details': {
         const items = [
           b.showDate && { icon: Calendar, label: 'Date', val: shortDate(info.startDate) },
@@ -491,7 +500,7 @@ export function LandingRenderer(p: RendererProps) {
           <div style={{ ...column, padding: pad }}>
             <div className="grid grid-cols-2 @2xl:grid-cols-4" style={{ gap: theme.space.gap }}>
               {items.map(({ icon: Icon, label, val }) => (
-                <div key={label} className="flex flex-col gap-2 min-w-0" style={{ ...theme.cardStyle, padding: theme.space.card * 0.85 }}>
+                <div key={label} className="flex flex-col gap-2 min-w-0" style={{ ...theme.cardStyle, padding: theme.space.card * 0.85, ...(b.align ? { textAlign: b.align, alignItems: JUSTIFY[b.align] } : {}) }}>
                   <Icon className="w-5 h-5" style={{ color: theme.primaryText }} />
                   <div className="text-[10px] font-mono uppercase tracking-wider" style={{ color: theme.subtle, fontFamily: theme.monoFamily || undefined }}>{label}</div>
                   <div className="text-sm font-semibold leading-snug break-words" style={heading}>{val}</div>
@@ -504,20 +513,20 @@ export function LandingRenderer(p: RendererProps) {
       case 'text':
         return (
           <div style={{ ...column, padding: pad }}>
-            <SectionHead label={b.label} heading={b.heading} theme={theme} center={b.align === 'center'} />
+            <SectionHead label={b.label} heading={b.heading} theme={theme} align={b.align} />
             <div style={b.card ? { ...theme.cardStyle, padding: theme.space.card * 1.4 } : undefined}>
-              <p className={`text-[15px] leading-[1.85] whitespace-pre-line ${b.align === 'center' ? 'text-center' : ''}`} style={{ color: theme.muted }}>{b.body}</p>
+              <p className="text-[15px] leading-[1.85] whitespace-pre-line" style={{ color: theme.muted, textAlign: b.align }}>{b.body}</p>
             </div>
           </div>
         );
       case 'features':
         return (
           <div style={{ ...column, padding: pad }}>
-            <SectionHead label={b.label} heading={b.heading} intro={b.intro} theme={theme} />
+            <SectionHead label={b.label} heading={b.heading} intro={b.intro} theme={theme} align={sectionAlign(b)} />
             {b.layout === 'list' ? (
               <div style={{ ...theme.cardStyle, padding: theme.space.card * 1.4 }}>
                 {b.items.map((it, i) => (
-                  <div key={it.id} className="flex gap-5" style={{ paddingTop: i ? theme.space.stack : 0, marginTop: i ? theme.space.stack : 0, borderTop: i ? `1px solid ${alpha(theme.primary, 0.15)}` : 'none' }}>
+                  <div key={it.id} className="flex gap-5" style={{ paddingTop: i ? theme.space.stack : 0, marginTop: i ? theme.space.stack : 0, borderTop: i ? `1px solid ${alpha(theme.primary, 0.15)}` : 'none', ...(b.align ? { justifyContent: JUSTIFY[b.align], textAlign: b.align } : {}) }}>
                     <Diamond color={it.color || theme.primary} />
                     <div>
                       <p className="font-black text-[15px]" style={heading}>{it.title}</p>
@@ -530,7 +539,7 @@ export function LandingRenderer(p: RendererProps) {
             ) : (
               <div className={`grid grid-cols-1 ${b.items.length % 3 === 0 ? '@2xl:grid-cols-3' : '@lg:grid-cols-2'}`} style={{ gap: theme.space.gap }}>
                 {b.items.map((it) => (
-                  <div key={it.id} className="flex gap-4" style={{ ...theme.cardStyle, padding: theme.space.card }}>
+                  <div key={it.id} className="flex gap-4" style={{ ...theme.cardStyle, padding: theme.space.card, ...(b.align ? { justifyContent: JUSTIFY[b.align], textAlign: b.align } : {}) }}>
                     <Diamond color={it.color || theme.primary} />
                     <div className="min-w-0">
                       {it.subtitle && <span className="text-xs font-mono font-bold" style={{ color: it.color || theme.primaryText, fontFamily: theme.monoFamily || undefined }}>{it.subtitle}</span>}
@@ -546,25 +555,25 @@ export function LandingRenderer(p: RendererProps) {
       case 'gallery':
         return b.images.length ? (
           <div style={{ ...column, padding: pad }}>
-            <SectionHead label={b.label} heading={b.heading} theme={theme} />
+            <SectionHead label={b.label} heading={b.heading} theme={theme} align={sectionAlign(b)} />
             <div className="columns-2 @2xl:columns-3 gap-3">
               {b.images.map((img) => <GalleryImage key={img.id} refId={img.url} radius={Math.min(theme.radius, 20)} />)}
             </div>
           </div>
         ) : embedded ? (
           <div style={{ ...column, padding: pad }}>
-            <SectionHead label={b.label} heading={b.heading} theme={theme} />
+            <SectionHead label={b.label} heading={b.heading} theme={theme} align={sectionAlign(b)} />
             <div className="h-32 flex items-center justify-center text-xs" style={{ background: theme.surface, border: `1px dashed ${theme.border}`, borderRadius: theme.radius, color: theme.subtle }}>Add photos in the builder</div>
           </div>
         ) : null;
       case 'testimonials':
         return (
           <div style={{ ...column, padding: pad }}>
-            <SectionHead label={b.label} heading={b.heading} theme={theme} />
+            <SectionHead label={b.label} heading={b.heading} theme={theme} align={sectionAlign(b)} />
             <div className="grid grid-cols-1 @lg:grid-cols-2" style={{ gap: theme.space.gap }}>
               {b.items.map((t) => (
-                <div key={t.id} className="space-y-3" style={{ ...theme.cardStyle, padding: theme.space.card }}>
-                  <div className="flex items-center gap-1">
+                <div key={t.id} className="space-y-3" style={{ ...theme.cardStyle, padding: theme.space.card, textAlign: b.align }}>
+                  <div className="flex items-center gap-1" style={b.align ? { justifyContent: JUSTIFY[b.align] } : undefined}>
                     {Array.from({ length: t.rating }).map((_, i) => <Star key={i} className="w-4 h-4" style={{ color: theme.primary, fill: theme.primary }} />)}
                   </div>
                   <p className="text-sm italic leading-relaxed">&ldquo;{t.text}&rdquo;</p>
@@ -577,7 +586,7 @@ export function LandingRenderer(p: RendererProps) {
       case 'quote':
         return (
           <div style={{ ...column, padding: pad }}>
-            <blockquote className="flex gap-4 items-start" style={{ ...theme.cardStyle, padding: theme.space.card * 1.4 }}>
+            <blockquote className="flex gap-4 items-start" style={{ ...theme.cardStyle, padding: theme.space.card * 1.4, ...(b.align ? { justifyContent: JUSTIFY[b.align], textAlign: b.align } : {}) }}>
               <Quote className="w-6 h-6 shrink-0" style={{ color: theme.primaryText }} />
               <div>
                 <p className="text-lg italic leading-relaxed" style={{ fontFamily: theme.accentFamily === theme.headingFamily ? theme.headingFamily : theme.accentFamily }}>{b.text}</p>
@@ -590,10 +599,10 @@ export function LandingRenderer(p: RendererProps) {
         return (
           <div style={{ ...column, padding: pad }}>
             <div style={{ ...theme.cardStyle, padding: theme.space.card * 1.4, border: `1px solid ${alpha(theme.primary, 0.25)}` }}>
-              <SectionHead label={b.label} heading={b.heading} theme={theme} />
+              <SectionHead label={b.label} heading={b.heading} theme={theme} align={sectionAlign(b)} />
               <div className="grid grid-cols-1 @lg:grid-cols-3" style={{ gap: theme.space.gap }}>
                 {b.items.map((it) => (
-                  <div key={it.id}>
+                  <div key={it.id} style={{ textAlign: b.align }}>
                     <div className="text-[10px] font-mono uppercase tracking-wider mb-1" style={{ color: theme.subtle, fontFamily: theme.monoFamily || undefined }}>{it.label}</div>
                     <div className="text-sm font-semibold" style={{ ...heading, color: it.color || undefined }}>{it.value}</div>
                   </div>
@@ -605,7 +614,7 @@ export function LandingRenderer(p: RendererProps) {
       case 'stats':
         return (
           <div style={{ ...column, padding: pad }}>
-            <div style={{ ...theme.cardStyle, padding: theme.space.card * 1.3 }}>
+            <div style={{ ...theme.cardStyle, padding: theme.space.card * 1.3, textAlign: b.align }}>
               {b.label && (
                 <span className={`inline-block px-4 py-1.5 mb-4 ${theme.accentFamily !== theme.headingFamily ? 'text-lg' : 'text-xs font-bold uppercase tracking-widest'}`} style={{ border: `1.5px solid ${theme.primary}`, borderRadius: 7, fontFamily: theme.accentFamily }}>
                   {b.label}
@@ -636,14 +645,14 @@ export function LandingRenderer(p: RendererProps) {
       case 'venue':
         return (
           <div style={{ ...column, padding: pad }}>
-            <SectionHead label={b.label} heading={b.heading} theme={theme} />
-            <div style={{ ...theme.cardStyle, padding: theme.space.card * 1.3 }} className="space-y-4">
+            <SectionHead label={b.label} heading={b.heading} theme={theme} align={sectionAlign(b)} />
+            <div style={{ ...theme.cardStyle, padding: theme.space.card * 1.3, textAlign: b.align }} className="space-y-4">
               <p className="text-sm font-bold" style={heading}>{info.venue}</p>
               {b.body && <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: theme.muted }}>{b.body}</p>}
               {b.tips.length > 0 && (
                 <div className="space-y-3">
                   {b.tips.map((t) => (
-                    <div key={t.id} className="flex items-center gap-3">
+                    <div key={t.id} className="flex items-center gap-3" style={b.align ? { justifyContent: JUSTIFY[b.align] } : undefined}>
                       <span className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-base" style={{ background: t.color || theme.primary }}>{t.label}</span>
                       <p className="text-[13px]" style={{ color: theme.muted }}>{t.value}</p>
                     </div>
@@ -661,24 +670,24 @@ export function LandingRenderer(p: RendererProps) {
       case 'programs':
         return (
           <div style={{ ...column, padding: pad }}>
-            <SectionHead label={b.label} heading={b.heading} intro={b.intro} theme={theme} center />
-            <div className={`grid grid-cols-1 ${b.items.length >= 3 ? '@3xl:grid-cols-3' : b.items.length === 2 ? '@2xl:grid-cols-2' : 'max-w-md mx-auto w-full'}`} style={{ gap: theme.space.gap }}>
-              {b.items.map((it) => <ProgramCard key={it.id} it={it} p={p} />)}
+            <SectionHead label={b.label} heading={b.heading} intro={b.intro} theme={theme} align={sectionAlign(b)} />
+            <div className={`grid grid-cols-1 ${b.items.length >= 3 ? '@3xl:grid-cols-3' : b.items.length === 2 ? '@2xl:grid-cols-2' : 'max-w-md w-full'}`} style={{ gap: theme.space.gap, ...(b.items.length < 2 ? SELF[sectionAlign(b)] : {}) }}>
+              {b.items.map((it) => <ProgramCard key={it.id} it={it} p={p} align={b.align} />)}
             </div>
           </div>
         );
       case 'faq':
         return (
           <div style={{ ...column, padding: pad }}>
-            <SectionHead label={b.label} heading={b.heading} theme={theme} center />
-            <div className="max-w-3xl mx-auto flex flex-col" style={{ gap: theme.space.gap * 0.6 }}>
+            <SectionHead label={b.label} heading={b.heading} theme={theme} align={sectionAlign(b)} />
+            <div className="max-w-3xl flex flex-col" style={{ gap: theme.space.gap * 0.6, ...SELF[sectionAlign(b)] }}>
               {b.items.map((it) => (
                 <details key={it.id} className="group" style={{ ...theme.cardStyle, padding: 0 }}>
                   <summary className="flex items-center justify-between gap-4 cursor-pointer list-none px-5 py-4 font-bold text-[15px] [&::-webkit-details-marker]:hidden" style={heading}>
-                    <span className="min-w-0">{it.question}</span>
+                    <span className="min-w-0 flex-1" style={{ textAlign: b.align }}>{it.question}</span>
                     <ChevronDown className="w-5 h-5 shrink-0 transition-transform group-open:rotate-180" style={{ color: theme.primaryText }} />
                   </summary>
-                  <p className="px-5 pb-5 text-sm leading-relaxed whitespace-pre-line" style={{ color: theme.muted }}>{it.answer}</p>
+                  <p className="px-5 pb-5 text-sm leading-relaxed whitespace-pre-line" style={{ color: theme.muted, textAlign: b.align }}>{it.answer}</p>
                 </details>
               ))}
             </div>
@@ -687,17 +696,17 @@ export function LandingRenderer(p: RendererProps) {
       case 'image':
         return (
           <div style={b.fullWidth ? { padding: `${theme.space.section / 2}px 0` } : { ...column, padding: pad }}>
-            <ImageSection refId={b.url} caption={b.caption} theme={theme} />
+            <ImageSection refId={b.url} caption={b.caption} theme={theme} align={b.align} />
           </div>
         );
       case 'cta':
         return (
-          <div className="text-center" style={{ ...column, padding: `${theme.space.section * 0.75}px 24px` }}>
+          <div style={{ ...column, padding: `${theme.space.section * 0.75}px 24px`, textAlign: sectionAlign(b) }}>
             {b.label && <p className={`${labelLook(theme, theme.primaryText).className} mb-3`} style={labelLook(theme, theme.primaryText).style}>{b.label}</p>}
             {b.heading && <h2 className="font-bold mb-4" style={{ ...heading, fontSize: 'clamp(26px, 5cqw, 44px)' }}>{b.heading}</h2>}
-            {b.body && <p className="max-w-md mx-auto mb-8" style={{ color: theme.muted }}>{b.body}</p>}
+            {b.body && <p className="max-w-md mb-8" style={{ color: theme.muted, ...SELF[sectionAlign(b)] }}>{b.body}</p>}
             {b.ctaLabel && (
-              <div className="flex flex-wrap justify-center gap-3">
+              <div className="flex flex-wrap gap-3" style={{ justifyContent: JUSTIFY[sectionAlign(b)] }}>
                 {ctaButtons(p, b.ctaTarget, b.ctaUrl, b.ctaLabel).map((cta) => (
                   <Link
                     key={cta.key}
@@ -727,17 +736,28 @@ export function LandingRenderer(p: RendererProps) {
         </nav>
       )}
 
-      {visible.map((b) => (
-        <div
-          key={b.id}
-          id={`blk-${b.id}`}
-          onClick={onSelect ? (e) => { e.preventDefault(); onSelect(b.id); } : undefined}
-          className={onSelect ? 'relative cursor-pointer' : 'relative'}
-          style={embedded && selectedId === b.id ? { outline: `3px solid ${theme.primary}`, outlineOffset: -3 } : undefined}
-        >
-          {renderBlock(b)}
-        </div>
-      ))}
+      {visible.map((b, i) => {
+        // The countdown band has lines of its own, so no extra line is drawn against it.
+        const next = visible[i + 1];
+        const line = b.divider && next && b.type !== 'countdown' && next.type !== 'countdown';
+        return (
+          <React.Fragment key={b.id}>
+            <div
+              id={`blk-${b.id}`}
+              onClick={onSelect ? (e) => { e.preventDefault(); onSelect(b.id); } : undefined}
+              className={onSelect ? 'relative cursor-pointer' : 'relative'}
+              style={embedded && selectedId === b.id ? { outline: `3px solid ${theme.primary}`, outlineOffset: -3 } : undefined}
+            >
+              {renderBlock(b)}
+            </div>
+            {line && (
+              <div aria-hidden="true" style={{ ...column, padding: '0 24px' }}>
+                <div style={{ height: 1, background: theme.border }} />
+              </div>
+            )}
+          </React.Fragment>
+        );
+      })}
 
       {visible.length === 0 && (
         <div className="py-32 text-center text-sm" style={{ color: theme.subtle }}>No sections yet — add a block in the builder.</div>

@@ -22,14 +22,20 @@ export interface LandingPair {
   color: string;
 }
 
+export type SectionAlign = 'left' | 'center' | 'right';
+
 interface Base {
   id: string;
   hidden?: boolean;
+  /** Where the section's heading and text sit. Unset keeps the section's own look (see sectionAlign). The hero uses `layout` instead. */
+  align?: SectionAlign;
+  /** A thin line under the section, between it and the next one. */
+  divider?: boolean;
 }
 
 export interface HeroBlock extends Base {
   type: 'hero';
-  layout: 'left' | 'center';
+  layout: SectionAlign;
   /** Where the title and buttons sit: on the image, below it, on a card half over its bottom edge, or beside it on a brand-colour band (the image framed). Older heroes: inside. */
   placement?: 'inside' | 'outside' | 'card' | 'split';
   imageUrl: string;
@@ -54,7 +60,7 @@ export interface HeroBlock extends Base {
 /** `until` (YYYY-MM-DD) counts down to the end of that day instead of the event start: an early-bird deadline. */
 export interface CountdownBlock extends Base { type: 'countdown'; label: string; until?: string }
 export interface DetailsBlock extends Base { type: 'details'; showDate: boolean; showVenue: boolean; showCapacity: boolean; showLink: boolean }
-export interface TextBlock extends Base { type: 'text'; label: string; heading: string; body: string; align: 'left' | 'center'; card: boolean }
+export interface TextBlock extends Base { type: 'text'; label: string; heading: string; body: string; align: SectionAlign; card: boolean }
 export interface FeaturesBlock extends Base { type: 'features'; label: string; heading: string; intro?: string; layout: 'grid' | 'list'; items: LandingListItem[] }
 export interface GalleryBlock extends Base { type: 'gallery'; label: string; heading: string; images: { id: string; url: string }[] }
 export interface TestimonialsBlock extends Base { type: 'testimonials'; label: string; heading: string; items: Testimony[] }
@@ -106,6 +112,13 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; desc: string }[] =
   { type: 'faq', label: 'FAQ', desc: 'Questions that open to show the answer' },
   { type: 'cta', label: 'Call to Action', desc: 'Closing message with a button' },
 ];
+
+/** Where a section's heading sits when its alignment was never chosen: centred for the sections that always were, else left. */
+export function sectionAlign(b: LandingBlock): SectionAlign {
+  if (b.type === 'hero') return b.layout;
+  if (b.align) return b.align;
+  return b.type === 'programs' || b.type === 'faq' || b.type === 'cta' || b.type === 'countdown' || b.type === 'image' ? 'center' : 'left';
+}
 
 let seq = 0;
 export function blockId(prefix = 'b') {
