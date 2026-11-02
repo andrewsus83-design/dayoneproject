@@ -14,6 +14,7 @@ import { useWakeLock } from '@/lib/useWakeLock';
 import { DrawMachine, DRAW_STYLES } from '@/components/raffle/DrawMachine';
 import { SlotSettings } from '@/components/raffle/SlotSettings';
 import { RepeatWinnersToggle } from '@/components/raffle/RepeatWinnersToggle';
+import { useScreenMachineSize } from '@/components/raffle/MachineCabinet';
 import { StageFrameShell } from '@/components/stage/StageFrameShell';
 import { DoorPrizeViewer } from '@/components/events/DoorPrizeViewer';
 import type { SlotResult } from '@/components/raffle/SlotMachine';
@@ -58,6 +59,7 @@ function DoorPrizeArena({ slug, initialId }: { slug: string; initialId?: string 
   const [result, setResult] = useState<SlotResult | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [forfeitError, setForfeitError] = useState<string | null>(null);
+  const machineSize = useScreenMachineSize();
   const digits = numberDigits(guests, config.info.capacity);
   const guestById = (id?: string) => (id ? guests.find((g) => g.id === id) : undefined);
   const drawIdRef = useRef(draw?.id);
@@ -152,7 +154,7 @@ function DoorPrizeArena({ slug, initialId }: { slug: string; initialId?: string 
           </div>
         </header>
 
-        <main className="relative z-20 flex-1 px-8 pb-10 grid grid-cols-1 xl:grid-cols-12 gap-8 items-start max-w-7xl mx-auto w-full">
+        <main className="relative z-20 flex-1 px-8 pb-10 grid grid-cols-1 xl:grid-cols-12 gap-8 items-start max-w-[1800px] mx-auto w-full">
           <div className="xl:col-span-8 flex flex-col items-center gap-6">
             <div className="text-center">
               <span className="text-xs font-bold uppercase tracking-widest text-premium-gold">★ {draw.name} · {DRAW_STYLES.find((s) => s.id === draw.style)?.label} ★</span>
@@ -166,25 +168,29 @@ function DoorPrizeArena({ slug, initialId }: { slug: string; initialId?: string 
                 <RepeatWinnersToggle eventId={eventId} drawId={draw.id} disabled={spinning} />
               </div>
             )}
+            {/* The slot machine, the wheel and the name picker are drawn by pulling the lever; the claw keeps its own button. */}
             <DrawMachine
               key={draw.id}
               eventId={eventId}
               draw={draw}
-              size="md"
+              size={draw.style === 'claw' ? 'md' : machineSize}
               trigger={trigger}
-              showButton={false}
+              showButton={draw.style !== 'claw'}
+              lockedNote={full ? 'All winners drawn' : undefined}
               // The settings fold away when a draw starts, so they never sit on the screen during the reveal.
               onSpinStart={() => { setSpinning(true); setResult(null); setShowSettings(false); }}
               onResult={(r) => { setSpinning(false); setResult(r); }}
             />
-            <button
-              type="button"
-              disabled={spinning || full}
-              onClick={() => setTrigger((t) => t + 1)}
-              className={`px-12 py-4 rounded-2xl font-display font-bold text-base text-black uppercase tracking-wider transition-all shadow-gold scale-on-click flex items-center gap-3 ${spinning || full ? 'bg-zinc-600 cursor-not-allowed' : 'bg-premium-gold hover:bg-premium-goldHover'}`}
-            >
-              {spinning ? <><RefreshCw className="w-5 h-5 animate-spin" /> Drawing…</> : full ? 'All winners drawn' : <><Play className="w-5 h-5 fill-current" /> Draw a winner</>}
-            </button>
+            {draw.style === 'claw' && (
+              <button
+                type="button"
+                disabled={spinning || full}
+                onClick={() => setTrigger((t) => t + 1)}
+                className={`px-12 py-4 rounded-2xl font-display font-bold text-base text-black uppercase tracking-wider transition-all shadow-gold scale-on-click flex items-center gap-3 ${spinning || full ? 'bg-zinc-600 cursor-not-allowed' : 'bg-premium-gold hover:bg-premium-goldHover'}`}
+              >
+                {spinning ? <><RefreshCw className="w-5 h-5 animate-spin" /> Drawing…</> : full ? 'All winners drawn' : <><Play className="w-5 h-5 fill-current" /> Draw a winner</>}
+              </button>
+            )}
             {server && boardError && <p className="text-xs text-premium-danger">{boardError}</p>}
           </div>
 

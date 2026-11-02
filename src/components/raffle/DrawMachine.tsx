@@ -13,6 +13,7 @@ import { SlotMachine, type PickResolver, type SlotEntry, type SlotResult } from 
 import { WheelSpinner } from './WheelSpinner';
 import { NamePicker } from './NamePicker';
 import { ClawMachine3D } from './ClawMachine3D';
+import type { MachineSize } from './MachineCabinet';
 
 export const DRAW_STYLES: { id: DrawStyle; label: string; desc: string }[] = [
   { id: 'slot', label: 'Slot Machine', desc: 'Number reels or a name reel' },
@@ -35,13 +36,16 @@ function revealMs(draw: DoorPrize, reels: number): number {
  * server once it lands. Sample events, and practice spins (`record` off), pick on this device.
  */
 export function DrawMachine({
-  eventId, draw, size = 'md', trigger, showButton = true, record = true, onSpinStart, onResult,
+  eventId, draw, size = 'md', trigger, showButton = true, lockedNote, record = true, onSpinStart, onResult,
 }: {
   eventId: string;
   draw: DoorPrize;
-  size?: 'md' | 'lg';
+  size?: MachineSize;
   trigger?: number;
+  /** The lever that starts a draw (slot machine, wheel, name picker); the claw has its own button. */
   showButton?: boolean;
+  /** Set when no more draws are allowed (e.g. every winner is drawn): the lever locks and this says why. */
+  lockedNote?: string;
   record?: boolean;
   onSpinStart?: () => void;
   onResult?: (r: SlotResult) => void;
@@ -85,11 +89,11 @@ export function DrawMachine({
   const handle = (r: SlotResult) => {
     if (onServer) void refreshDoorPrizeBoard(eventId);
     else if (record) recordDrawWinner(eventId, draw.id, { label: r.label, number: r.number, guestId: r.entry?.id });
-    if (draw.confetti) confetti({ particleCount: size === 'lg' ? 180 : 110, spread: 90, origin: { y: 0.6 }, colors: ['#00F0FF', '#C5A059', '#FF3366', '#00E676'] });
+    if (draw.confetti) confetti({ particleCount: size === 'md' ? 110 : 180, spread: 90, origin: { y: 0.6 }, colors: ['#00F0FF', '#C5A059', '#FF3366', '#00E676'] });
     onResult?.(r);
   };
 
-  const common = { entries, excludeIds: excluded.guestIds, trigger, size, showButton, resolve, onSpinStart, onResult: handle };
+  const common = { entries, excludeIds: excluded.guestIds, trigger, size, showButton, lockedNote, resolve, onSpinStart, onResult: handle };
 
   if (draw.style === 'wheel') return <WheelSpinner key={draw.id} {...common} />;
   if (draw.style === 'picker') return <NamePicker key={draw.id} {...common} />;
@@ -109,6 +113,7 @@ export function DrawMachine({
       size={size}
       trigger={trigger}
       showLever={showButton}
+      lockedNote={lockedNote}
       showResult
       resolve={resolve}
       onSpinStart={onSpinStart}

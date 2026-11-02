@@ -22,6 +22,7 @@ import { formatDate } from '@/lib/utils';
 import { getClientDomain } from '@/lib/domain';
 import { type SlotResult } from '@/components/raffle/SlotMachine';
 import { DrawMachine, DRAW_STYLES } from '@/components/raffle/DrawMachine';
+import { useScreenMachineSize } from '@/components/raffle/MachineCabinet';
 import { PinterestMasonryPhotoWall } from '@/components/events/PinterestMasonryPhotoWall';
 import { BrandMark } from '@/components/BrandMark';
 
@@ -98,6 +99,7 @@ function StageBigScreenContent({ slug }: { slug: string }) {
   const [slotTrigger, setSlotTrigger] = useState(0);
   const [slotResult, setSlotResult] = useState<SlotResult | null>(null);
   const [isRaffleSpinning, setIsRaffleSpinning] = useState(false);
+  const machineSize = useScreenMachineSize();
 
   // The real photo wall (approved photos) for saved events.
   const wallKey = useWallKey(eventId, !sample, keyParam);
@@ -406,7 +408,7 @@ function StageBigScreenContent({ slug }: { slug: string }) {
 
       {/* MODULE 4 (sample events): the door prize marked "on stage" in the dashboard, drawn on this device */}
       {stageMode === 'raffle' && sample && stageDraw && (
-        <main className="flex-1 p-10 flex flex-col justify-center items-center max-w-5xl mx-auto w-full z-10 animate-fadeIn text-center space-y-6">
+        <main style={{ '--wheel-reserve': '440px' } as React.CSSProperties} className="flex-1 p-10 flex flex-col justify-center items-center max-w-[1500px] mx-auto w-full z-10 animate-fadeIn text-center space-y-6">
           <div>
             <span className="text-xs font-mono uppercase text-premium-gold font-bold tracking-widest">
               ★ {stageDraw.name.toUpperCase()} • {(DRAW_STYLES.find((d) => d.id === stageDraw.style)?.label ?? '').toUpperCase()} ★
@@ -415,14 +417,15 @@ function StageBigScreenContent({ slug }: { slug: string }) {
           </div>
 
           <div className="my-2 w-full flex justify-center">
+            {/* The slot machine, the wheel and the name picker are drawn by pulling the lever; the claw keeps its own button. */}
             <DrawMachine
               key={stageDraw.id}
               eventId={eventId}
               draw={stageDraw}
-              size="lg"
+              size={stageDraw.style === 'claw' ? 'lg' : machineSize}
               trigger={slotTrigger}
-              showButton={false}
-              onSpinStart={() => setIsRaffleSpinning(true)}
+              showButton={stageDraw.style !== 'claw'}
+              onSpinStart={() => { setIsRaffleSpinning(true); setSlotResult(null); }}
               onResult={(r) => { setIsRaffleSpinning(false); setSlotResult(r); }}
             />
           </div>
@@ -438,18 +441,20 @@ function StageBigScreenContent({ slug }: { slug: string }) {
             </div>
           )}
 
-          <div className="pt-2">
-            <button
-              type="button"
-              disabled={isRaffleSpinning}
-              onClick={handleStageSpin}
-              className={`px-10 py-4 rounded-2xl font-display font-bold text-sm uppercase tracking-wider text-black shadow-gold transition-all scale-on-click ${
-                isRaffleSpinning ? 'bg-premium-borderDark text-zinc-400 cursor-not-allowed' : 'bg-premium-gold hover:bg-premium-goldHover'
-              }`}
-            >
-              {isRaffleSpinning ? 'DRAWING LIVE ON STAGE...' : 'TRIGGER STAGE DRAW'}
-            </button>
-          </div>
+          {stageDraw.style === 'claw' && (
+            <div className="pt-2">
+              <button
+                type="button"
+                disabled={isRaffleSpinning}
+                onClick={handleStageSpin}
+                className={`px-10 py-4 rounded-2xl font-display font-bold text-sm uppercase tracking-wider text-black shadow-gold transition-all scale-on-click ${
+                  isRaffleSpinning ? 'bg-premium-borderDark text-zinc-400 cursor-not-allowed' : 'bg-premium-gold hover:bg-premium-goldHover'
+                }`}
+              >
+                {isRaffleSpinning ? 'DRAWING LIVE ON STAGE...' : 'TRIGGER STAGE DRAW'}
+              </button>
+            </div>
+          )}
         </main>
       )}
 

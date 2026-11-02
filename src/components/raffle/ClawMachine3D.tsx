@@ -63,7 +63,7 @@ function GiftCube({ size, color, label, style }: { size: number; color: string; 
 }
 
 export function ClawMachine3D({ entries, excludeIds = [], trigger, size = 'md', showButton = true, resolve, onSpinStart, onResult }: MachineProps) {
-  const scale = size === 'lg' ? 1.55 : 1;
+  const scale = size === 'md' ? 1 : 1.55;
   const maxBoxes = 12;
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [phase, setPhase] = useState<Phase>('idle');
@@ -318,7 +318,7 @@ export function ClawMachine3D({ entries, excludeIds = [], trigger, size = 'md', 
       {winner && phase === 'done' && (
         <div className="px-6 py-3 rounded-2xl border border-premium-gold/50 bg-premium-gold/10 text-center">
           <div className="text-[10px] font-mono uppercase text-premium-gold tracking-widest">Lucky guest</div>
-          <div className={`font-display font-bold text-white ${size === 'lg' ? 'text-4xl' : 'text-xl'}`}>{winner.name}</div>
+          <div className={`font-display font-bold text-white ${size === 'md' ? 'text-xl' : 'text-4xl'}`}>{winner.name}</div>
         </div>
       )}
       {showButton && (

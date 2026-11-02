@@ -2,6 +2,7 @@
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { SlotMode } from '@/lib/eventStore';
+import { Lever, MachineCabinet, MachineHint, type MachineSize } from './MachineCabinet';
 
 export interface SlotEntry {
   id: string;
@@ -48,9 +49,11 @@ interface SlotMachineProps {
   excludeNumbers?: number[];
   entries?: SlotEntry[];
   excludeIds?: string[];
-  size?: 'md' | 'lg';
+  size?: MachineSize;
   trigger?: number;
   showLever?: boolean;
+  /** Set when no more draws are allowed (e.g. every winner is drawn): the lever locks and this says why. */
+  lockedNote?: string;
   showResult?: boolean;
   /** Saved events: the server picks the winner, the reels land on it. */
   resolve?: PickResolver;
@@ -59,8 +62,9 @@ interface SlotMachineProps {
 }
 
 const SIZES = {
-  md: { cellH: 84, digitW: 72, nameW: 380, digitText: 'text-5xl', nameText: 'text-2xl', gap: 'gap-2.5', pad: 'p-6' },
-  lg: { cellH: 128, digitW: 112, nameW: 680, digitText: 'text-8xl', nameText: 'text-5xl', gap: 'gap-4', pad: 'p-10' },
+  md: { cellH: 84, digitW: 72, nameW: 380, digitText: 'text-5xl', nameText: 'text-2xl', gap: 'gap-2.5', result: 'text-3xl', person: 'text-xl', maxVw: 70 },
+  lg: { cellH: 128, digitW: 112, nameW: 680, digitText: 'text-8xl', nameText: 'text-5xl', gap: 'gap-4', result: 'text-5xl', person: 'text-3xl', maxVw: 45 },
+  xl: { cellH: 144, digitW: 126, nameW: 820, digitText: 'text-9xl', nameText: 'text-6xl', gap: 'gap-5', result: 'text-6xl', person: 'text-3xl', maxVw: 45 },
 };
 
 const EASE = 'cubic-bezier(0.12, 0.72, 0.16, 1)';
@@ -161,51 +165,15 @@ function Reel({
   );
 }
 
-function Lever({ onPull, disabled, height }: { onPull: () => void; disabled: boolean; height: number }) {
-  const [pulled, setPulled] = useState(false);
-  const travel = height - 70;
-  const pull = () => {
-    if (disabled) return;
-    setPulled(true);
-    onPull();
-    setTimeout(() => setPulled(false), 700);
-  };
-  return (
-    <button
-      type="button"
-      onClick={pull}
-      disabled={disabled}
-      aria-label="Pull the lever"
-      className="relative flex flex-col items-center select-none disabled:cursor-not-allowed scale-on-click"
-      style={{ height, width: 56 }}
-    >
-      <span className="absolute left-1/2 -translate-x-1/2 top-6 bottom-6 w-2 rounded-full bg-premium-surfaceDark border border-premium-borderDark" />
-      <span
-        className="absolute left-1/2 -translate-x-1/2 w-3 rounded-full bg-gradient-to-b from-zinc-300 to-zinc-600 shadow-lg transition-all duration-300 ease-out"
-        style={{ top: pulled ? travel * 0.6 + 20 : 20, height: pulled ? travel * 0.4 : travel }}
-      />
-      <span
-        className={`absolute left-1/2 -translate-x-1/2 w-11 h-11 rounded-full border-2 transition-all duration-300 ease-out flex items-center justify-center ${
-          disabled ? 'bg-zinc-700 border-zinc-600' : 'bg-premium-gold border-premium-goldHover shadow-gold'
-        }`}
-        style={{ top: pulled ? travel : 0 }}
-      >
-        <span className="w-4 h-4 rounded-full bg-white/30" />
-      </span>
-      <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-11 h-5 rounded-xl bg-premium-surfaceDark border border-premium-borderDark" />
-    </button>
-  );
-}
-
 export function SlotMachine({
   mode, totalNumbers, numbers, numberEntries, digits: digitsOverride, revealName = false, excludeNumbers = [], entries = [], excludeIds = [],
-  size = 'md', trigger, showLever = true, showResult = true, resolve, onSpinStart, onResult,
+  size = 'md', trigger, showLever = true, lockedNote, showResult = true, resolve, onSpinStart, onResult,
 }: SlotMachineProps) {
   const s = SIZES[size];
   const maxNumber = numbers ? numbers.reduce((m, n) => Math.max(m, n), 1) : totalNumbers;
   const digits = Math.max(digitsOverride ?? 1, digitCount(maxNumber));
   const reelCount = mode === 'number' ? digits : 1;
-  const layoutKey = `${mode}-${reelCount}`;
+  const layoutKey = `${mode}-${reelCount}-${size}`;
 
   const [spin, setSpin] = useState<{ id: number; key: string; strips: string[][]; stops: number[] } | null>(null);
   const [landed, setLanded] = useState<boolean[]>([]);
@@ -331,19 +299,17 @@ export function SlotMachine({
   const rangeLabel = numbers
     ? `${numbers.filter((n) => !excludeNumbers.includes(n)).length} guest numbers`
     : `numbers ${'1'.padStart(digits, '0')}–${String(Math.max(1, Math.floor(totalNumbers))).padStart(digits, '0')}`;
-  const reelHeight = s.cellH * 3;
+  const idleHint = mode === 'number'
+    ? `Pull the lever · ${rangeLabel} · ${reelCount} reel${reelCount === 1 ? '' : 's'}`
+    : `Pull the lever · ${entries.length - excludeIds.filter((id) => entries.some((e) => e.id === id)).length} guest${entries.length === 1 ? '' : 's'} in the draw`;
+  const busy = phase === 'spinning' || asking;
 
   return (
     <div className="flex flex-col items-center gap-6 w-full">
-      <div
-        className={`relative flex items-center gap-6 rounded-[2.5rem] border-4 border-premium-gold shadow-gold ${s.pad} max-w-full`}
-        style={{ background: 'linear-gradient(145deg, #1D1D20 0%, #18181B 55%, #121214 100%)' }}
+      <MachineCabinet
+        size={size}
+        lever={showLever ? <Lever size={size} onPull={() => void start()} disabled={busy || !!lockedNote} busy={busy} title={lockedNote} /> : undefined}
       >
-        <span className="absolute top-3 left-3 w-6 h-6 border-t-2 border-l-2 border-premium-gold/60 rounded-tl-xl" />
-        <span className="absolute top-3 right-3 w-6 h-6 border-t-2 border-r-2 border-premium-gold/60 rounded-tr-xl" />
-        <span className="absolute bottom-3 left-3 w-6 h-6 border-b-2 border-l-2 border-premium-gold/60 rounded-bl-xl" />
-        <span className="absolute bottom-3 right-3 w-6 h-6 border-b-2 border-r-2 border-premium-gold/60 rounded-br-xl" />
-
         <div className={`flex items-center ${s.gap}`}>
           {strips.map((strip, i) => (
             <Reel
@@ -354,7 +320,7 @@ export function SlotMachine({
               resetKey={layoutKey}
               duration={durations[i]}
               cellH={s.cellH}
-              width={mode === 'number' ? `${s.digitW}px` : `min(${s.nameW}px, 70vw)`}
+              width={mode === 'number' ? `${s.digitW}px` : `min(${s.nameW}px, ${s.maxVw}vw)`}
               textClass={mode === 'number' ? s.digitText : s.nameText}
               isName={mode === 'name'}
               state={shownPhase === 'spinning' ? (landed[i] ? 'landed' : 'spinning') : shownPhase === 'done' ? 'landed' : 'idle'}
@@ -362,39 +328,22 @@ export function SlotMachine({
             />
           ))}
         </div>
-
-        {showLever && (
-          <>
-            <span className="w-px self-stretch bg-premium-borderDark" />
-            <Lever onPull={() => void start()} disabled={phase === 'spinning' || asking} height={Math.min(reelHeight, 240)} />
-          </>
-        )}
-      </div>
+      </MachineCabinet>
 
       {showResult && (
         <div className="text-center space-y-1 min-h-[3.5rem]">
-          {error ? (
-            <p className="text-sm font-bold text-premium-danger">{error}</p>
-          ) : asking ? (
-            <p className="text-sm font-mono text-premium-gold animate-pulse">Drawing…</p>
-          ) : shownPhase === 'spinning' ? (
-            <p className="text-sm font-mono text-premium-gold animate-pulse">Spinning…</p>
-          ) : shownPhase === 'done' && shownResult ? (
+          {!error && !asking && shownPhase === 'done' && shownResult ? (
             <>
               <p className="text-[11px] font-mono uppercase tracking-[0.3em] text-zinc-500">{shownResult.mode === 'number' ? 'Lucky number' : 'Lucky guest'}</p>
-              <p className={`font-display font-bold text-premium-gold ${size === 'lg' ? 'text-5xl' : 'text-3xl'} ${shownResult.mode === 'number' ? 'font-mono tracking-[0.2em]' : ''}`}>
+              <p className={`font-display font-bold text-premium-gold ${s.result} ${shownResult.mode === 'number' ? 'font-mono tracking-[0.2em]' : ''}`}>
                 {shownResult.label}
               </p>
               {revealName && shownResult.mode === 'number' && shownResult.entry && (
-                <p className={`font-display font-medium text-white ${size === 'lg' ? 'text-3xl' : 'text-xl'}`}>{shownResult.entry.name}</p>
+                <p className={`font-display font-medium text-white ${s.person}`}>{shownResult.entry.name}</p>
               )}
             </>
           ) : (
-            <p className="text-sm font-mono text-zinc-500">
-              {mode === 'number'
-                ? `Pull the lever · ${rangeLabel} · ${reelCount} reel${reelCount === 1 ? '' : 's'}`
-                : `Pull the lever · ${entries.length - excludeIds.filter((id) => entries.some((e) => e.id === id)).length} guest${entries.length === 1 ? '' : 's'} in the draw`}
-            </p>
+            <MachineHint size={size} error={error} asking={asking} spinning={shownPhase === 'spinning'} lockedNote={lockedNote} idle={idleHint} />
           )}
         </div>
       )}
