@@ -653,6 +653,11 @@ export function ScreenEditor({ eventId, scene: openedScene, target, liveOn, logo
             </Field>
           )}
           <Slider name="Blur" value={main.blur} min={0} max={24} step={1} format={(v) => `${v}px`} onChange={(blur) => patchMain({ blur }, 'blur')} />
+          {main.blur > 0 && (scene.kind === 'video' || scene.kind === 'web') && (
+            <p className="text-[11px] text-premium-gold leading-relaxed">
+              Blur on a {scene.kind === 'video' ? 'video' : 'moving page'} is heavy for the graphics card and can make a big screen stutter, most on 4K. Check it on the real screen, or blur a picture instead.
+            </p>
+          )}
           <Slider name="Darken" value={main.dim} min={0} max={0.8} step={0.05} format={(v) => `${Math.round(v * 100)}%`} onChange={(dim) => patchMain({ dim }, 'dim')} />
         </div>
         <p className="text-[11px] text-zinc-500 leading-relaxed">The {kindLabel.toLowerCase()} itself cannot be deleted here. To replace it, use Edit on its source card.</p>

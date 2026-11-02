@@ -118,13 +118,17 @@ function ImageStack({ urls, index, fit, kenburns, driftSeconds, ready, fail }: {
   const [tries, setTries] = useState<Record<string, number>>({});
   const current = urls[index] ?? urls[0];
 
-  // Warm the browser cache with every image, nearest first.
+  // Warm the browser cache with every image, nearest first. Each one once: decoding a big picture again and again
+  // pushes the picture on show out of the browser's decoded-image memory, which shows as stutter on a big screen.
+  const warmed = useRef(new Set<string>());
   useEffect(() => {
     const order = urls.map((u, i) => ({ u, d: Math.abs(i - index) })).sort((a, b) => a.d - b.d).map((x) => x.u);
     let cancelled = false;
     (async () => {
       for (const u of order) {
         if (cancelled) return;
+        if (warmed.current.has(u)) continue;
+        warmed.current.add(u);
         const img = new Image();
         img.src = u;
         await img.decode().catch(() => undefined);
@@ -173,6 +177,8 @@ function ImageStack({ urls, index, fit, kenburns, driftSeconds, ready, fail }: {
             style={
               kenburns
                 ? {
+                    // Its own layer, so the slow zoom is the graphics card scaling a finished picture, not a repaint.
+                    willChange: 'transform, opacity',
                     opacity: u === current && loaded[u] ? 1 : 0,
                     // The picture on show zooms slowly; one that is leaving eases back while it fades, so nothing jumps.
                     transform: u === current && loaded[u] ? 'scale(1.1)' : 'scale(1)',
@@ -314,7 +320,10 @@ export function SceneContent({ scene, slide, playing, sound, logo, replay = 0, o
   onOverlays?: (state: OverlayState) => void;
 }) {
   const fit = scene.options.fit === 'cover' ? 'cover' : 'contain';
-  const urls = scene.media.map((m) => m.url);
+  // The same list every render unless the pictures change: a new array each time would restart the slideshow's
+  // picture warm-up (decoding every picture again) on every render.
+  const urlKey = scene.media.map((m) => m.url).join('\n');
+  const urls = useMemo(() => (urlKey ? urlKey.split('\n') : []), [urlKey]);
   const layout = useMemo(() => normalizeLayout(scene.options.layout), [scene.options.layout]);
   const [auto, setAuto] = useState({ from: slide, at: slide });
   const { ready, fail } = useLoadGuard(LOAD_TIMEOUT_MS[scene.kind], onReady, onFail);

@@ -362,12 +362,12 @@ export type ScreenFeedState = 'loading' | 'live' | 'offline' | 'missing';
  * - every request has a time limit, so a hung connection cannot stop the polling;
  * - while the connection is down it keeps the last good feed (also across a restart, from this computer's copy)
  *   and retries with growing waits, then straight away when the network, the tab or the window comes back;
- * - nothing re-renders unless the program or the scene really changed.
+ * - nothing re-renders unless the program, the scene or the connection state really changed (a poll that finds
+ *   nothing new must cost the screen nothing: a re-render every second makes a big screen stutter).
  */
 export function useScreenFeed(screenId: string, intervalMs = 1000) {
   const [feed, setFeed] = useState<ScreenFeed | null>(null);
   const [state, setState] = useState<ScreenFeedState>('loading');
-  const [lastOkAt, setLastOkAt] = useState<number | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -395,7 +395,6 @@ export function useScreenFeed(screenId: string, intervalMs = 1000) {
         const next = await fetchScreenFeed(screenId, request.signal);
         failures = 0;
         if (alive) {
-          setLastOkAt(Date.now());
           if (!next) {
             setState('missing');
             writeCachedFeed(screenId, null);
@@ -464,5 +463,5 @@ export function useScreenFeed(screenId: string, intervalMs = 1000) {
     };
   }, [screenId, intervalMs]);
 
-  return { feed, state, lastOkAt };
+  return { feed, state };
 }

@@ -23,6 +23,11 @@ const enterStyle = (enter: Enter, delay: number, playing: boolean): React.CSSPro
 const loopStyle = (loop: Look['loop'], playing: boolean): React.CSSProperties | undefined =>
   loop === 'none' ? undefined : { animation: `d1-fx-${loop} ${loop === 'pulse' ? 2.4 : 3.6}s ease-in-out infinite`, animationPlayState: playing ? 'running' : 'paused' };
 
+/**
+ * Opacity, shadow and glow. The shadow and glow are drop-shadow filters (they follow the shape and chain into the broad
+ * haze the editor shows). A filter on something that also floats or pulses is redone by the graphics card on every
+ * frame, which is heavy for a weak card on a 4K screen: that combination is the costly one.
+ */
 function lookStyle(look: Look): React.CSSProperties {
   const filters: string[] = [];
   if (look.shadow === 'soft') filters.push('drop-shadow(0 0.4em 0.7em rgba(0,0,0,0.55))');
@@ -49,15 +54,19 @@ export function MainLayer({ main, playing, replay, children }: { main: MainLayou
   }, [replay]);
 
   const moved = main.x !== 0 || main.y !== 0 || main.scale !== 1;
-  const filters = [main.blur > 0 ? `blur(${main.blur}px)` : '', main.dim > 0 ? `brightness(${1 - main.dim})` : ''].filter(Boolean).join(' ');
+  // Darken is a see-through black sheet over the content, not a brightness filter: the same look (black at that
+  // strength multiplies every colour by the same amount), but a filter on a full-screen layer is re-done by the graphics
+  // card for every frame of a video, which stutters a 4K screen. Blur has no such shortcut and stays a filter.
+  const blur = main.blur > 0 ? `blur(${main.blur}px)` : undefined;
   return (
     <div
       data-layer-main
       className="absolute inset-0"
-      style={moved || filters ? { transform: moved ? `translate(${main.x}%, ${main.y}%) scale(${main.scale})` : undefined, filter: filters || undefined } : undefined}
+      style={moved || blur ? { transform: moved ? `translate(${main.x}%, ${main.y}%) scale(${main.scale})` : undefined, filter: blur } : undefined}
     >
       <div ref={enterRef} className="absolute inset-0" style={enterStyle(main.enter, main.delay, playing)}>
         {children}
+        {main.dim > 0 && <div data-layer-dim className="absolute inset-0 bg-black pointer-events-none" style={{ opacity: main.dim }} />}
       </div>
     </div>
   );
