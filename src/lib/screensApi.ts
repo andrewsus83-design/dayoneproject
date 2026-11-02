@@ -13,6 +13,7 @@ import type { StageFrame } from '@/lib/eventStore';
 import type { StageModuleId } from '@/lib/types';
 import type { ProbeResult } from '@/lib/screenUrl';
 import { layoutPaths, type SceneLayout } from '@/lib/sceneLayout';
+import { chromeFiles, normalizeChrome, type ScreenChrome } from '@/lib/screenChrome';
 
 /** 'web' is a link: a web page or an embed (YouTube, Google Slides, Canva…) shown inside the screen. */
 export type SceneKind = 'slides' | 'images' | 'video' | 'web';
@@ -70,12 +71,14 @@ export interface Screen {
   position: number;
   program: Program;
   rev: number;
+  /** The screen's own header, frame and footer (lib/screenChrome.ts); null = drawn as before. Read it with normalizeChrome. */
+  chrome?: Partial<ScreenChrome> | null;
 }
 
 export interface ScreenFeed {
-  screen: Pick<Screen, 'id' | 'name' | 'width' | 'height' | 'program' | 'rev'>;
-  /** wall_key: lets the photo wall module read approved photos on an output that is not signed in. */
-  event: { slug: string; name: string; logo: string | null; wall_key: string | null };
+  screen: Pick<Screen, 'id' | 'name' | 'width' | 'height' | 'program' | 'rev' | 'chrome'>;
+  /** wall_key: lets the photo wall module read approved photos on an output that is not signed in. starts_at and venue_name fill the header. */
+  event: { slug: string; name: string; logo: string | null; wall_key: string | null; starts_at?: string | null; venue_name?: string | null };
   scene: Omit<Scene, 'event_id'> | null;
 }
 
@@ -120,9 +123,12 @@ export const sceneSteps = (scene: Pick<Scene, 'kind' | 'media'> | null | undefin
 /** The output page for one screen (outside /events/<slug>, so no event loading notice ever shows on air). */
 export const outputPath = (screenId: string) => `/live/${screenId}`;
 
-/** The stage page showing one module only, for outputs and previews: no controls, no pointer. */
-export const moduleOutputPath = (slug: string, module: StageModuleId, wallKey?: string | null) =>
-  `/events/${slug}/stage?output=1&module=${module}${module === 'photowall' && wallKey ? `&key=${encodeURIComponent(wallKey)}` : ''}`;
+/**
+ * The stage page showing one module only, for outputs and previews: no controls, no pointer. `bare` leaves out the
+ * stage's own header and ticker, for a screen that draws its own look around it.
+ */
+export const moduleOutputPath = (slug: string, module: StageModuleId, wallKey?: string | null, bare = false) =>
+  `/events/${slug}/stage?output=1&module=${module}${bare ? '&bare=1' : ''}${module === 'photowall' && wallKey ? `&key=${encodeURIComponent(wallKey)}` : ''}`;
 
 /** The photo wall key for previews in the switcher (organizers and screen managers). */
 export async function fetchWallKey(eventId: string): Promise<string | null> {
@@ -138,12 +144,13 @@ function readable(message: string): string {
   if (message.includes('invalid_screen_source')) return 'That source does not exist for this event any more.';
   if (message.includes('a41_scenes_kind_check')) return 'Saving a link needs a one-time database update that has not been applied yet.';
   if (message.includes('a41_scenes_web_https')) return 'A link screen needs a web address that starts with https://.';
+  if (/chrome/.test(message) && /column|schema cache/.test(message)) return 'Saving the screen look needs a one-time database update that has not been applied yet.';
   if (/width|height/.test(message) && /check/.test(message)) return 'Screen size must be between 320 × 240 and 7680 × 4320.';
   if (/Failed to fetch|NetworkError|network|load failed/i.test(message)) return 'No connection. Check the internet and try again.';
   return message;
 }
 
-const SCREEN_COLUMNS = 'id, event_id, name, width, height, position, program, rev';
+const SCREEN_COLUMNS = 'id, event_id, name, width, height, position, program, rev, chrome';
 const SCENE_COLUMNS = 'id, event_id, title, kind, media, options, frame, updated_at';
 
 export async function listScreens(eventId: string): Promise<Screen[]> {
@@ -168,9 +175,30 @@ export async function saveScreen(input: { id?: string; eventId: string; name: st
   return data as Screen;
 }
 
-export async function deleteScreen(id: string): Promise<void> {
-  const { error } = await createClient().from('a41_screens').delete().eq('id', id);
+export async function deleteScreen(screen: Pick<Screen, 'id' | 'chrome'>): Promise<void> {
+  const { error } = await createClient().from('a41_screens').delete().eq('id', screen.id);
   if (error) throw new Error(readable(error.message));
+  await removeMediaFiles(chromeFiles(normalizeChrome(screen.chrome)));
+}
+
+/**
+ * Saves a screen's look (its own header, frame and footer). The output pages notice it at their next poll; outputs
+ * on this device hear it at once. Pictures the look no longer uses are deleted from storage.
+ */
+export async function saveScreenChrome(screen: Pick<Screen, 'id' | 'chrome'>, chrome: ScreenChrome): Promise<Screen> {
+  const { data, error } = await createClient().from('a41_screens').update({ chrome }).eq('id', screen.id).select(SCREEN_COLUMNS).single();
+  if (error) throw new Error(readable(error.message));
+  const saved = data as Screen;
+  try {
+    const bus = new BroadcastChannel(screenBusName(screen.id));
+    bus.postMessage({ program: saved.program, rev: saved.rev });
+    bus.close();
+  } catch {
+    // Other devices pick it up from the server.
+  }
+  const kept = chromeFiles(chrome);
+  await removeMediaFiles(chromeFiles(normalizeChrome(screen.chrome)).filter((u) => !kept.includes(u)));
+  return saved;
 }
 
 /** Puts a source live on a screen; returns the screen with its new rev. */

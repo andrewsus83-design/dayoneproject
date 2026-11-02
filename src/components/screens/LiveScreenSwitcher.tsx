@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Camera, Check, ChevronLeft, ChevronRight, Copy, ExternalLink, Film, Gamepad2, Gift, ImageIcon, Link2, Loader2, Monitor, Pencil,
-  Plus, Presentation, Radio, Send, Sparkles, Trash2, X,
+  Palette, Plus, Presentation, Radio, Send, Sparkles, Trash2, X,
 } from 'lucide-react';
 import { STAGE_MODULE_NAMES } from '@/lib/stageApi';
 import type { StageModuleId } from '@/lib/types';
@@ -13,9 +13,12 @@ import {
   type Scene, type Screen,
 } from '@/lib/screensApi';
 import { hostOf } from '@/lib/screenUrl';
+import { normalizeChrome } from '@/lib/screenChrome';
 import { hasDraft } from '@/lib/sceneDraft';
 import { DESIGN_HEIGHT, FitBox, SourceView, designWidth, useLoadState } from './ScreenView';
 import { LoadBadge } from './LoadBadge';
+import { ScreenChromeView, type ChromeEvent } from './ScreenChromeView';
+import { ScreenLookEditor } from './ScreenLookEditor';
 import { SceneEditor } from './SceneEditor';
 import { ScreenEditor } from './ScreenEditor';
 
@@ -80,6 +83,10 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
   // The screen editor: a draft of the previewed custom screen.
   const [designing, setDesigning] = useState(false);
   const [logo, setLogo] = useState<string | null>(null);
+  // The event as the screens on air have it (name, date, place), for the header of a screen's own look.
+  const [chromeEvent, setChromeEvent] = useState<ChromeEvent | null>(null);
+  // The screen whose header, frame and footer are being set.
+  const [looking, setLooking] = useState<Screen | null>(null);
   // The preview counts as loaded only when the source has really loaded here; Try again mounts it afresh.
   const [previewNonce, setPreviewNonce] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
@@ -115,7 +122,9 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
     return p?.kind === 'scene' ? scenes.find((s) => s.id === p.id) ?? null : null;
   })();
   const dw = target ? designWidth(target.width, target.height) : 1920;
-  const previewKey = `${preview.source}|${previewScene?.updated_at ?? ''}|${previewNonce}`;
+  // Sources are shown inside the chosen screen's own header, frame and footer, as on air.
+  const targetChrome = useMemo(() => normalizeChrome(target?.chrome), [target?.chrome]);
+  const previewKey = `${preview.source}|${previewScene?.updated_at ?? ''}|${previewNonce}|${targetChrome.on ? 'look' : ''}`;
   const { load: previewLoad, onReady: previewReady, onFail: previewFail } = useLoadState(previewKey);
 
   // The event's logo as the screens on air have it, so a footer logo or a Logo item looks the same here as on air.
@@ -123,7 +132,11 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
   useEffect(() => {
     if (!targetId0) return;
     let alive = true;
-    fetchScreenFeed(targetId0).then((f) => alive && setLogo(f?.event.logo ?? null)).catch(() => undefined);
+    fetchScreenFeed(targetId0).then((f) => {
+      if (!alive) return;
+      setLogo(f?.event.logo ?? null);
+      setChromeEvent(f?.event ?? null);
+    }).catch(() => undefined);
     return () => {
       alive = false;
     };
@@ -174,7 +187,7 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
   const removeScreen = (s: Screen) => {
     if (!confirm(`Remove the screen “${s.name}”? Its link stops working.`)) return;
     run(async () => {
-      await deleteScreen(s.id);
+      await deleteScreen(s);
       setScreens((list) => list?.filter((x) => x.id !== s.id) ?? list);
     });
   };
@@ -267,6 +280,9 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
                 >
                   <Pencil className="w-4 h-4" />
                 </button>
+                <button type="button" onClick={() => setLooking(s)} className={`${quiet} ${normalizeChrome(s.chrome).on ? 'text-premium-gold' : ''}`} title="Header, frame and footer of this screen">
+                  <Palette className="w-4 h-4" />
+                </button>
                 <button type="button" onClick={() => removeScreen(s)} className={`${quiet} hover:text-premium-danger`} title="Remove"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
@@ -331,7 +347,9 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
             {target && <span className="text-[10px] font-mono text-zinc-500">as {target.name}</span>}
           </div>
           <FitBox width={dw} height={DESIGN_HEIGHT} className={`w-full aspect-video rounded-2xl border-2 ${previewLoad.state === 'failed' ? 'border-premium-danger/60' : 'border-premium-success/50'}`}>
-            <SourceView key={previewKey} source={preview.source} scene={previewScene} slug={slug} slide={preview.slide} wallKey={wallKey} logo={logo} playing sound={false} onReady={previewReady} onFail={previewFail} />
+            <ScreenChromeView chrome={targetChrome} event={chromeEvent}>
+              <SourceView key={previewKey} source={preview.source} scene={previewScene} slug={slug} slide={preview.slide} wallKey={wallKey} logo={logo} playing sound={false} bare={targetChrome.on} onReady={previewReady} onFail={previewFail} />
+            </ScreenChromeView>
           </FitBox>
           <LoadBadge load={previewLoad} onRetry={() => setPreviewNonce((n) => n + 1)} />
           <div className="flex flex-wrap items-center gap-2">
@@ -374,17 +392,20 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
           </span>
           {target ? (
             <FitBox width={dw} height={DESIGN_HEIGHT} className="w-full aspect-video rounded-2xl border-2 border-premium-danger/50">
-              <SourceView
-                key={`${target.id}|${target.program.source}|${programScene?.updated_at ?? ''}`}
-                source={target.program.source}
-                scene={programScene}
-                slug={slug}
-                slide={target.program.slide}
-                wallKey={wallKey}
-                logo={logo}
-                playing
-                sound={false}
-              />
+              <ScreenChromeView chrome={targetChrome} event={chromeEvent}>
+                <SourceView
+                  key={`${target.id}|${target.program.source}|${programScene?.updated_at ?? ''}|${targetChrome.on ? 'look' : ''}`}
+                  source={target.program.source}
+                  scene={programScene}
+                  slug={slug}
+                  slide={target.program.slide}
+                  wallKey={wallKey}
+                  logo={logo}
+                  playing
+                  sound={false}
+                  bare={targetChrome.on}
+                />
+              </ScreenChromeView>
             </FitBox>
           ) : (
             <div className="w-full aspect-video rounded-2xl border-2 border-dashed border-premium-borderDark flex items-center justify-center text-xs text-zinc-500">No screens yet</div>
@@ -445,11 +466,26 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
         </div>
       </div>
 
+      {looking && (
+        <ScreenLookEditor
+          screen={looking}
+          event={chromeEvent}
+          eventId={eventId}
+          logo={logo}
+          onSaved={(saved) => {
+            setScreens((list) => list?.map((x) => (x.id === saved.id ? saved : x)) ?? list);
+            setLooking(null);
+          }}
+          onClose={() => setLooking(null)}
+        />
+      )}
+
       {designing && previewScene && (
         <ScreenEditor
           eventId={eventId}
           scene={previewScene}
           target={target}
+          event={chromeEvent}
           liveOn={liveOn(sceneSource(previewScene.id))}
           logo={logo}
           startSlide={preview.slide}

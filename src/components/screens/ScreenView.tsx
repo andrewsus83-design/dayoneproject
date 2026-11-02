@@ -305,9 +305,11 @@ function WebFrame({ url, ready, fail }: { url: string; ready: () => void; fail: 
  * added (the content moved or zoomed, text, pictures, the logo, effects). A scene is ready once its content and every
  * added picture have loaded.
  */
-export function SceneContent({ scene, slide, playing, sound, logo, replay = 0, onReady, onFail, onOverlays }: {
+export function SceneContent({ scene, slide, playing, sound, logo, replay = 0, bare = false, onReady, onFail, onOverlays }: {
   scene: SceneLike;
   slide: number;
+  /** The screen draws its own header, frame and footer: leave out the scene's own. */
+  bare?: boolean;
   /** Outputs play videos and run image slideshows; small previews stay still. */
   playing: boolean;
   sound: boolean;
@@ -359,25 +361,33 @@ export function SceneContent({ scene, slide, playing, sound, logo, replay = 0, o
   const kenburns = layout.main.kenburns && (scene.kind === 'images' || scene.kind === 'slides');
   const driftSeconds = scene.kind === 'images' ? Math.max(6, seconds + 1) : 20;
 
-  return (
-    <div className="relative w-full h-full">
-      <StageFrameShell frame={sceneFrame(scene.frame)} logoRef={logo ?? undefined} className="w-full h-full bg-black">
-        <div className="relative flex-1 min-h-0">
-          {!urls.length ? (
-            <div className="absolute inset-0 flex items-center justify-center text-zinc-600 font-mono text-2xl">No media yet</div>
+  const content = (
+    <div className="relative flex-1 min-h-0">
+      {!urls.length ? (
+        <div className="absolute inset-0 flex items-center justify-center text-zinc-600 font-mono text-2xl">No media yet</div>
+      ) : (
+        <MainLayer main={layout.main} playing={playing} replay={replay}>
+          {scene.kind === 'web' ? (
+            <WebFrame url={urls[0]} ready={mainReady} fail={fail} />
+          ) : scene.kind === 'video' ? (
+            <VideoPlayer url={urls[0]} loop={scene.options.loop !== false} sound={!!scene.options.sound && sound} playing={playing} fit={fit} ready={mainReady} fail={fail} />
           ) : (
-            <MainLayer main={layout.main} playing={playing} replay={replay}>
-              {scene.kind === 'web' ? (
-                <WebFrame url={urls[0]} ready={mainReady} fail={fail} />
-              ) : scene.kind === 'video' ? (
-                <VideoPlayer url={urls[0]} loop={scene.options.loop !== false} sound={!!scene.options.sound && sound} playing={playing} fit={fit} ready={mainReady} fail={fail} />
-              ) : (
-                <ImageStack urls={urls} index={index} fit={fit} kenburns={kenburns} driftSeconds={driftSeconds} ready={mainReady} fail={fail} />
-              )}
-            </MainLayer>
+            <ImageStack urls={urls} index={index} fit={fit} kenburns={kenburns} driftSeconds={driftSeconds} ready={mainReady} fail={fail} />
           )}
-        </div>
-      </StageFrameShell>
+        </MainLayer>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="relative w-full h-full flex flex-col bg-black">
+      {bare ? (
+        content
+      ) : (
+        <StageFrameShell frame={sceneFrame(scene.frame)} logoRef={logo ?? undefined} className="w-full h-full bg-black">
+          {content}
+        </StageFrameShell>
+      )}
       {layout.items.length > 0 && <ItemsLayer items={layout.items} playing={playing} replay={replay} logo={logo} onState={setOverlayRaw} />}
     </div>
   );
@@ -392,7 +402,7 @@ const NO_OVERLAY: OverlayState = { pending: 0, failed: 0 };
  * It tells onReady when it has something to show, or onFail why not, so a take can go on air only when the next
  * source is ready.
  */
-export function SourceView({ source, scene, slug, slide, wallKey, logo, playing, sound = false, onReady, onFail }: {
+export function SourceView({ source, scene, slug, slide, wallKey, logo, playing, sound = false, bare = false, onReady, onFail }: {
   source: string;
   scene: SceneLike | null;
   slug: string;
@@ -401,15 +411,17 @@ export function SourceView({ source, scene, slug, slide, wallKey, logo, playing,
   logo?: string | null;
   playing: boolean;
   sound?: boolean;
+  /** The screen draws its own header, frame and footer around this: the module leaves out its header and ticker, the scene its frame and footer. */
+  bare?: boolean;
   onReady?: () => void;
   onFail?: (reason: string) => void;
 }) {
   const parsed = parseSource(source);
   if (parsed?.kind === 'module') {
-    return <ModuleFrame src={moduleOutputPath(slug, parsed.id, wallKey)} title={parsed.id} onReady={onReady} onFail={onFail} />;
+    return <ModuleFrame src={moduleOutputPath(slug, parsed.id, wallKey, bare)} title={parsed.id} onReady={onReady} onFail={onFail} />;
   }
   if (parsed?.kind === 'scene' && scene) {
-    return <SceneContent scene={scene} slide={slide} playing={playing} sound={sound} logo={logo} onReady={onReady} onFail={onFail} />;
+    return <SceneContent scene={scene} slide={slide} playing={playing} sound={sound} logo={logo} bare={bare} onReady={onReady} onFail={onFail} />;
   }
   return <MissingSource onFail={onFail} />;
 }

@@ -14,7 +14,7 @@ import {
 } from '@/lib/eventStore';
 import { AudiencePicker } from '@/components/raffle/AudiencePicker';
 import { SendButtons } from './SendButtons';
-import { FrameDesigner } from '@/components/stage/FrameDesigner';
+import { ScreenLookNote } from '@/components/screens/ScreenLookNote';
 import { downloadBlob, downloadDataUrl, toCsv } from '@/lib/image';
 
 type Tab = 'content' | 'guests' | 'winners' | 'design' | 'screen';
@@ -399,7 +399,7 @@ export function GamesBuilder({ eventId }: { eventId: string }) {
                 <span className="font-mono text-premium-gold">No. 007</span> instead of their name. It is set when you open the lobby.
               </p>
             )}
-            {tab === 'design' && <FrameDesigner value={activity.frame} onChange={(p) => patch({ frame: { ...activity.frame, ...p } })} logoRef={config.design.logoUrl} />}
+            {tab === 'design' && <ScreenLookNote eventId={eventId} />}
             {tab === 'screen' && (
               <div className="space-y-4">
                 <p className="text-xs text-zinc-400">Games have their own link, separate from door prizes. Each activity also has its own link.</p>

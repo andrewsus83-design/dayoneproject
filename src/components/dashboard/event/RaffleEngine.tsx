@@ -13,7 +13,7 @@ import { SendButtons } from './SendButtons';
 import { DrawMachine, DRAW_STYLES } from '@/components/raffle/DrawMachine';
 import { SlotSettings } from '@/components/raffle/SlotSettings';
 import { RepeatWinnersToggle } from '@/components/raffle/RepeatWinnersToggle';
-import { FrameDesigner } from '@/components/stage/FrameDesigner';
+import { ScreenLookNote } from '@/components/screens/ScreenLookNote';
 import { StageFrameShell } from '@/components/stage/StageFrameShell';
 import { downloadBlob, toCsv } from '@/lib/image';
 
@@ -210,7 +210,7 @@ export function RaffleEngine({ eventId }: { eventId: string }) {
 
           {tab === 'design' && (
             <div className="p-6 rounded-[2rem] bg-premium-charcoal border border-premium-borderDark">
-              <FrameDesigner value={draw.frame} onChange={(p) => patch({ frame: { ...draw.frame, ...p } })} logoRef={config.design.logoUrl} />
+              <ScreenLookNote eventId={eventId} />
             </div>
           )}
 

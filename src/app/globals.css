@@ -138,19 +138,20 @@ body {
   box-shadow: 0 0 25px rgba(255, 51, 102, 0.35);
 }
 
-/* Stage LED Marquee Ticker */
-@keyframes marquee {
-  0% {
-    transform: translateX(0%);
+/* Stage LED ticker: StageTicker lays out N identical copies of one unit and slides by exactly one of them,
+   so the loop has no seam and the bar is never empty. */
+@keyframes ticker-slide {
+  from {
+    transform: translate3d(0, 0, 0);
   }
-  100% {
-    transform: translateX(-50%);
+  to {
+    transform: translate3d(calc(-100% / var(--ticker-copies, 2)), 0, 0);
   }
 }
 
-.animate-marquee {
-  display: inline-flex;
-  animation: marquee 25s linear infinite;
+.animate-ticker {
+  animation: ticker-slide var(--ticker-seconds, 25s) linear infinite;
+  will-change: transform;
 }
 
 /* Animated multi-colour text used by the event "prism" title style */

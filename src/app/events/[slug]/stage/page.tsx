@@ -23,6 +23,7 @@ import { getClientDomain } from '@/lib/domain';
 import { type SlotResult } from '@/components/raffle/SlotMachine';
 import { DrawMachine, DRAW_STYLES } from '@/components/raffle/DrawMachine';
 import { useScreenMachineSize } from '@/components/raffle/MachineCabinet';
+import { StageTicker } from '@/components/stage/StageTicker';
 import { PinterestMasonryPhotoWall } from '@/components/events/PinterestMasonryPhotoWall';
 import { BrandMark } from '@/components/BrandMark';
 
@@ -63,6 +64,8 @@ function StageBigScreenContent({ slug }: { slug: string }) {
   const keyParam = search.get('key');
   // Live screens show one module through this page (?output=1&module=<id>): no controls, no keys, no pointer.
   const outputMode = search.get('output') === '1';
+  // A live screen that draws its own header, frame and footer asks for the module without its own (?bare=1).
+  const bare = outputMode && search.get('bare') === '1';
   const moduleParam = search.get('module');
   // The display must not sleep while this is the stage screen (inside a Live Screen, that page holds the lock).
   useWakeLock(!outputMode);
@@ -198,7 +201,7 @@ function StageBigScreenContent({ slug }: { slug: string }) {
       <div className="absolute bottom-0 right-1/4 w-[800px] h-[800px] bg-premium-gold/10 blur-[180px] pointer-events-none rounded-full" />
 
       {/* POPVERSE LED Stage Frame — decorative cathedral border overlay for the big screen */}
-      {slug === 'popverse' && (
+      {slug === 'popverse' && !bare && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src="https://cdn.openart.ai/openart-ai/production/2026-10/create-image/gyygId5ZYPaN2nz17abs/image_1793300675118_e65da6c9_1793300675879_1fc2362a.png"
@@ -209,7 +212,7 @@ function StageBigScreenContent({ slug }: { slug: string }) {
       )}
 
       {/* Top Ballroom Stage Header */}
-      <header className="h-20 px-8 sm:px-12 flex items-center justify-between z-20 backdrop-blur-md bg-premium-surfaceDark/80 border-b border-premium-borderDark">
+      {!bare && <header className="h-20 px-8 sm:px-12 flex items-center justify-between z-20 backdrop-blur-md bg-premium-surfaceDark/80 border-b border-premium-borderDark">
         <div className="flex items-center gap-4 min-w-0">
           <BrandMark size={40} />
           <div className="min-w-0">
@@ -254,7 +257,7 @@ function StageBigScreenContent({ slug }: { slug: string }) {
             </button>
           )}
         </div>
-      </header>
+      </header>}
 
       {/* MODULE 1: Welcome & attendance */}
       {stageMode === 'welcome' && (
@@ -466,13 +469,7 @@ function StageBigScreenContent({ slug }: { slug: string }) {
       )}
 
       {/* Scrolling Stage Bottom Ticker Text */}
-      <div className="h-10 bg-premium-surfaceDark border-t border-premium-borderDark overflow-hidden flex items-center z-20">
-        <div className="whitespace-nowrap animate-marquee font-mono text-xs text-premium-gold flex items-center gap-8">
-          <span>{tickerText}</span>
-          <span>•</span>
-          <span>{tickerText}</span>
-        </div>
-      </div>
+      {!bare && <StageTicker text={tickerText} />}
 
       {/* Stage Tech HUD Controller Bar (Hidden with key H) */}
       {hudVisible && (

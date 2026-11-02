@@ -19,6 +19,8 @@ import {
   type Scene, type Screen,
 } from '@/lib/screensApi';
 import { DESIGN_HEIGHT, FitBox, SceneContent, designWidth, sceneFrame, useLoadState } from './ScreenView';
+import { ScreenChromeView, type ChromeEvent } from './ScreenChromeView';
+import { normalizeChrome } from '@/lib/screenChrome';
 import { LoadBadge } from './LoadBadge';
 import type { OverlayState } from './SceneLayoutView';
 
@@ -149,6 +151,9 @@ function EditOverlay({ stageRef, dw, items, main, sel, onSelect, begin, liveItem
   const [snap, setSnap] = useState({ x: false, y: false });
   const drag = useRef<Drag | null>(null);
 
+  // The area the items sit in is the screen between its own header and footer (the whole screen when it has none).
+  const contentHeight = () => stageRef.current?.offsetHeight || DESIGN_HEIGHT;
+
   const measure = useCallback(() => {
     const stage = stageRef.current;
     if (!stage) return;
@@ -196,7 +201,7 @@ function EditOverlay({ stageRef, dw, items, main, sel, onSelect, begin, liveItem
       const el = stage.querySelector<HTMLElement>('[data-layer-main]');
       e.currentTarget.setPointerCapture(e.pointerId);
       begin();
-      drag.current = { mode: 'move', main: true, sx: e.clientX, sy: e.clientY, x0: main.x, y0: main.y, s, pw: el?.offsetWidth || dw, ph: el?.offsetHeight || DESIGN_HEIGHT };
+      drag.current = { mode: 'move', main: true, sx: e.clientX, sy: e.clientY, x0: main.x, y0: main.y, s, pw: el?.offsetWidth || dw, ph: el?.offsetHeight || contentHeight() };
       return;
     }
     const item = items.find((i) => i.id === target);
@@ -208,7 +213,7 @@ function EditOverlay({ stageRef, dw, items, main, sel, onSelect, begin, liveItem
       drag.current = { mode: 'move', main: false, id: item.id, sx: e.clientX, sy: e.clientY, x0: item.x, y0: item.y, s };
     } else {
       const cx = o.left + ((item.x / 100) * dw) * s;
-      const cy = o.top + ((item.y / 100) * DESIGN_HEIGHT) * s;
+      const cy = o.top + ((item.y / 100) * contentHeight()) * s;
       drag.current = { mode: 'size', id: item.id, type: item.type, size0: item.size, cx, cy, d0: Math.max(10, Math.hypot(e.clientX - cx, e.clientY - cy)) };
     }
   };
@@ -229,7 +234,7 @@ function EditOverlay({ stageRef, dw, items, main, sel, onSelect, begin, liveItem
       return;
     }
     let x = clampPercent(d.x0 + (dx / dw) * 100);
-    let y = clampPercent(d.y0 + (dy / DESIGN_HEIGHT) * 100);
+    let y = clampPercent(d.y0 + (dy / contentHeight()) * 100);
     // Easy to centre: close to the middle sticks to it.
     const sx = Math.abs(x - 50) < 0.8;
     const sy = Math.abs(y - 50) < 0.8;
@@ -266,7 +271,7 @@ function EditOverlay({ stageRef, dw, items, main, sel, onSelect, begin, liveItem
         <ItemBox key={it.id} item={it} index={i} box={view.boxes[it.id]} on={sel === itemSel(it.id)} px={px} handle={handle} onDown={down} />
       ))}
       {snap.x && <div className="absolute top-0 bottom-0 bg-premium-neon pointer-events-none" style={{ left: dw / 2 - px / 2, width: px }} />}
-      {snap.y && <div className="absolute left-0 right-0 bg-premium-neon pointer-events-none" style={{ top: DESIGN_HEIGHT / 2 - px / 2, height: px }} />}
+      {snap.y && <div className="absolute left-0 right-0 bg-premium-neon pointer-events-none" style={{ top: '50%', height: px, transform: 'translateY(-50%)' }} />}
     </div>
   );
 }
@@ -280,11 +285,13 @@ function EditOverlay({ stageRef, dw, items, main, sel, onSelect, begin, liveItem
  * screens until "Push": the draft is only in this browser, and the screens on air keep showing the saved version.
  * Push is possible once the draft has loaded in the preview, like Take in the switcher.
  */
-export function ScreenEditor({ eventId, scene: openedScene, target, liveOn, logo, startSlide = 0, onPushed, onClose }: {
+export function ScreenEditor({ eventId, scene: openedScene, target, event = null, liveOn, logo, startSlide = 0, onPushed, onClose }: {
   eventId: string;
   scene: Scene;
   /** The screen whose shape the preview has, and where Push goes. */
   target: Screen | null;
+  /** The event, for the header of the target screen's own look. */
+  event?: ChromeEvent | null;
   /** Names of the screens that already show this scene. */
   liveOn: string[];
   logo?: string | null;
@@ -324,6 +331,8 @@ export function ScreenEditor({ eventId, scene: openedScene, target, liveOn, logo
   const selection = sel.startsWith('item:') && !selItem ? MAIN : sel;
 
   const dw = target ? designWidth(target.width, target.height) : 1920;
+  // A screen with its own header, frame and footer draws them around the scene, so the scene's own are not drawn.
+  const look = useMemo(() => normalizeChrome(target?.chrome), [target?.chrome]);
 
   /* ── What the preview shows, and whether it has loaded ── */
   const loadKey = [scene.kind, draft.media.map((m) => m.url).join(','), draft.frame.imageUrl ?? '', draft.frame.footerImageUrl ?? '', nonce].join('|');
@@ -667,8 +676,10 @@ export function ScreenEditor({ eventId, scene: openedScene, target, liveOn, logo
 
   const rows: { id: string; icon: React.ReactNode; name: string; sub?: string }[] = [
     ...[...items].reverse().map((i) => ({ id: itemSel(i.id), icon: <ItemIcon item={i} />, name: itemLabel(i), sub: i.type === 'text' ? 'Text' : i.type === 'image' ? 'Picture' : 'Logo' })),
-    { id: FOOTER, icon: <PanelBottom className="w-3.5 h-3.5" />, name: 'Footer', sub: frame.footerOn ? frame.footerStyle === 'image' ? 'Own banner' : frame.footerText || 'On' : 'Deleted' },
-    { id: FRAME, icon: <FrameIcon className="w-3.5 h-3.5" />, name: 'Frame', sub: frame.preset === 'none' ? 'None' : FRAME_PRESETS.find((p) => p.id === frame.preset)?.label },
+    ...(look.on ? [] : [
+      { id: FOOTER, icon: <PanelBottom className="w-3.5 h-3.5" />, name: 'Footer', sub: frame.footerOn ? frame.footerStyle === 'image' ? 'Own banner' : frame.footerText || 'On' : 'Deleted' },
+      { id: FRAME, icon: <FrameIcon className="w-3.5 h-3.5" />, name: 'Frame', sub: frame.preset === 'none' ? 'None' : FRAME_PRESETS.find((p) => p.id === frame.preset)?.label },
+    ]),
     { id: MAIN, icon: <Layers className="w-3.5 h-3.5" />, name: kindLabel, sub: 'The screen itself' },
   ];
 
@@ -731,23 +742,26 @@ export function ScreenEditor({ eventId, scene: openedScene, target, liveOn, logo
 
             <div className="w-full rounded-2xl border-2 border-premium-success/50 overflow-hidden bg-black" style={{ aspectRatio: `${dw} / ${DESIGN_HEIGHT}`, maxHeight: '64vh' }}>
               <FitBox width={dw} height={DESIGN_HEIGHT} className="w-full h-full">
-                <div ref={stageRef} className="absolute inset-0 select-none">
-                  <SceneContent
-                    key={loadKey}
-                    scene={draftScene}
-                    slide={slide}
-                    playing
-                    sound={false}
-                    logo={logo}
-                    replay={replay}
-                    onReady={onReady}
-                    onFail={onFail}
-                    onOverlays={setOverlays}
-                  />
-                  {guides && (
-                    <EditOverlay stageRef={stageRef} dw={dw} items={items} main={main} sel={selection} onSelect={setSel} begin={begin} liveItem={liveItem} liveMain={liveMain} end={end} />
-                  )}
-                </div>
+                <ScreenChromeView chrome={look} event={event}>
+                  <div ref={stageRef} className="absolute inset-0 select-none">
+                    <SceneContent
+                      key={loadKey}
+                      scene={draftScene}
+                      slide={slide}
+                      playing
+                      sound={false}
+                      logo={logo}
+                      replay={replay}
+                      bare={look.on}
+                      onReady={onReady}
+                      onFail={onFail}
+                      onOverlays={setOverlays}
+                    />
+                    {guides && (
+                      <EditOverlay stageRef={stageRef} dw={dw} items={items} main={main} sel={selection} onSelect={setSel} begin={begin} liveItem={liveItem} liveMain={liveMain} end={end} />
+                    )}
+                  </div>
+                </ScreenChromeView>
               </FitBox>
             </div>
 
@@ -817,6 +831,7 @@ export function ScreenEditor({ eventId, scene: openedScene, target, liveOn, logo
                   );
                 })}
               </div>
+              {look.on && <p className="text-[11px] text-zinc-500 leading-relaxed">{target?.name} draws its own header, frame and footer around this screen, so they are not edited here. Change them with the palette button on the screen&apos;s card.</p>}
             </div>
             <div className="pt-3 border-t border-premium-borderDark" data-testid="inspector">
               {inspector}

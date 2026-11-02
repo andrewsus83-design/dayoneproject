@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, ArrowDown, ArrowUp, Check, Film, ImageIcon, Link2, Loader2, Presentation, RotateCw, Trash2, Upload, X } from 'lucide-react';
-import { FRAME_PRESETS } from '@/components/stage/StageFrameShell';
 import type { StageFrame } from '@/lib/eventStore';
 import {
   SCENE_KIND_LABELS, deleteScene, imageForScreen, isExternalMedia, pdfToSlides, probeLink, removeMediaFiles, saveScene, sceneFiles, uploadMedia,
@@ -60,7 +59,9 @@ export function SceneEditor({ eventId, scene, startAs, logo, onSaved, onDeleted,
   const [probe, setProbe] = useState<{ key: string; result?: ProbeResult; error?: string } | null>(null);
   const [nonce, setNonce] = useState(0);
   const [options, setOptions] = useState<SceneOptions>(scene?.options ?? { seconds: 8, loop: true, sound: false, fit: 'contain' });
-  const [frame, setFrame] = useState<Partial<StageFrame>>(scene?.frame ?? {});
+  // What the scene was saved with. It is not edited here any more (the header, frame and footer are set on the screen),
+  // but it is kept, and it is still drawn on a screen that has no look of its own.
+  const [frame] = useState<Partial<StageFrame>>(scene?.frame ?? {});
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -68,8 +69,6 @@ export function SceneEditor({ eventId, scene, startAs, logo, onSaved, onDeleted,
   // Files uploaded in this session; removed again if the editor is closed without saving.
   const fresh = useRef<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
-  const frameRef = useRef<HTMLInputElement>(null);
-  const footerRef = useRef<HTMLInputElement>(null);
 
   /* ── Links: what the address is, what the server says about it, and whether it has loaded here ── */
   const link = useMemo(() => (mode === 'link' ? classifyLink(linkText, { seconds: options.seconds }) : null), [mode, linkText, options.seconds]);
@@ -120,7 +119,6 @@ export function SceneEditor({ eventId, scene, startAs, logo, onSaved, onDeleted,
   })();
 
   const f = sceneFrame(frame);
-  const setF = (patch: Partial<StageFrame>) => setFrame((x) => ({ ...x, ...patch }));
 
   const run = async (fn: () => Promise<void>) => {
     setError(null);
@@ -172,17 +170,6 @@ export function SceneEditor({ eventId, scene, startAs, logo, onSaved, onDeleted,
       }
     });
     if (fileRef.current) fileRef.current.value = '';
-  };
-
-  const uploadFrameImage = (slot: 'frame' | 'footer', file: File | undefined) => {
-    if (!file) return;
-    run(async () => {
-      setProgress('Uploading…');
-      const img = await imageForScreen(file);
-      const m = remember(await uploadMedia(eventId, img.blob, { w: img.w, h: img.h }));
-      if (slot === 'frame') setF({ preset: 'image', imageUrl: m.url, imageBlend: 'normal' });
-      else setF({ footerOn: true, footerStyle: 'image', footerImageUrl: m.url });
-    });
   };
 
   const chooseMode = (m: Mode) => {
@@ -397,52 +384,9 @@ export function SceneEditor({ eventId, scene, startAs, logo, onSaved, onDeleted,
               </div>
             )}
 
-            {/* Frame and footer */}
-            <div className="space-y-2 pt-2 border-t border-premium-borderDark">
-              <span className={label}>Frame</span>
-              <input ref={frameRef} type="file" accept="image/png,image/webp,image/jpeg" className="hidden" onChange={(e) => uploadFrameImage('frame', e.target.files?.[0])} />
-              <div className="flex flex-wrap gap-1.5">
-                {FRAME_PRESETS.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => (p.id === 'image' ? frameRef.current?.click() : setF({ preset: p.id }))}
-                    className={pill(f.preset === p.id)}
-                    title={p.desc}
-                  >
-                    {p.id === 'image' ? 'Upload frame' : p.label}
-                  </button>
-                ))}
-              </div>
-              <p className="text-[11px] text-zinc-500">An uploaded frame should be a PNG with a transparent middle.</p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className={label}>Footer</span>
-                <button type="button" onClick={() => setF({ footerOn: !f.footerOn })} className={pill(f.footerOn)}>{f.footerOn ? 'On' : 'Off'}</button>
-              </div>
-              {f.footerOn && (
-                <>
-                  <input ref={footerRef} type="file" accept="image/png,image/webp,image/jpeg" className="hidden" onChange={(e) => uploadFrameImage('footer', e.target.files?.[0])} />
-                  <div className="flex flex-wrap gap-1.5">
-                    {(['dark', 'gold', 'glass', 'image'] as const).map((s) => (
-                      <button key={s} type="button" onClick={() => (s === 'image' && !f.footerImageUrl ? footerRef.current?.click() : setF({ footerStyle: s }))} className={pill(f.footerStyle === s)}>
-                        {s === 'image' ? 'Own banner' : s[0].toUpperCase() + s.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                  {f.footerStyle === 'image' ? (
-                    <button type="button" onClick={() => footerRef.current?.click()} className={pill(false)}>Upload another banner</button>
-                  ) : (
-                    <>
-                      <input value={f.footerText} onChange={(e) => setF({ footerText: e.target.value.slice(0, 120) })} placeholder="Footer text, e.g. #TechUnite2026" className={input} />
-                      <button type="button" onClick={() => setF({ footerLogo: !f.footerLogo })} className={pill(f.footerLogo)}>Show logo</button>
-                    </>
-                  )}
-                </>
-              )}
-            </div>
+            <p className="pt-2 border-t border-premium-borderDark text-[11px] text-zinc-500 leading-relaxed">
+              The header, frame and footer are set on each live screen (the palette button on its card), not on every custom screen.
+            </p>
           </div>
         </div>
 

@@ -1,7 +1,9 @@
 'use client';
 
-import React, { Component, Suspense, use, useEffect, useReducer, useState } from 'react';
+import React, { Component, Suspense, use, useEffect, useMemo, useReducer, useState } from 'react';
 import { DESIGN_HEIGHT, FitBox, SourceView, designWidth } from '@/components/screens/ScreenView';
+import { ScreenChromeView } from '@/components/screens/ScreenChromeView';
+import { normalizeChrome } from '@/lib/screenChrome';
 import { ScreenControls } from '@/components/screens/ScreenControls';
 import { FpsMeter } from '@/components/screens/FpsMeter';
 import { useScreenFeed, type ScreenFeed } from '@/lib/screensApi';
@@ -14,6 +16,8 @@ interface Layer {
   source: string;
   slide: number;
   scene: ScreenFeed['scene'];
+  /** The screen draws its own header, frame and footer around this layer, so the source leaves out its own. */
+  bare: boolean;
   /** Which try this is: a retry mounts the source again from scratch. */
   attempt: number;
 }
@@ -24,13 +28,17 @@ const RETRY_MS = [2000, 4000, 8000, 15_000, 30_000];
 /** If the source on air crashes, it starts over after this. */
 const RESTART_MS = 4000;
 
-const layerOf = (feed: ScreenFeed): Layer => ({
-  key: `${feed.screen.program.source}|${feed.scene?.updated_at ?? ''}`,
-  source: feed.screen.program.source,
-  slide: feed.screen.program.slide,
-  scene: feed.scene,
-  attempt: 0,
-});
+const layerOf = (feed: ScreenFeed): Layer => {
+  const bare = normalizeChrome(feed.screen.chrome).on;
+  return {
+    key: `${feed.screen.program.source}|${feed.scene?.updated_at ?? ''}|${bare ? 'bare' : ''}`,
+    source: feed.screen.program.source,
+    slide: feed.screen.program.slide,
+    scene: feed.scene,
+    bare,
+    attempt: 0,
+  };
+};
 const domKey = (l: Layer) => `${l.key}#${l.attempt}`;
 
 /**
@@ -212,6 +220,13 @@ function ScreenOutput({ screenId }: { screenId: string }) {
   const height = feed?.screen.height ?? 1080;
   const layers = [shownDown ? null : shown, failed ? null : incoming].filter((l): l is Layer => !!l);
 
+  // The screen's own header, frame and footer stay up through every take, so the ticker never restarts. They switch
+  // on or off together with the source that is on air (the one fading in counts as on air), so a source that draws
+  // its own header is never squeezed under them.
+  const look = useMemo(() => normalizeChrome(feed?.screen.chrome), [feed?.screen.chrome]);
+  const onAir = fading && incoming ? incoming : shown ?? incoming;
+  const chrome = onAir && onAir.bare !== look.on ? { ...look, on: onAir.bare } : look;
+
   const status = [
     state === 'offline' ? 'Offline: showing the last screen, retrying' : state === 'missing' ? 'This screen was removed' : state === 'live' ? 'Connected' : 'Connecting',
     failed ? `Next screen would not load (${failed}) · retrying` : null,
@@ -227,6 +242,7 @@ function ScreenOutput({ screenId }: { screenId: string }) {
 
       <div className="absolute inset-0">
         <FitBox width={designWidth(width, height)} height={DESIGN_HEIGHT} className="w-full h-full">
+          <ScreenChromeView chrome={chrome} event={feed?.event ?? null}>
           {/* The standby sits under everything: it shows until the first source is ready, and whenever the one on air falls over. */}
           <Standby feed={feed} message={state === 'missing' && !shown ? 'This screen is no longer set up.' : undefined} />
           {layers.map((layer) => {
@@ -250,6 +266,7 @@ function ScreenOutput({ screenId }: { screenId: string }) {
                     slide={layer.slide}
                     wallKey={feed?.event.wall_key}
                     logo={feed?.event.logo}
+                    bare={layer.bare}
                     // A take's video waits for its fade, so it starts from the beginning in front of the audience.
                     playing={!isIncoming || fading}
                     sound={started}
@@ -260,6 +277,7 @@ function ScreenOutput({ screenId }: { screenId: string }) {
               </div>
             );
           })}
+          </ScreenChromeView>
         </FitBox>
       </div>
 
