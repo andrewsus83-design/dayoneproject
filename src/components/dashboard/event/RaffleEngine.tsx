@@ -12,6 +12,7 @@ import { AudiencePicker } from '@/components/raffle/AudiencePicker';
 import { SendButtons } from './SendButtons';
 import { DrawMachine, DRAW_STYLES } from '@/components/raffle/DrawMachine';
 import { SlotSettings } from '@/components/raffle/SlotSettings';
+import { RepeatWinnersToggle } from '@/components/raffle/RepeatWinnersToggle';
 import { FrameDesigner } from '@/components/stage/FrameDesigner';
 import { StageFrameShell } from '@/components/stage/StageFrameShell';
 import { downloadBlob, toCsv } from '@/lib/image';
@@ -171,6 +172,7 @@ export function RaffleEngine({ eventId }: { eventId: string }) {
                   </div>
                 </StageFrameShell>
               </div>
+              <RepeatWinnersToggle eventId={eventId} drawId={draw.id} />
               <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
                 <input type="checkbox" checked={saveWinners} onChange={(e) => setSaveWinners(e.target.checked)} className="accent-[#C5A059]" />
                 Save winners drawn here (off = practice spins)
@@ -188,7 +190,7 @@ export function RaffleEngine({ eventId }: { eventId: string }) {
                 <input type="checkbox" checked={draw.confetti} onChange={(e) => patch({ confetti: e.target.checked })} className="accent-[#C5A059]" />
                 Confetti burst when a winner is revealed
               </label>
-              <p className="text-[11px] text-zinc-500 sm:col-span-2">Only checked-in guests can win, and a guest can only win once across all door prizes.</p>
+              <p className="text-[11px] text-zinc-500 sm:col-span-2">Only checked-in guests can win, and a guest can only win once across all door prizes, unless “Winner can participate again” is on for this door prize (Machine tab).</p>
             </div>
           )}
 

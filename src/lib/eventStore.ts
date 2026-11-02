@@ -323,6 +323,8 @@ export interface DoorPrize {
   pickedGuestIds: string[];
   anonymous: boolean;
   numberSource: 'guests' | 'range';
+  /** On: a guest (or number) that already won another door prize can be drawn again. Off: one win per event. */
+  repeatWinners: boolean;
 }
 
 export interface GamesConfig {
@@ -585,10 +587,15 @@ export function buildDefaults(base: Event): EventConfig {
   };
 }
 
-export function drawExclusions(config: EventConfig) {
+/**
+ * Guests and numbers a draw cannot pick: everyone who won any door prize, or, when the draw lets winners
+ * participate again, only the winners of that same door prize.
+ */
+export function drawExclusions(config: EventConfig, draw?: Pick<DoorPrize, 'id' | 'repeatWinners'>) {
   const numbers: number[] = [];
   const guestIds: string[] = [];
   for (const d of config.doorprizes.items) {
+    if (draw?.repeatWinners && d.id !== draw.id) continue;
     for (const w of d.winners) {
       if (typeof w.number === 'number') numbers.push(w.number);
       if (w.guestId) guestIds.push(w.guestId);
@@ -773,7 +780,7 @@ function defaultDoorPrizes(base: Event): DoorPrizesConfig {
 }
 
 const ACTIVITY_EXTRAS = { audience: 'all' as Audience, pickedGuestIds: [] as string[], anonymous: false, prize: '', winners: [] as GameWinner[], nameAlign: 'left' as NameAlign };
-const DRAW_EXTRAS = { audience: 'all' as Audience, pickedGuestIds: [] as string[], anonymous: false, numberSource: 'guests' as const };
+const DRAW_EXTRAS = { audience: 'all' as Audience, pickedGuestIds: [] as string[], anonymous: false, numberSource: 'guests' as const, repeatWinners: false };
 
 function normalizeGames(defaults: GamesConfig, stored: Partial<GamesConfig> | undefined): GamesConfig {
   const merged = { ...defaults, ...stored };

@@ -12,6 +12,7 @@ import { boardExclusions, forfeitDraw, serverPrize, toDrawWinner, useDoorPrizeBo
 import { stageBusName } from '@/lib/stageApi';
 import { DrawMachine, DRAW_STYLES } from '@/components/raffle/DrawMachine';
 import { SlotSettings } from '@/components/raffle/SlotSettings';
+import { RepeatWinnersToggle } from '@/components/raffle/RepeatWinnersToggle';
 import { StageFrameShell } from '@/components/stage/StageFrameShell';
 import { DoorPrizeViewer } from '@/components/events/DoorPrizeViewer';
 import type { SlotResult } from '@/components/raffle/SlotMachine';
@@ -68,8 +69,8 @@ function DoorPrizeArena({ slug, initialId }: { slug: string; initialId?: string 
       ? (prize?.winners ?? []).map((w) => ({ ...toDrawWinner(prize!, w, digits), forfeited: w.status === 'forfeited' }))
       : draw.winners;
   const awarded = server ? prize?.awarded ?? 0 : draw?.winners.length ?? 0;
-  // A guest wins once per event, across all door prizes.
-  const excludedIds = new Set((server ? boardExclusions(board) : drawExclusions(config)).guestIds);
+  // A guest wins once per event, across all door prizes, unless this door prize lets winners participate again.
+  const excludedIds = new Set((server ? boardExclusions(board, draw) : drawExclusions(config, draw)).guestIds);
   const eligible = draw ? guestPool(guests, draw.audience, draw.pickedGuestIds).filter((g) => !excludedIds.has(g.id)).length : 0;
   const full = !!draw && awarded >= draw.quantity;
 
@@ -174,6 +175,7 @@ function DoorPrizeArena({ slug, initialId }: { slug: string; initialId?: string 
             >
               {spinning ? <><RefreshCw className="w-5 h-5 animate-spin" /> Drawing…</> : full ? 'All winners drawn' : <><Play className="w-5 h-5 fill-current" /> Draw a winner</>}
             </button>
+            <RepeatWinnersToggle eventId={eventId} drawId={draw.id} disabled={spinning} />
             {server && boardError && <p className="text-xs text-premium-danger">{boardError}</p>}
           </div>
 

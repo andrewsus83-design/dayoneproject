@@ -120,6 +120,11 @@ function itemPayload(d: DoorPrize) {
   return { id: d.id, name: d.name.trim() || 'Door Prize', prize: d.prize.trim(), quantity: d.quantity, anonymous: d.anonymous };
 }
 
+/** Sent only when on, so a draw with the setting off is the same call the server always understood. */
+function repeatArg(d: DoorPrize) {
+  return d.repeatWinners ? { p_repeat: true } : {};
+}
+
 /** Makes the server's door prizes match the setup. Returns the organizers' board. */
 export async function syncDoorPrizes(eventId: string, items: DoorPrize[]): Promise<DoorPrizeBoard> {
   const board = await rpc<DoorPrizeBoard>('a41_sync_door_prizes', { p_event: eventId, p_items: items.slice(0, 100).map(itemPayload) });
@@ -129,7 +134,9 @@ export async function syncDoorPrizes(eventId: string, items: DoorPrize[]): Promi
 
 /**
  * Draws a winner of the door prize: a random checked-in guest with no draw in this event yet (only the picked
- * guests when the door prize is for picked guests). revealMs is how long the machine animates first.
+ * guests when the door prize is for picked guests). With the door prize's "winner can participate again" on, guests
+ * who won another door prize are drawn from too; its own winners and forfeited guests never are.
+ * revealMs is how long the machine animates first.
  */
 export async function drawDoorPrize(eventId: string, draw: DoorPrize, revealMs: number): Promise<GuestDraw> {
   const picked = draw.audience === 'picked' ? draw.pickedGuestIds.filter((id) => UUID.test(id)) : null;
@@ -138,6 +145,7 @@ export async function drawDoorPrize(eventId: string, draw: DoorPrize, revealMs: 
     p_item: itemPayload(draw),
     p_picked: picked,
     p_reveal_ms: Math.round(revealMs),
+    ...repeatArg(draw),
   });
   return { drawId: r.draw.id, guest: r.guest };
 }
@@ -149,6 +157,7 @@ export async function drawDoorNumber(eventId: string, draw: DoorPrize, total: nu
     p_item: itemPayload(draw),
     p_total: Math.floor(total),
     p_reveal_ms: Math.round(revealMs),
+    ...repeatArg(draw),
   });
   return { drawId: r.draw.id, number: r.draw.number };
 }
@@ -236,12 +245,16 @@ export function useDoorPrizeBoard(eventId: string | null, pollMs = 0) {
   return { ...state, refresh };
 }
 
-/** Every guest and number that already has a draw (won or forfeited): the server never draws them again. */
-export function boardExclusions(board: DoorPrizeBoard | null) {
+/**
+ * Every guest and number that already has a draw (won or forfeited): the server never draws them again. For a
+ * door prize that lets winners participate again, only its own draws and forfeited ones count.
+ */
+export function boardExclusions(board: DoorPrizeBoard | null, draw?: Pick<DoorPrize, 'id' | 'repeatWinners'>) {
   const numbers: number[] = [];
   const guestIds: string[] = [];
   for (const p of board?.prizes ?? []) {
     for (const w of p.winners) {
+      if (draw?.repeatWinners && p.config_id !== draw.id && w.status !== 'forfeited') continue;
       if (typeof w.number === 'number') numbers.push(w.number);
       if (w.guest_id) guestIds.push(w.guest_id);
     }

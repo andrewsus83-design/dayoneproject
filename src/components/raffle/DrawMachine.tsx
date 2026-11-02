@@ -54,8 +54,9 @@ export function DrawMachine({
   const digits = numberDigits(guests, config.info.capacity);
   const nameOf = (g: Pick<Guest, 'name' | 'guest_number'>) => (draw.anonymous ? `No. ${formatGuestNumber(g.guest_number, digits)}` : g.name);
   const entries: SlotEntry[] = pool.map((g) => ({ id: g.id, name: nameOf(g) }));
-  // Saved events: whoever the server already drew (won or forfeited) is out; it never draws them again.
-  const excluded = server ? boardExclusions(board) : drawExclusions(config);
+  // Saved events: whoever the server already drew (won or forfeited) is out; it never draws them again. A door prize
+  // that lets winners participate again only leaves out its own winners and forfeited guests.
+  const excluded = server ? boardExclusions(board, draw) : drawExclusions(config, draw);
 
   // Number draws: real guest numbers from the pool, or a plain 1–N range.
   const byGuests = draw.numberSource !== 'range';
