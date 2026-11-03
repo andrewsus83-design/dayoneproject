@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   addResponse, findForm, readGuests, todayIso, useAssetUrl, useEventConfigBySlug, useResponses, useSampleGuests, writeGuests,
   formatEventDate, nextGuestNumber, numberDigits,
@@ -56,6 +56,8 @@ export function InvitationFormPage({ slug, formId }: { slug: string; formId: str
   const sampleGuests = useSampleGuests(eventId);
   // The pass this phone holds for this form, so sending the form again updates the same guest.
   const heldPass = useStoredPasses(slug)[formId] ?? null;
+  // A personal link from the host (?t=<their pass>) tells the server which guest on the list is answering.
+  const invite = useSearchParams().get('t')?.trim().slice(0, 80) || null;
   const router = useRouter();
   const [replyNotice, setReplyNotice] = useState<string | null>(null);
   const form = useMemo(() => findForm(config, formId), [config, formId]);
@@ -132,6 +134,7 @@ export function InvitationFormPage({ slug, formId }: { slug: string; formId: str
       answers: r.answers,
       token: heldPass,
       form: formId,
+      invite,
     };
     let res: RegisterResult;
     try {

@@ -569,7 +569,7 @@ export function buildDefaults(base: Event): EventConfig {
       guestNumbers: true,
       numberLabel: 'Guest No.',
       background: '',
-      sendConfirmation: false,
+      sendConfirmation: true,
     },
     forms: { items: [], order: [] },
     access: { ...DEFAULT_ACCESS },

@@ -167,6 +167,8 @@ export interface RegisterInput {
   token?: string | null;
   /** The form replied to: '' (or left out) is the first form, else the id of one of the event's other forms. */
   form?: string;
+  /** The pass in the personal invitation link the host sent (?t=), so the reply lands on that guest's own entry. */
+  invite?: string | null;
 }
 
 export type RegisterFailure = 'not_found' | 'closed' | 'paused' | 'not_open' | 'full' | 'invalid' | 'rate_limited';
@@ -404,6 +406,7 @@ export async function registerGuest(slug: string, input: RegisterInput): Promise
     p_token: input.token || null,
     // The first form is called without p_form, as before forms existed.
     ...(input.form ? { p_form: input.form } : {}),
+    ...(input.invite ? { p_invite: input.invite } : {}),
   });
   if (result.ok && result.stored) storePass(slug, result.token, input.form ?? '');
   return result;

@@ -3,7 +3,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import {
-  CheckCircle2, ClipboardCheck, Download, Loader2, Pencil, Plus, RefreshCw, Trash2, Upload, XCircle,
+  Check, CheckCircle2, ClipboardCheck, Download, Link2, Loader2, Pencil, Plus, RefreshCw, Trash2, Upload, XCircle,
 } from 'lucide-react';
 import type { Guest } from '@/lib/types';
 import {
@@ -14,31 +14,33 @@ import {
   type GuestInput, type ImportResult,
 } from '@/lib/guestsApi';
 import { downloadBlob, toCsv } from '@/lib/image';
+import { broadcastLink } from '@/lib/broadcast';
 import { FormFilter, inForm } from './FormFilter';
+import { SendButtons, useOrigin } from './SendButtons';
 
 type SubTab = 'list' | 'invitation' | 'import';
 
 /** Spreadsheet apps run cells that start with = + - @ as formulas; a leading ' keeps them as text. */
 const cell = (v: string | number) => (typeof v === 'string' && /^[=+\-@]/.test(v) ? `'${v}` : v);
 
-/** One spreadsheet row → a guest. Column names are matched loosely (Name, Phone, Email, "Phone / Email", Category, Table). */
+/** One spreadsheet row → a guest. Column names are matched loosely, in English or Indonesian (Name/Nama, Phone/No HP, Email, "Phone / Email", Category/Kategori, Table/Meja). */
 function rowToGuest(row: Record<string, unknown>): GuestInput {
   const keys = Object.keys(row);
   const pick = (test: (h: string) => boolean) => {
     const k = keys.find((h) => test(h.toLowerCase().trim()));
     return k ? String(row[k] ?? '').trim() : '';
   };
-  const name = pick((h) => h.includes('name') && !h.includes('company'));
+  const name = pick((h) => (h.includes('name') || h.includes('nama')) && !h.includes('company') && !h.includes('perusahaan'));
   const email = pick((h) => h.includes('email') && !h.includes('phone'));
-  const phone = pick((h) => (h.includes('phone') || h.includes('whatsapp') || h.includes('mobile') || h === 'wa') && !h.includes('email'));
+  const phone = pick((h) => (h.includes('phone') || h.includes('whatsapp') || h.includes('mobile') || h.includes('telepon') || h.includes('telp') || /^(wa|hp|no\.? ?hp)$/.test(h)) && !h.includes('email'));
   const contact = pick((h) => h.includes('contact') || (h.includes('phone') && h.includes('email')));
   const fromContact = splitContact(contact);
   return {
     name,
     email: email || fromContact.email,
     phone: phone || fromContact.phone,
-    tags: pick((h) => h.includes('category') || h.includes('tag') || h === 'type'),
-    table_no: pick((h) => h.includes('table') || h.includes('seat')),
+    tags: pick((h) => h.includes('category') || h.includes('kategori') || h.includes('tag') || h === 'type'),
+    table_no: pick((h) => h.includes('table') || h.includes('meja') || h.includes('seat')),
   };
 }
 
@@ -87,6 +89,20 @@ export function GuestsTab({ eventId, onOpenInvitationBuilder }: { eventId: strin
   const [status, setStatus] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null);
   const [working, setWorking] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const origin = useOrigin();
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  /** The link to a guest's QR pass: the same one the pass and reminder emails carry. */
+  const passLink = (g: Guest) => broadcastLink('pass', info.slug, origin, g);
+  const copyPassLink = async (g: Guest) => {
+    try {
+      await navigator.clipboard.writeText(passLink(g));
+      setCopiedId(g.id);
+      window.setTimeout(() => setCopiedId((id) => (id === g.id ? null : id)), 2000);
+    } catch {
+      say('Could not copy the link. Copy it from the Pass link column of the exported CSV instead.', 'error');
+    }
+  };
 
   const say = (text: string, tone: 'ok' | 'error' = 'ok') => setStatus({ text, tone });
   const checkedIn = guests.filter((g) => g.is_checked_in).length;
@@ -185,12 +201,12 @@ export function GuestsTab({ eventId, onOpenInvitationBuilder }: { eventId: strin
 
   const handleExport = () => {
     const rows = [
-      ['No.', ...(multi ? ['Form'] : []), 'Name', 'Email', 'Phone', 'Category', 'Table', 'RSVP', 'Party', 'QR Token', 'Checked in'],
+      ['No.', ...(multi ? ['Form'] : []), 'Name', 'Email', 'Phone', 'Category', 'Table', 'RSVP', 'Party', 'QR Token', 'Pass link', 'Checked in'],
       ...guests.filter((g) => inForm(g, formFilter)).map((g) => [
         formatGuestNumber(g.guest_number, digits), ...(multi ? [formLabel(findForm(config, g.form_id ?? ''))] : []),
         g.name, g.email ?? '', g.phone ?? '', (g.tags ?? [g.category]).filter(Boolean).join(', '),
         g.table_number ?? '', g.rsvp_status, g.rsvp_status === 'attending' ? g.party_size || g.plus_one_count + 1 : '', g.qr_code_token,
-        g.is_checked_in ? 'Yes' : 'No',
+        passLink(g), g.is_checked_in ? 'Yes' : 'No',
       ].map(cell)),
     ];
     downloadBlob(`${info.slug}${formFilter ? `-${formFilter}` : ''}-guests.csv`, new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' }));
@@ -448,7 +464,21 @@ export function GuestsTab({ eventId, onOpenInvitationBuilder }: { eventId: strin
                         <td className="p-4 text-zinc-300 font-medium">{g.table_number || 'General Seating'}</td>
                       </>
                     )}
-                    <td className="p-4 text-zinc-500 font-mono text-[10px]" title={g.qr_code_token}>{passCode(g.qr_code_token)}</td>
+                    <td className="p-4">
+                      <div className="text-zinc-500 font-mono text-[10px]" title={g.qr_code_token}>{passCode(g.qr_code_token)}</div>
+                      <div className="mt-1.5 flex items-center gap-1.5 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => void copyPassLink(g)}
+                          title={`Copy ${g.name}'s QR pass link`}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 scale-on-click border ${copiedId === g.id ? 'border-premium-success/40 text-premium-success' : 'border-premium-borderDark text-zinc-300 hover:text-white hover:border-premium-gold/50'}`}
+                        >
+                          {copiedId === g.id ? <Check className="w-3 h-3" /> : <Link2 className="w-3 h-3" />}
+                          {copiedId === g.id ? 'Copied' : 'Copy link'}
+                        </button>
+                        <SendButtons eventId={eventId} kind="pass" guest={g} size="sm" />
+                      </div>
+                    </td>
                     <td className="p-4 text-right">
                       {g.is_checked_in ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-premium-success/15 text-premium-success font-bold text-[10px] border border-premium-success/30">

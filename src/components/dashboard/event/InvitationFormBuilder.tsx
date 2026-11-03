@@ -1305,6 +1305,11 @@ export function InvitationFormBuilder({ eventId }: { eventId: string }) {
                       : 'This form has no email question, so there is nowhere to send it. Add “Your email address” from the Essentials on the Questions tab.'}
                   </p>
                 )}
+                {inv.sendConfirmation && serverReplies && findQuestion(questions, 'email') && !findQuestion(questions, 'email')?.required && (
+                  <p className="text-[11px] text-premium-gold bg-premium-gold/10 border border-premium-gold/30 rounded-xl px-3 py-2">
+                    Guests can skip the email question, and then they get no email. Make “{findQuestion(questions, 'email')?.label}” required on the Questions tab so everyone gets their QR pass and link by email.
+                  </p>
+                )}
                 {inv.guestNumbers && (
                   <Field label="Number label on the ticket">
                     <input value={inv.numberLabel} onChange={(e) => setInv({ numberLabel: e.target.value })} placeholder="Guest No." className={inputCls} />

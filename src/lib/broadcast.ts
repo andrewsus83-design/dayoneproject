@@ -21,10 +21,16 @@ export function feedbackLink(slug: string, origin: string, guest?: Pick<Guest, '
   return guest?.qr_code_token ? `${base}?t=${encodeURIComponent(guest.qr_code_token)}` : base;
 }
 
-/** Where each template's button and {link} point. */
-export function broadcastLink(kind: BroadcastKind, slug: string, origin: string, guest?: Pick<Guest, 'qr_code_token'> | null): string {
+/**
+ * Where each template's button and {link} point. A guest's invitation link is personal (?t=<their pass>) and opens the
+ * form they belong to, so their reply lands on their own entry on the list instead of becoming a second guest.
+ */
+export function broadcastLink(kind: BroadcastKind, slug: string, origin: string, guest?: Pick<Guest, 'qr_code_token' | 'form_id'> | null): string {
   const base = `${origin}/events/${slug}`;
-  if (kind === 'invitation') return `${base}/invitation`;
+  if (kind === 'invitation') {
+    const form = guest?.form_id ? `/${encodeURIComponent(guest.form_id)}` : '';
+    return `${base}/invitation${form}${guest?.qr_code_token ? `?t=${encodeURIComponent(guest.qr_code_token)}` : ''}`;
+  }
   if (kind === 'thankyou') return `${base}/photowall`;
   return guest?.qr_code_token ? `${base}/pass?t=${encodeURIComponent(guest.qr_code_token)}` : `${base}/pass`;
 }
