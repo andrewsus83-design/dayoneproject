@@ -32,12 +32,15 @@ interface WinnerRow extends DrawWinner {
 export function DoorPrizeScreen({ slug, initialId }: { slug: string; initialId?: string | null }) {
   const { eventId, hydrated } = useEventConfigBySlug(slug);
   const server = hydrated && isServerEventId(eventId);
-  const { status } = useDoorPrizeBoard(server ? eventId : null, 3000);
+  const { status, board } = useDoorPrizeBoard(server ? eventId : null, 3000);
 
   if (!hydrated || (server && (status === 'idle' || status === 'loading'))) {
     return <div className="min-h-screen bg-premium-black flex items-center justify-center text-zinc-500 text-sm">Loading stage…</div>;
   }
-  if (server && status === 'forbidden') return <DoorPrizeViewer slug={slug} initialId={initialId} />;
+  // The machines (and their lever) belong to a signed-in organizer whose board loaded. Everyone else on a saved
+  // event, whatever went wrong (no session, a failed first load), gets the read-only winners board: the lever is
+  // never a fallback.
+  if (server && !(status === 'ready' || (status === 'error' && board))) return <DoorPrizeViewer slug={slug} initialId={initialId} />;
   return <DoorPrizeArena slug={slug} initialId={initialId} />;
 }
 

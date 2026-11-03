@@ -8,6 +8,7 @@ import { ArrowLeft, EyeOff, Gift, Trophy, WifiOff } from 'lucide-react';
 import { guestAppPath } from '@/lib/guestsApi';
 import { publicWinnerLabel, usePublicDoorPrizes, type ServerWinner } from '@/lib/doorPrizeApi';
 import { BrandMark } from '@/components/BrandMark';
+import { Lever, MachineCabinet } from '@/components/raffle/MachineCabinet';
 
 const REVEAL_MS = 12_000;
 
@@ -134,21 +135,27 @@ export function DoorPrizeViewer({ slug, initialId }: { slug: string; initialId?:
               )}
             </div>
 
-            {spotlight ? (
-              <div className={`p-8 rounded-[2.5rem] bg-premium-charcoal text-center border-2 ${fresh ? 'border-premium-gold shadow-gold animate-fadeIn' : 'border-premium-borderDark'}`}>
-                <Trophy className="w-10 h-10 text-premium-gold mx-auto mb-3" />
-                <span className="text-xs font-mono uppercase text-premium-success font-bold">{fresh ? 'Just drawn' : 'Latest winner'} · {spotlight.prize.name}</span>
-                <h3 className={`text-premium-gold font-bold mt-2 ${spotlight.winner.name ? 'text-4xl font-display' : 'text-5xl font-mono tracking-[0.15em]'}`}>
-                  {publicWinnerLabel(spotlight.winner)}
-                </h3>
-                {spotlight.winner.table_no && <p className="text-sm text-zinc-400 mt-2">Table {spotlight.winner.table_no}</p>}
-                {spotlight.prize.prize && <p className="text-xs text-zinc-500 mt-3">{spotlight.prize.prize}</p>}
-              </div>
-            ) : (
-              <div className="p-8 rounded-[2.5rem] bg-premium-charcoal border border-premium-borderDark text-center">
-                <p className="text-sm text-zinc-400">No winners yet. Keep this page open: winners appear the moment they are drawn.</p>
-              </div>
-            )}
+            {/* The same gold machine as on stage. Guests watch the lever go down when a winner is drawn; it is watch-only. */}
+            <MachineCabinet
+              size="md"
+              tight
+              className={`w-full ${fresh ? 'animate-fadeIn' : ''}`}
+              lever={<Lever readOnly compact size="md" busy={!!fresh} title="Only the host can pull the lever" />}
+            >
+              {spotlight ? (
+                <div className="flex-1 min-w-0 text-center py-2">
+                  <Trophy className="w-10 h-10 text-premium-gold mx-auto mb-3" />
+                  <span className="text-xs font-mono uppercase text-premium-success font-bold">{fresh ? 'Just drawn' : 'Latest winner'} · {spotlight.prize.name}</span>
+                  <h3 className={`text-premium-gold font-bold mt-2 ${spotlight.winner.name ? 'text-2xl sm:text-4xl font-display' : 'text-4xl sm:text-5xl font-mono tracking-[0.1em]'}`}>
+                    {publicWinnerLabel(spotlight.winner)}
+                  </h3>
+                  {spotlight.winner.table_no && <p className="text-sm text-zinc-400 mt-2">Table {spotlight.winner.table_no}</p>}
+                  {spotlight.prize.prize && <p className="text-xs text-zinc-500 mt-3">{spotlight.prize.prize}</p>}
+                </div>
+              ) : (
+                <p className="flex-1 min-w-0 py-6 text-sm text-zinc-400 text-center">No winners yet. Keep this page open: winners appear the moment they are drawn.</p>
+              )}
+            </MachineCabinet>
 
             <div className="p-6 rounded-[2rem] bg-premium-charcoal/90 border border-premium-borderDark">
               <div className="text-xs font-mono uppercase text-zinc-400 tracking-wider mb-4 flex items-center justify-between">

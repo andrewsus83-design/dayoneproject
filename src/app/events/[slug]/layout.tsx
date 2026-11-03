@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { LiveEventSync } from '@/components/events/LiveEventSync';
+import { GuestPortraitLock } from '@/components/events/GuestPortraitLock';
 
 /** Guests who add an event to their home screen get that event's guest app (see /api/manifest/<slug>). */
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -22,5 +23,10 @@ export const viewport: Viewport = {
 
 export default async function EventLayout({ children, params }: { children: React.ReactNode; params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  return <LiveEventSync slug={slug}>{children}</LiveEventSync>;
+  return (
+    <LiveEventSync slug={slug}>
+      {children}
+      <GuestPortraitLock />
+    </LiveEventSync>
+  );
 }

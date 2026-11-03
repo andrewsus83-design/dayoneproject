@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { PhotoWallUpload } from '@/lib/types';
+import { downloadMedia, shareMedia } from '@/lib/mediaShare';
 import {
   Heart,
   Download,
@@ -49,49 +50,13 @@ export function PinterestMasonryPhotoWall({
   const handleDownload = (e: React.MouseEvent, item: PhotoWallUpload) => {
     e.stopPropagation();
     const ext = item.media_type === 'video' ? 'mp4' : item.image_url.includes('.jpg') ? 'jpg' : 'webp';
-    const filename = `dayoneproject-${item.id}.${ext}`;
-    const link = document.createElement('a');
-    const href = item.video_url && item.media_type === 'video' ? item.video_url : item.image_url;
-    // Supabase Storage sends the file as a download (not a new tab) when asked to.
-    link.href = href.includes('/storage/v1/object/public/') ? `${href}?download=${encodeURIComponent(filename)}` : href;
-    link.download = filename;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadMedia(item.video_url && item.media_type === 'video' ? item.video_url : item.image_url, item.id, ext);
   };
 
   const handleShare = async (e: React.MouseEvent, item: PhotoWallUpload) => {
     e.stopPropagation();
-    // Stored photos are shared as the photo itself (or its own link), never the page address,
-    // which can carry the wall key.
-    const stored = item.image_url.includes('/storage/v1/object/public/');
-    const link = stored ? item.image_url : window.location.href;
-    const text = item.caption || 'A moment from the event, on dayoneproject.xyz';
-
-    if (navigator.share) {
-      try {
-        if (stored && navigator.canShare) {
-          const blob = await fetch(item.image_url).then((r) => r.blob());
-          const file = new File([blob], `dayoneproject-${item.id}.${blob.type === 'image/jpeg' ? 'jpg' : 'webp'}`, { type: blob.type });
-          if (navigator.canShare({ files: [file] })) {
-            await navigator.share({ files: [file], text });
-            return;
-          }
-        }
-        await navigator.share({ title: 'Event photo wall • dayoneproject.xyz', text, url: link });
-      } catch (err) {
-        if (!(err instanceof DOMException && err.name === 'AbortError')) copyLink(link);
-      }
-    } else {
-      copyLink(link);
-    }
-  };
-
-  const copyLink = (link: string) => {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(link).catch(() => undefined);
+    const outcome = await shareMedia({ url: item.image_url, id: item.id, caption: item.caption });
+    if (outcome === 'copied') {
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2500);
     }

@@ -41,11 +41,12 @@ export function useScreenMachineSize(): MachineSize {
 
 /**
  * The pull-the-lever control every draw machine shares. It also pulls by itself when a draw starts from somewhere
- * else (another tab, the server), so the audience always sees the lever go down.
+ * else (another tab, the server), so the audience always sees the lever go down. `readOnly` is the guests' view:
+ * the same lever, animated by `busy`, but it is not a button, so nobody but the organizer's machine can pull it.
  */
 export function Lever({
-  onPull, disabled, busy = false, size = 'md', compact = false, title,
-}: { onPull: () => void; disabled: boolean; busy?: boolean; size?: MachineSize; compact?: boolean; title?: string }) {
+  onPull, disabled = false, busy = false, size = 'md', compact = false, title, readOnly = false,
+}: { onPull?: () => void; disabled?: boolean; busy?: boolean; size?: MachineSize; compact?: boolean; title?: string; readOnly?: boolean }) {
   const { unit: u, height } = (compact ? LEVER_COMPACT : LEVER)[size];
   const travel = height - 70 * u;
   const [pulled, setPulled] = useState(false);
@@ -61,21 +62,13 @@ export function Lever({
   }, [pulled]);
 
   const pull = () => {
-    if (disabled) return;
+    if (disabled || readOnly || !onPull) return;
     setPulled(true);
     onPull();
   };
 
-  return (
-    <button
-      type="button"
-      onClick={pull}
-      disabled={disabled}
-      aria-label="Pull the lever"
-      title={title}
-      className="relative flex flex-col items-center select-none shrink-0 disabled:cursor-not-allowed scale-on-click"
-      style={{ height, width: 56 * u }}
-    >
+  const parts = (
+    <>
       <span
         className="absolute left-1/2 -translate-x-1/2 rounded-full bg-premium-surfaceDark border border-premium-borderDark"
         style={{ top: 24 * u, bottom: 24 * u, width: 8 * u }}
@@ -96,6 +89,34 @@ export function Lever({
         className="absolute bottom-0 left-1/2 -translate-x-1/2 rounded-xl bg-premium-surfaceDark border border-premium-borderDark"
         style={{ width: 44 * u, height: 20 * u }}
       />
+    </>
+  );
+
+  if (readOnly) {
+    return (
+      <div
+        role="img"
+        aria-label="Lever: only the host can pull it"
+        title={title}
+        className="relative flex flex-col items-center select-none shrink-0 pointer-events-none"
+        style={{ height, width: 56 * u }}
+      >
+        {parts}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={pull}
+      disabled={disabled}
+      aria-label="Pull the lever"
+      title={title}
+      className="relative flex flex-col items-center select-none shrink-0 disabled:cursor-not-allowed scale-on-click"
+      style={{ height, width: 56 * u }}
+    >
+      {parts}
     </button>
   );
 }

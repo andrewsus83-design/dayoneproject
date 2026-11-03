@@ -216,14 +216,61 @@ body {
 html:has(.guest-app),
 html:has(.guest-app) body,
 html:has(.guest-landing),
-html:has(.guest-landing) body {
+html:has(.guest-landing) body,
+html:has(.guest-feed),
+html:has(.guest-feed) body {
   overflow-x: hidden;
   overscroll-behavior: none;
 }
 .guest-app,
-.guest-landing {
+.guest-landing,
+.guest-feed {
   touch-action: pan-y;
   overflow-wrap: anywhere;
+}
+
+/* Guest pages fill the visible screen, not the tallest the browser could be (100vh counts the address bar a phone browser
+   hides while you scroll, which left a strip of scroll under the page). */
+@supports (height: 100dvh) {
+  .guest-app.min-h-screen,
+  .guest-app .min-h-screen {
+    min-height: 100dvh;
+  }
+}
+
+/* Guest phones stay upright. An installed Android app is locked by the manifest; iPhones and plain browser tabs cannot be
+   locked by a web page, so a phone held sideways gets this cover until it is turned back. Tablets and laptops are taller
+   than 500px sideways and are left alone, and the big-screen pages (no .guest-app) never show it. */
+.guest-rotate {
+  display: none;
+}
+@media (orientation: landscape) and (pointer: coarse) and (max-height: 500px) {
+  body:has(.guest-app, .guest-feed) .guest-rotate {
+    display: flex;
+  }
+}
+
+/* Photo feed (guest photo wall): the big heart that pops where a photo is double-tapped, like TikTok and Reels. */
+@keyframes d1-heart-pop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+  25% { opacity: 1; transform: translate(-50%, -50%) scale(1.25); }
+  55% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -140%) scale(1.1); }
+}
+.animate-heart-pop {
+  animation: d1-heart-pop 0.9s ease-out forwards;
+}
+@keyframes d1-like-beat {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+.animate-like-beat {
+  animation: d1-like-beat 0.35s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-heart-pop { animation-duration: 0.01s; }
+  .animate-like-beat { animation: none; }
 }
 
 /* Big-screen controls (ScreenControls) keep a pointer even where the screen hides it on air. */
