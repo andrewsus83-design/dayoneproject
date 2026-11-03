@@ -190,6 +190,11 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
   const customise = (moduleId: StageModuleId) =>
     run(async () => {
       let scene = scenes.find((s) => sceneModule(s) === moduleId);
+      const onAir = scene ? liveOn(sceneSource(scene.id)) : [];
+      if (onAir.length) {
+        setError(`${STAGE_MODULE_NAMES[moduleId]} (custom) is on air on ${onAir.join(', ')}. Take another source live there first to edit it.`);
+        return;
+      }
       if (!scene) {
         const made = await saveScene({ eventId, title: `${STAGE_MODULE_NAMES[moduleId]} (custom)`, kind: 'module', media: [], options: { module: moduleId }, frame: {} });
         scene = made;
@@ -265,6 +270,10 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
   };
 
   const liveOn = (source: string) => (screens ?? []).filter((s) => s.program.source === source).map((s) => s.name);
+  // What is on air is not edited: a source is changed in Preview, before it is taken live. Only a screen's own header,
+  // frame and footer (the palette button on its card) can change while it is on air.
+  const previewOnAir = previewScene ? liveOn(sceneSource(previewScene.id)) : [];
+  const onAirNote = (names: string[]) => `On air on ${names.join(', ')}. Take another source live there first to edit this one.`;
 
   if (!screens) {
     return (
@@ -278,7 +287,7 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
     <div className="space-y-6">
       <div>
         <h3 className="text-2xl font-display font-bold text-white flex items-center gap-2"><Radio className="w-5 h-5 text-premium-danger" /> Live Screens</h3>
-        <p className="text-xs text-zinc-400 mt-1">Click a source to load it in Preview, then Take it live on a screen once it shows “Loaded”. Each screen has its own link: open it full screen on the computer that drives the display, and it follows what you take. A new source loads out of sight first, so the screen never goes blank.</p>
+        <p className="text-xs text-zinc-400 mt-1">Click a source to load it in Preview, then Take it live on a screen once it shows “Loaded”. Each screen has its own link: open it full screen on the computer that drives the display, and it follows what you take. A new source loads out of sight first, so the screen never goes blank. Edit a source before you take it live: once it is on air only the screen’s header, frame and footer can change.</p>
       </div>
 
       {error && (
@@ -436,9 +445,11 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
             <button
               type="button"
               onClick={() => (previewScene ? setDesigning(true) : previewModule && customise(previewModule))}
-              disabled={!previewScene && !previewModule}
+              disabled={(!previewScene && !previewModule) || previewOnAir.length > 0}
               title={
-                previewScene
+                previewOnAir.length > 0
+                  ? onAirNote(previewOnAir)
+                  : previewScene
                   ? 'Resize, delete, add text and effects on a draft. The big screens change only when you push.'
                   : previewModule
                     ? 'Move or zoom this stage module and add text, pictures and effects on a draft. The first time, this makes a custom copy under Sources; the plain module stays as it is.'
@@ -522,12 +533,15 @@ export function LiveScreenSwitcher({ eventId, slug }: { eventId: string; slug: s
                     <Pencil className="w-3 h-3" /> Customise
                   </button>
                 )}
-                {scene && scene.kind !== 'module' && (
+                {scene && onAir.length > 0 && (
+                  <p className="px-2.5 pb-2 text-[10px] text-zinc-600" title={onAirNote(onAir)}>On air: take another source to edit</p>
+                )}
+                {scene && onAir.length === 0 && scene.kind !== 'module' && (
                   <button type="button" onClick={() => setEditing(scene)} className="w-full px-2.5 pb-2 text-left text-[10px] font-bold text-zinc-500 hover:text-premium-gold flex items-center gap-1 scale-on-click">
                     <Pencil className="w-3 h-3" /> Edit
                   </button>
                 )}
-                {scene?.kind === 'module' && (
+                {scene?.kind === 'module' && onAir.length === 0 && (
                   <div className="flex items-center gap-3 px-2.5 pb-2">
                     <button type="button" onClick={() => { setPreview({ source, slide: 0 }); setDesigning(true); }} className="text-[10px] font-bold text-zinc-500 hover:text-premium-gold flex items-center gap-1 scale-on-click">
                       <Pencil className="w-3 h-3" /> Edit

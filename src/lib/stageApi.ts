@@ -9,7 +9,7 @@ import type { LatestWinner } from '@/lib/doorPrizeApi';
 /*
  * The stage LED screen across devices (supabase/migrations/*_a41_stage_state.sql).
  *
- * The operator (StageLedEditor, an event manager) saves the stage state with saveStageState; every stage screen
+ * The raffle engine (an event manager) saves the stage state with saveStageState; every stage screen
  * polls the cached /api/stage/<slug> route (useStageFeed) and follows the highest rev it has seen. On the same
  * device the change also goes out at once on a BroadcastChannel keyed by the event (stageBusName), and sample events
  * live only there and in localStorage (stageLocalKey). Only the 7 system modules can be on the stage: the database

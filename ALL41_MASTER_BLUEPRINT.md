@@ -706,7 +706,7 @@ export async function compressImageToWebP(file: File, maxDimension = 1920, quali
 
 # [PAGE 14] BALLROOM STAGE LED 7-MODULE MASTER DISPLAY (`/STAGE`)
 
-To prevent broken layouts or accidental desktop browser clutter on multi-million-rupiah ballroom LED walls, **all41.app** provides a dedicated 16:9 / 4K broadcast display at [`/events/[slug]/stage`](file:///Users/drew83/Projects/all41/src/app/events/%5Bslug%5D/stage/page.tsx), configured exclusively through [`StageLedEditor.tsx`](file:///Users/drew83/Projects/all41/src/components/dashboard/StageLedEditor.tsx).
+To prevent broken layouts or accidental desktop browser clutter on multi-million-rupiah ballroom LED walls, **all41.app** provides a dedicated 16:9 / 4K broadcast display at [`/events/[slug]/stage`](file:///Users/drew83/Projects/all41/src/app/events/%5Bslug%5D/stage/page.tsx), shown on the big screens through Live Screens (`LiveScreenSwitcher.tsx`: prepare a source in Preview, then Take it live).
 
 ## 14.1 Strict System-Locked 7-Module Architecture
 Organizers cannot inject arbitrary unstyled widgets onto the stage screen. They can only enable, reorder, set rotation durations, or manually lock onto the **7 official system modules**:
@@ -1274,7 +1274,6 @@ flowchart LR
     │   ├── dashboard/
     │   │   ├── Sidebar.tsx                       # Context-aware Sidebar (Workspace vs 10 Event Menus + Live Rails)
     │   │   ├── Header.tsx                        # Glassmorphic Dashboard Top Header
-    │   │   └── StageLedEditor.tsx                # 7-Module Ballroom Stage LED Configuration Editor
     │   ├── events/
     │   │   └── PinterestMasonryPhotoWall.tsx     # Multi-column Pinterest Masonry Grid + Lightbox + Share/Download
     │   └── marketing/

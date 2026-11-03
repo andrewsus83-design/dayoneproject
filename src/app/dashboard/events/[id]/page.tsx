@@ -4,7 +4,6 @@ import React, { useState, useEffect, useMemo, use, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Header } from '@/components/dashboard/Header';
-import { StageLedEditor } from '@/components/dashboard/StageLedEditor';
 import { LiveScreenSwitcher } from '@/components/screens/LiveScreenSwitcher';
 import { PinterestMasonryPhotoWall } from '@/components/events/PinterestMasonryPhotoWall';
 import { LandingPageBuilder } from '@/components/dashboard/event/LandingPageBuilder';
@@ -768,10 +767,8 @@ function EventDashboardContent({ eventId }: { eventId: string }) {
 
             <div className="pt-4 border-t border-premium-borderDark">
               <h3 className="text-2xl font-display font-bold text-white">LIVE Launchers</h3>
-              <p className="text-xs text-zinc-400">Open any event screen in a new tab, and direct what the classic stage LED page shows.</p>
+              <p className="text-xs text-zinc-400">Open any event screen in a new tab. What the big screens show is run from Live Screens above.</p>
             </div>
-
-            <StageLedEditor eventId={eventId} />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[
